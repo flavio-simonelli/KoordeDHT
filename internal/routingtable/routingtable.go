@@ -85,8 +85,15 @@ func (rt *RoutingTable) Successor() domain.Node {
 // SetSuccessor aggiorna il successore del nodo locale.
 func (rt *RoutingTable) SetSuccessor(n domain.Node) {
 	rt.succMu.Lock()
+	old := rt.successor.Node
 	rt.successor = &routingEntry{Node: n}
 	rt.succMu.Unlock()
+	rt.logger.Info("routingtable.SetSuccessor",
+		logger.F("old.addr", old.Addr),
+		logger.F("new.addr", n.Addr),
+		logger.F("old.id", old.ID.ToHexString()),
+		logger.F("new.id", n.ID.ToHexString()),
+	)
 }
 
 // Predecessor restituisce il predecessore del nodo locale.
@@ -100,8 +107,15 @@ func (rt *RoutingTable) Predecessor() domain.Node {
 // SetPredecessor aggiorna il predecessore del nodo locale.
 func (rt *RoutingTable) SetPredecessor(n domain.Node) {
 	rt.predMu.Lock()
+	old := rt.predecessor.Node
 	rt.predecessor = &routingEntry{Node: n}
 	rt.predMu.Unlock()
+	rt.logger.Info("routingtable.SetPredecessor",
+		logger.F("old.addr", old.Addr),
+		logger.F("new.addr", n.Addr),
+		logger.F("old.id", old.ID.ToHexString()),
+		logger.F("new.id", n.ID.ToHexString()),
+	)
 }
 
 // DeBruijn restituisce il nodo De Bruijn all'indice specificato.
@@ -121,6 +135,14 @@ func (rt *RoutingTable) FixDeBruijn(i int, n domain.Node) {
 		return
 	}
 	rt.dbMu[i].Lock()
+	old := rt.deBruijn[i].Node
 	rt.deBruijn[i] = &routingEntry{Node: n}
 	rt.dbMu[i].Unlock()
+	rt.logger.Info("routingtable.FixDeBruijn",
+		logger.F("index", i),
+		logger.F("old.addr", old.Addr),
+		logger.F("new.addr", n.Addr),
+		logger.F("old.id", old.ID.ToHexString()),
+		logger.F("new.id", n.ID.ToHexString()),
+	)
 }
