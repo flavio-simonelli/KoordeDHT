@@ -1,0 +1,15 @@
+logger:
+  level: "debug"         # debug, info, warn, error
+  encoding: "console"    # "console" o "json"
+  mode: "stdout"        # "stdout" oppure "file" (se stdout il log vengono messi su stdout, altrimenti con file verrà utilizzata la configurazione lumberjack sottostante)
+
+  file:                  # usato solo se mode = file
+    path: "logs/app.log"
+    maxSize: 5           # MB
+    maxBackups: 3        # file vecchi da mantenere
+    maxAge: 1           # giorni da mantenere
+    compress: true       # se comprimere i file vecchi
+
+dht:
+  bootstrapPeers: []
+  parametersFile: "config/dht/config.yaml"
