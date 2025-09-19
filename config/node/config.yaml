@@ -1,15 +1,28 @@
 logger:
-  level: "debug"         # debug, info, warn, error
-  encoding: "console"    # "console" o "json"
-  mode: "stdout"        # "stdout" oppure "file" (se stdout il log vengono messi su stdout, altrimenti con file verrà utilizzata la configurazione lumberjack sottostante)
+  level: "debug"           # log level: debug, info, warn, error
+  encoding: "console"      # log encoding: console | json
+  mode: "stdout"           # output mode: stdout | file
 
-  file:                  # usato solo se mode = file
+  file:                    # used only if mode = file
     path: "logs/app.log"
-    maxSize: 5           # MB
-    maxBackups: 3        # file vecchi da mantenere
-    maxAge: 1           # giorni da mantenere
-    compress: true       # se comprimere i file vecchi
+    maxSize: 5             # MB per log file
+    maxBackups: 3          # number of old files to retain
+    maxAge: 1              # days to retain log files
+    compress: true         # compress old log files
 
 dht:
-  bootstrapPeers: []
-  parametersFile: "config/dht/config.yaml"
+  idBits: 4                # identifier size (keyspace = 2^idBits)
+  bootstrapPeers: []       # initial peers for joining
+
+  deBruijn:
+    degree: 2              # de Bruijn graph degree (2 = minimal, log n = optimal)
+    backupSize: 0          # number of backup predecessors for de Bruijn pointer
+    fixInterval: 10s       # refresh interval for de Bruijn pointers
+
+  faultTolerance:
+    successorListSize: 4   # length of successor list (≈ log n)
+    stabilizationInterval: 5s  # stabilization procedure interval
+    failureTimeout: 3s     # max time before marking a node as failed
+
+
+
