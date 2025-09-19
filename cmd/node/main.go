@@ -2,7 +2,7 @@ package main
 
 import (
 	"KoordeDHT/internal/config"
-	"KoordeDHT/internal/logger"
+	zapfactory "KoordeDHT/internal/logger/zap"
 	"log"
 
 	"go.uber.org/zap"
@@ -17,7 +17,7 @@ func main() {
 		log.Fatalf("Errore nel caricamento del file di configurazione: %v", err)
 	}
 	// istanzia il logger
-	zapLog, err := logger.New(cfg.Logger)
+	zapLog, err := zapfactory.New(cfg.Logger)
 	if err != nil {
 		log.Fatalf("Errore nel caricamento del file di logger: %v", err)
 	}
