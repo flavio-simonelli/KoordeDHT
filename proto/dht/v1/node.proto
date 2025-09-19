@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package dht.v1;
+
+option go_package = "github.com/flaviosimonelli/KoordeDHT/internal/api/dht/v1;dhtv1";
+
+import "google/protobuf/empty.proto"; // usato come empty message
+
+// ---------------------------------------------------------------
+// Message definitions
+// ---------------------------------------------------------------
+
+message Node {
+    bytes id = 1; // Unique identifier for the node (endianess non importante perchè vengono creati e usati come byte array e non vengono mai interpretati come numeri)
+    string address = 2; // Network address of the node (e.g., IP:Port)
+}
+
+// Richiesta per trovare il successore responsabile di "id".
+message FindSuccessorRequest {
+  bytes id = 1; // ID target nel ring
+}
+
+// Risposta: nodo successore responsabile di "id".
+message FindSuccessorResponse {
+  Node node = 1;
+}
+
+// ---------------------------------------------------------------
+// Service definition
+// ---------------------------------------------------------------
+
+service DHT {
+    // Trova il successore responsabile di "id".
+    rpc FindSuccessor(FindSuccessorRequest) returns (FindSuccessorResponse);
+
+    // Ottieni il predecessore del nodo.
+    rpc GetPredecessor(google.protobuf.Empty) returns (Node);
+
+    // Ottieni il successore del nodo.
+    rpc GetSuccessor(google.protobuf.Empty) returns (Node);
+
+    // Notifica al nodo che "node" potrebbe essere il suo predecessore.
+    rpc Notify(Node) returns (google.protobuf.Empty);
+
+    // Ping per verificare se il nodo è attivo.
+    rpc Ping(google.protobuf.Empty) returns (google.protobuf.Empty);
+}
+
+
+
+
+
+
