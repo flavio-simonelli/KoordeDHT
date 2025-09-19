@@ -21,8 +21,10 @@ func New(cfg config.LoggerConfig) (*zap.Logger, error) {
 	encCfg := zap.NewProductionEncoderConfig()
 	encCfg.TimeKey = "ts"
 	encCfg.EncodeTime = zapcore.ISO8601TimeEncoder
+	encCfg.EncodeLevel = zapcore.LowercaseLevelEncoder
 	var encoder zapcore.Encoder
 	if cfg.Encoding == "console" {
+		encCfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
 		encoder = zapcore.NewConsoleEncoder(encCfg)
 	} else {
 		encoder = zapcore.NewJSONEncoder(encCfg)
