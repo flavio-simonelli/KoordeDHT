@@ -13,6 +13,7 @@ logger:
 dht:
   idBits: 4                # identifier size (keyspace = 2^idBits)
   bootstrapPeers: []       # initial peers for joining
+  mode: "private"          # network mode: public | private
 
   deBruijn:
     degree: 2              # de Bruijn graph degree (2 = minimal, log n = optimal)
@@ -24,5 +25,6 @@ dht:
     stabilizationInterval: 5s  # stabilization procedure interval
     failureTimeout: 3s     # max time before marking a node as failed
 
-
-
+server:
+    host: ""               # server host (empty = all interfaces (in base a come è configurata dht mode))"
+    port: 0               # server port (0 = random available port)

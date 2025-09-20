@@ -4,7 +4,6 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 )
@@ -17,10 +16,9 @@ var (
 type ID []byte
 
 // NewIdFromAddr genera un Id a partire da ip:port nel range 2^b
-func NewIdFromAddr(ip string, port int, b int) ID {
+func NewIdFromAddr(addr string, b int) ID {
 	bytes := (b + 7) / 8
-	data := fmt.Sprintf("%s:%d", ip, port)
-	h := sha1.Sum([]byte(data)) // 160 bit
+	h := sha1.Sum([]byte(addr)) // 160 bit
 	buf := make([]byte, bytes)
 	copy(buf, h[:bytes])
 	return buf

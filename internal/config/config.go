@@ -37,13 +37,20 @@ type FaultToleranceConfig struct {
 type DHTConfig struct {
 	IDBits         int                  `yaml:"idBits"`
 	BootstrapPeers []string             `yaml:"bootstrapPeers"`
+	Mode           string               `yaml:"mode"` // public | private
 	DeBruijn       DeBruijnConfig       `yaml:"deBruijn"`
 	FaultTolerance FaultToleranceConfig `yaml:"faultTolerance"`
+}
+
+type ServerConfig struct {
+	Host string `yaml:"host"`
+	Port int    `yaml:"port"`
 }
 
 type NodeConfig struct {
 	Logger LoggerConfig `yaml:"logger"`
 	DHT    DHTConfig    `yaml:"dht"`
+	Server ServerConfig `yaml:"server"`
 }
 
 func LoadConfig(path string) (*NodeConfig, error) {
