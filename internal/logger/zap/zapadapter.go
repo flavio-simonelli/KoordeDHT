@@ -13,6 +13,10 @@ type ZapAdapter struct {
 
 func NewZapAdapter(l *zap.Logger) ZapAdapter { return ZapAdapter{L: l} }
 
+func (z ZapAdapter) With(fields ...logger.Field) logger.Logger {
+	return ZapAdapter{L: z.L.With(toZap(fields)...)}
+}
+
 func (z ZapAdapter) Debug(msg string, fields ...logger.Field) {
 	if ce := z.L.Check(zap.DebugLevel, msg); ce != nil {
 		ce.Write(toZap(fields)...)
