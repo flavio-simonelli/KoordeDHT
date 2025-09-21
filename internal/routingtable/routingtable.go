@@ -64,6 +64,11 @@ func New(self domain.Node, graphGrade int, opts ...Option) (*RoutingTable, error
 	return rt, nil
 }
 
+// Degree restituisce il grado del grafo De Bruijn.
+func (rt *RoutingTable) Degree() int {
+	return rt.graphGrade
+}
+
 // Self restituisce il nodo locale.
 func (rt *RoutingTable) Self() domain.Node {
 	return rt.self.Node
