@@ -6,6 +6,7 @@ import (
 	"KoordeDHT/internal/logger"
 	zapfactory "KoordeDHT/internal/logger/zap"
 	"KoordeDHT/internal/node"
+	"KoordeDHT/internal/server"
 	"log"
 	"os"
 
@@ -38,16 +39,28 @@ func main() {
 	// inizializza nodo
 	id := domain.NewIdFromAddr(addr, cfg.DHT.IDBits)
 	lgr.Info("ID del nodo", logger.F("id", id.ToHexString()))
-	n := domain.Node{
+	domainNode := domain.Node{
 		ID:   id,
 		Addr: addr,
 	}
-	_, err = node.New(n, cfg.DHT.IDBits, cfg.DHT.DeBruijn.Degree, node.WithLogger(lgr.With(logger.F("component", "node"), logger.F("node_id", id.ToHexString()))))
+	n, err := node.New(domainNode, cfg.DHT.IDBits, cfg.DHT.DeBruijn.Degree, node.WithLogger(lgr.With(logger.F("component", "node"), logger.F("id", id.ToHexString()), logger.F("addr", addr))))
 	if err != nil {
 		lgr.Error("Errore nell'inizializzare il nodo", logger.F("error", err.Error()))
 		os.Exit(1)
 	}
 	// avvia server
+	s := server.New(n)
+	serveErr := make(chan error, 1)
+	go func() { serveErr <- s.Run(lis) }()
+	// check se il server ha errori
+	select {
+	case err := <-serveErr:
+		lgr.Error("Server errore", logger.F("error", err.Error()))
+		os.Exit(1) //TODO: grateful stop
+	default:
+		// nessun errore ancora
+	}
+	lgr.Info("Server started correctly")
+	// join in dht or create a new one
 
-	// avvia nodo creando o unendosi alla rete
 }
