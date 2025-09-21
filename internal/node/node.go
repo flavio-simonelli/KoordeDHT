@@ -39,7 +39,7 @@ func New(self domain.Node, idBits, degree int, opts ...Option) (*Node, error) {
 
 func (n *Node) Join(bootstrapAddr string) error {
 	// richiesta al nodo di bootstrap per trovare il mio successore
-	succ, err := n.cp.FindSuccessor(n.rt.Self().ID, bootstrapAddr)
+	succ, err := n.cp.FindSuccessor(n.rt.Self().ID, n.rt.Self().ID, n.rt.Self().ID, bootstrapAddr)
 	if err != nil {
 		return err
 	}

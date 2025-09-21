@@ -30,27 +30,50 @@ func (n *Node) periodic(name string, interval time.Duration, fn func()) {
 
 func (n *Node) FixDebruijnLinks() {
 	degreeGraph := n.rt.Degree()
-	idBits := n.rt.IDBits()
 	myId := n.rt.Self().ID
-	for i := 0; i < degreeGraph; i++ {
-		// calcola l'id De Bruijn all'indice i
-		dbId, err := myId.DeBruijnNext(degreeGraph, i, idBits)
-		if err != nil {
-			n.lgr.Error("errore nel calcolo dell'id De Bruijn", logger.F("index", i), logger.F("error", err))
-		}
-		// trova il successore dell'id De Bruijn
-		succ, err := n.FindSuccessor(dbId)
-		if err != nil {
-			n.lgr.Error("errore nel trovare il successore dell'id De Bruijn", logger.F("debruijn_id", dbId.ToHexString()), logger.F("error", err))
+	// calcola l'id anchor (De Bruijn all'indice 0)
+	anchorId := myId.AdvanceDeBruijn(0, degreeGraph)
+	// trova il predecessore dell'id anchor
+	anchorPred, err := n.FindPredecessor(anchorId, anchorId, anchorId)
+	if err != nil {
+		n.lgr.Error("errore nel trovare il predecessore dell'id anchor", logger.F("anchor_id", anchorId.ToHexString()), logger.F("error", err))
+		return
+	}
+	// aggiorna il link De Bruijn all'indice 0 (anchor)
+	n.rt.FixDeBruijn(0, anchorPred)
+	n.lgr.Info("aggiornato link De Bruijn",
+		logger.F("index", 0),
+		logger.F("debruijn_id", anchorId.ToHexString()),
+		logger.FNode("predecessor", anchorPred),
+	)
+	// per ogni indice i da 1 a degreeGraph metti il successore del nodo precedente
+	current := anchorPred
+	for i := 1; i < degreeGraph+1; i++ {
+		// ccontatta il nodo i-1 per consocere il suo successore
+		// se il nodo precedente coincide con me, metti il mio successore
+		if current.ID.Equal(n.rt.Self().ID) {
+			n.rt.FixDeBruijn(i, n.rt.Successor())
+			n.lgr.Info("aggiornato link De Bruijn",
+				logger.F("index", i),
+				logger.F("debruijn_id", "same as self"),
+				logger.FNode("successor", n.rt.Successor()),
+			)
+			current = n.rt.Successor()
 			continue
+		}
+		// contatta il nodo current per conoscere il suo successore
+		succ, err := n.cp.GetSuccessor(current.Addr)
+		if err != nil {
+			n.lgr.Error("errore nel contattare il nodo precedente per conoscere il suo successore", logger.FNode("node", current), logger.F("error", err))
+			break
 		}
 		// aggiorna il link De Bruijn all'indice i
 		n.rt.FixDeBruijn(i, succ)
 		n.lgr.Info("aggiornato link De Bruijn",
 			logger.F("index", i),
-			logger.F("debruijn_id", dbId.ToHexString()),
 			logger.FNode("successor", succ),
 		)
+		current = succ
 	}
 }
 

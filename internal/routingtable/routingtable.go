@@ -19,16 +19,16 @@ type routingEntry struct {
 
 // RoutingTable rappresenta i link di un nodo Koorde.
 type RoutingTable struct {
-	logger      logger.Logger   // logger per la routing table (default: NopLogger)
-	idBits      int             // numero di bit dello spazio ID
-	graphGrade  int             // grado del grafo De Bruijn
-	self        *routingEntry   // il nodo locale
-	succMu      sync.RWMutex    // mutex per il successore
-	successor   *routingEntry   // successore nel ring
-	predMu      sync.RWMutex    // mutex per il predecessore
-	predecessor *routingEntry   // predecessore nel ring
-	dbMu        []sync.RWMutex  // mutex per i link De Bruijn
-	deBruijn    []*routingEntry // collegamenti De Bruijn (dimensione k)
+	logger      logger.Logger // logger per la routing table (default: NopLogger)
+	idBits      int           // numero di bit dello spazio ID
+	graphGrade  int           // grado del grafo De Bruijn
+	self        *routingEntry // il nodo locale
+	succMu      sync.RWMutex  // mutex per il successore
+	successor   *routingEntry // log(n) successori per tolleranza ai guasti // todo: implementare successor list
+	predMu      sync.RWMutex  // mutex per il predecessore
+	predecessor *routingEntry // predecessore nel ring
+	dbWinMu     []sync.RWMutex
+	deBruijn    []*routingEntry // finestra: anchor = predecessor(k*m), succ^1(anchor), ..., succ^k(anchor)
 }
 
 // New crea una nuova tabella di routing per il nodo specificato.
@@ -52,13 +52,19 @@ func New(self domain.Node, idBits, graphGrade int, opts ...Option) (*RoutingTabl
 		successor:   &routingEntry{Node: self},
 		predecessor: &routingEntry{Node: self},
 		deBruijn:    make([]*routingEntry, graphGrade),
-		dbMu:        make([]sync.RWMutex, graphGrade),
+		dbWinMu:     make([]sync.RWMutex, graphGrade+1),
 		logger:      &logger.NopLogger{}, // default: nessun log
 	}
 	// inizializza i link De Bruijn con il nodo locale
-	for i := 0; i < graphGrade; i++ {
+	for i := range rt.deBruijn {
 		rt.deBruijn[i] = &routingEntry{Node: self}
 	}
+	/*
+		// inizializza la successor list con il nodo locale
+		for i := range rt.successor {
+			rt.successor[i] = &routingEntry{Node: self}
+		}
+	*/
 	// Inizializza i parametri idBits e graphGrade
 	rt.idBits = idBits
 	rt.graphGrade = graphGrade
@@ -129,25 +135,31 @@ func (rt *RoutingTable) SetPredecessor(n domain.Node) {
 }
 
 // DeBruijn restituisce il nodo De Bruijn all'indice specificato.
-func (rt *RoutingTable) DeBruijn(i int) domain.Node {
+// l'indice deve essere compreso tra 0 e graphGrade.
+// l'indice 0 è la radice (anchor).
+// Se l'indice non è valido, restituisce errore.
+func (rt *RoutingTable) DeBruijn(i int) (domain.Node, error) {
 	if i < 0 || i >= len(rt.deBruijn) {
-		return domain.Node{}
+		return domain.Node{}, errors.New("index out of range")
 	}
-	rt.dbMu[i].RLock()
+	rt.dbWinMu[i].RLock()
 	n := rt.deBruijn[i].Node
-	rt.dbMu[i].RUnlock()
-	return n
+	rt.dbWinMu[i].RUnlock()
+	return n, nil
 }
 
 // FixDeBruijn aggiorna il nodo De Bruijn all'indice specificato.
+// l'indice deve essere compreso tra 0 e graphGrade.
+// l'indice 0 è la radice (anchor).
+// Se l'indice non è valido, la funzione non fa nulla.
 func (rt *RoutingTable) FixDeBruijn(i int, n domain.Node) {
 	if i < 0 || i >= len(rt.deBruijn) {
 		return
 	}
-	rt.dbMu[i].Lock()
+	rt.dbWinMu[i].Lock()
 	old := rt.deBruijn[i].Node
 	rt.deBruijn[i] = &routingEntry{Node: n}
-	rt.dbMu[i].Unlock()
+	rt.dbWinMu[i].Unlock()
 	rt.logger.Info("routingtable.FixDeBruijn",
 		logger.F("index", i),
 		logger.F("old.addr", old.Addr),
@@ -170,11 +182,36 @@ func (rt *RoutingTable) FindSuccessor(id domain.ID) (domain.Node, bool) {
 	// cerca il nodo più vicino a id tra i nodi conosciuti
 	// controlla il successore
 	// TODO: implementare sia i più link brujin che i più successori
-	rt.dbMu[0].RLock()
+	rt.dbWinMu[0].RLock()
 	closest := rt.deBruijn[0].Node
-	rt.dbMu[0].RUnlock()
+	rt.dbWinMu[0].RUnlock()
 	if closest.ID.Equal(rt.self.ID) {
 		closest = succ
 	}
 	return closest, false
+}
+
+// FindPredecessor prova a trovare rapidamente il predecessore reale di id
+// usando l'ancora predecessor(k·m) e la finestra dei k successori.
+// FindPredecessorDB restituisce il predecessore reale di id
+// usando anchor + finestra de Bruijn.
+// Cerca dal k-esimo successore verso anchor.
+func (rt *RoutingTable) FindPredecessor(id domain.ID) domain.Node {
+	rt.dbWinMu[len(rt.deBruijn)-1].RLock()
+	next := rt.deBruijn[len(rt.deBruijn)-1].Node
+	rt.dbWinMu[len(rt.deBruijn)-1].RUnlock()
+
+	// scendi a ritroso fino ad anchor (index 0)
+	for i := len(rt.deBruijn) - 2; i >= 0; i-- {
+		rt.dbWinMu[i].RLock()
+		candidate := rt.deBruijn[i].Node
+		rt.dbWinMu[i].RUnlock()
+
+		if id.InOC(candidate.ID, next.ID) {
+			return candidate
+		}
+		next = candidate
+	}
+	// fallback: se non trovato, ritorna anchor
+	return rt.deBruijn[0].Node
 }

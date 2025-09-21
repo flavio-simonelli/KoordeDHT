@@ -20,14 +20,15 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	DHT_FindSuccessor_FullMethodName  = "/dht.v1.DHT/FindSuccessor"
-	DHT_GetPredecessor_FullMethodName = "/dht.v1.DHT/GetPredecessor"
-	DHT_GetSuccessor_FullMethodName   = "/dht.v1.DHT/GetSuccessor"
-	DHT_Notify_FullMethodName         = "/dht.v1.DHT/Notify"
-	DHT_Ping_FullMethodName           = "/dht.v1.DHT/Ping"
-	DHT_Put_FullMethodName            = "/dht.v1.DHT/Put"
-	DHT_Get_FullMethodName            = "/dht.v1.DHT/Get"
-	DHT_Delete_FullMethodName         = "/dht.v1.DHT/Delete"
+	DHT_FindSuccessor_FullMethodName   = "/dht.v1.DHT/FindSuccessor"
+	DHT_FindPredecessor_FullMethodName = "/dht.v1.DHT/FindPredecessor"
+	DHT_GetPredecessor_FullMethodName  = "/dht.v1.DHT/GetPredecessor"
+	DHT_GetSuccessor_FullMethodName    = "/dht.v1.DHT/GetSuccessor"
+	DHT_Notify_FullMethodName          = "/dht.v1.DHT/Notify"
+	DHT_Ping_FullMethodName            = "/dht.v1.DHT/Ping"
+	DHT_Put_FullMethodName             = "/dht.v1.DHT/Put"
+	DHT_Get_FullMethodName             = "/dht.v1.DHT/Get"
+	DHT_Delete_FullMethodName          = "/dht.v1.DHT/Delete"
 )
 
 // DHTClient is the client API for DHT service.
@@ -36,6 +37,8 @@ const (
 type DHTClient interface {
 	// Trova il successore responsabile di "id".
 	FindSuccessor(ctx context.Context, in *FindSuccessorRequest, opts ...grpc.CallOption) (*FindSuccessorResponse, error)
+	// Trova il predecessore responsabile di "id".
+	FindPredecessor(ctx context.Context, in *FindSuccessorRequest, opts ...grpc.CallOption) (*FindSuccessorResponse, error)
 	// Ottieni il predecessore del nodo.
 	GetPredecessor(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*Node, error)
 	// Ottieni il successore del nodo.
@@ -65,6 +68,16 @@ func (c *dHTClient) FindSuccessor(ctx context.Context, in *FindSuccessorRequest,
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(FindSuccessorResponse)
 	err := c.cc.Invoke(ctx, DHT_FindSuccessor_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *dHTClient) FindPredecessor(ctx context.Context, in *FindSuccessorRequest, opts ...grpc.CallOption) (*FindSuccessorResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FindSuccessorResponse)
+	err := c.cc.Invoke(ctx, DHT_FindPredecessor_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -147,6 +160,8 @@ func (c *dHTClient) Delete(ctx context.Context, in *DeleteRequest, opts ...grpc.
 type DHTServer interface {
 	// Trova il successore responsabile di "id".
 	FindSuccessor(context.Context, *FindSuccessorRequest) (*FindSuccessorResponse, error)
+	// Trova il predecessore responsabile di "id".
+	FindPredecessor(context.Context, *FindSuccessorRequest) (*FindSuccessorResponse, error)
 	// Ottieni il predecessore del nodo.
 	GetPredecessor(context.Context, *emptypb.Empty) (*Node, error)
 	// Ottieni il successore del nodo.
@@ -174,6 +189,9 @@ type UnimplementedDHTServer struct{}
 
 func (UnimplementedDHTServer) FindSuccessor(context.Context, *FindSuccessorRequest) (*FindSuccessorResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method FindSuccessor not implemented")
+}
+func (UnimplementedDHTServer) FindPredecessor(context.Context, *FindSuccessorRequest) (*FindSuccessorResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FindPredecessor not implemented")
 }
 func (UnimplementedDHTServer) GetPredecessor(context.Context, *emptypb.Empty) (*Node, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetPredecessor not implemented")
@@ -231,6 +249,24 @@ func _DHT_FindSuccessor_Handler(srv interface{}, ctx context.Context, dec func(i
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(DHTServer).FindSuccessor(ctx, req.(*FindSuccessorRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DHT_FindPredecessor_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FindSuccessorRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DHTServer).FindPredecessor(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DHT_FindPredecessor_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DHTServer).FindPredecessor(ctx, req.(*FindSuccessorRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -371,6 +407,10 @@ var DHT_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "FindSuccessor",
 			Handler:    _DHT_FindSuccessor_Handler,
+		},
+		{
+			MethodName: "FindPredecessor",
+			Handler:    _DHT_FindPredecessor_Handler,
 		},
 		{
 			MethodName: "GetPredecessor",

@@ -17,8 +17,10 @@ type Handler struct {
 }
 
 func (h *Handler) FindSuccessor(ctx context.Context, req *pb.FindSuccessorRequest) (*pb.FindSuccessorResponse, error) {
-	targetID := req.GetId()
-	successor, err := h.node.FindSuccessor(targetID)
+	targetID := req.TargetID
+	currentI := req.CurrentI
+	kshift := req.Kshift
+	successor, err := h.node.FindSuccessor(targetID, currentI, kshift)
 	if err != nil {
 		return nil, err
 	}
@@ -35,6 +37,14 @@ func (h *Handler) GetPredecessor(ctx context.Context, req *emptypb.Empty) (*pb.N
 	return &pb.Node{
 		Id:      pred.ID,
 		Address: pred.Addr,
+	}, nil
+}
+
+func (h *Handler) GetSuccessor(ctx context.Context, req *emptypb.Empty) (*pb.Node, error) {
+	succ := h.node.GetSuccessor()
+	return &pb.Node{
+		Id:      succ.ID,
+		Address: succ.Addr,
 	}, nil
 }
 

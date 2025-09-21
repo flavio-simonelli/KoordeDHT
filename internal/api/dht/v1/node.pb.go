@@ -77,7 +77,9 @@ func (x *Node) GetAddress() string {
 // Richiesta per trovare il successore responsabile di "id".
 type FindSuccessorRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            []byte                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"` // ID target nel ring
+	TargetID      []byte                 `protobuf:"bytes,1,opt,name=targetID,proto3" json:"targetID,omitempty"`                 // ID target nel ring
+	CurrentI      []byte                 `protobuf:"bytes,2,opt,name=current_i,json=currentI,proto3" json:"current_i,omitempty"` // ID del nodo immaginario (hop nel grafo de bruijn)
+	Kshift        []byte                 `protobuf:"bytes,3,opt,name=kshift,proto3" json:"kshift,omitempty"`                     // kshift dell'Id terget corrente con il numero di passi già effettuati
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -112,9 +114,23 @@ func (*FindSuccessorRequest) Descriptor() ([]byte, []int) {
 	return file_dht_v1_node_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *FindSuccessorRequest) GetId() []byte {
+func (x *FindSuccessorRequest) GetTargetID() []byte {
 	if x != nil {
-		return x.Id
+		return x.TargetID
+	}
+	return nil
+}
+
+func (x *FindSuccessorRequest) GetCurrentI() []byte {
+	if x != nil {
+		return x.CurrentI
+	}
+	return nil
+}
+
+func (x *FindSuccessorRequest) GetKshift() []byte {
+	if x != nil {
+		return x.Kshift
 	}
 	return nil
 }
@@ -355,9 +371,11 @@ const file_dht_v1_node_proto_rawDesc = "" +
 	"\x11dht/v1/node.proto\x12\x06dht.v1\x1a\x1bgoogle/protobuf/empty.proto\"0\n" +
 	"\x04Node\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\fR\x02id\x12\x18\n" +
-	"\aaddress\x18\x02 \x01(\tR\aaddress\"&\n" +
-	"\x14FindSuccessorRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\fR\x02id\"9\n" +
+	"\aaddress\x18\x02 \x01(\tR\aaddress\"g\n" +
+	"\x14FindSuccessorRequest\x12\x1a\n" +
+	"\btargetID\x18\x01 \x01(\fR\btargetID\x12\x1b\n" +
+	"\tcurrent_i\x18\x02 \x01(\fR\bcurrentI\x12\x16\n" +
+	"\x06kshift\x18\x03 \x01(\fR\x06kshift\"9\n" +
 	"\x15FindSuccessorResponse\x12 \n" +
 	"\x04node\x18\x01 \x01(\v2\f.dht.v1.NodeR\x04node\"4\n" +
 	"\n" +
@@ -370,9 +388,10 @@ const file_dht_v1_node_proto_rawDesc = "" +
 	"\vGetResponse\x12\x14\n" +
 	"\x05value\x18\x01 \x01(\tR\x05value\"!\n" +
 	"\rDeleteRequest\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\fR\x03key2\xc5\x03\n" +
+	"\x03key\x18\x01 \x01(\fR\x03key2\x95\x04\n" +
 	"\x03DHT\x12L\n" +
-	"\rFindSuccessor\x12\x1c.dht.v1.FindSuccessorRequest\x1a\x1d.dht.v1.FindSuccessorResponse\x126\n" +
+	"\rFindSuccessor\x12\x1c.dht.v1.FindSuccessorRequest\x1a\x1d.dht.v1.FindSuccessorResponse\x12N\n" +
+	"\x0fFindPredecessor\x12\x1c.dht.v1.FindSuccessorRequest\x1a\x1d.dht.v1.FindSuccessorResponse\x126\n" +
 	"\x0eGetPredecessor\x12\x16.google.protobuf.Empty\x1a\f.dht.v1.Node\x124\n" +
 	"\fGetSuccessor\x12\x16.google.protobuf.Empty\x1a\f.dht.v1.Node\x12.\n" +
 	"\x06Notify\x12\f.dht.v1.Node\x1a\x16.google.protobuf.Empty\x126\n" +
@@ -405,28 +424,30 @@ var file_dht_v1_node_proto_goTypes = []any{
 	(*emptypb.Empty)(nil),         // 7: google.protobuf.Empty
 }
 var file_dht_v1_node_proto_depIdxs = []int32{
-	0, // 0: dht.v1.FindSuccessorResponse.node:type_name -> dht.v1.Node
-	1, // 1: dht.v1.DHT.FindSuccessor:input_type -> dht.v1.FindSuccessorRequest
-	7, // 2: dht.v1.DHT.GetPredecessor:input_type -> google.protobuf.Empty
-	7, // 3: dht.v1.DHT.GetSuccessor:input_type -> google.protobuf.Empty
-	0, // 4: dht.v1.DHT.Notify:input_type -> dht.v1.Node
-	7, // 5: dht.v1.DHT.Ping:input_type -> google.protobuf.Empty
-	3, // 6: dht.v1.DHT.Put:input_type -> dht.v1.PutRequest
-	4, // 7: dht.v1.DHT.Get:input_type -> dht.v1.GetRequest
-	6, // 8: dht.v1.DHT.Delete:input_type -> dht.v1.DeleteRequest
-	2, // 9: dht.v1.DHT.FindSuccessor:output_type -> dht.v1.FindSuccessorResponse
-	0, // 10: dht.v1.DHT.GetPredecessor:output_type -> dht.v1.Node
-	0, // 11: dht.v1.DHT.GetSuccessor:output_type -> dht.v1.Node
-	7, // 12: dht.v1.DHT.Notify:output_type -> google.protobuf.Empty
-	7, // 13: dht.v1.DHT.Ping:output_type -> google.protobuf.Empty
-	7, // 14: dht.v1.DHT.Put:output_type -> google.protobuf.Empty
-	5, // 15: dht.v1.DHT.Get:output_type -> dht.v1.GetResponse
-	7, // 16: dht.v1.DHT.Delete:output_type -> google.protobuf.Empty
-	9, // [9:17] is the sub-list for method output_type
-	1, // [1:9] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	0,  // 0: dht.v1.FindSuccessorResponse.node:type_name -> dht.v1.Node
+	1,  // 1: dht.v1.DHT.FindSuccessor:input_type -> dht.v1.FindSuccessorRequest
+	1,  // 2: dht.v1.DHT.FindPredecessor:input_type -> dht.v1.FindSuccessorRequest
+	7,  // 3: dht.v1.DHT.GetPredecessor:input_type -> google.protobuf.Empty
+	7,  // 4: dht.v1.DHT.GetSuccessor:input_type -> google.protobuf.Empty
+	0,  // 5: dht.v1.DHT.Notify:input_type -> dht.v1.Node
+	7,  // 6: dht.v1.DHT.Ping:input_type -> google.protobuf.Empty
+	3,  // 7: dht.v1.DHT.Put:input_type -> dht.v1.PutRequest
+	4,  // 8: dht.v1.DHT.Get:input_type -> dht.v1.GetRequest
+	6,  // 9: dht.v1.DHT.Delete:input_type -> dht.v1.DeleteRequest
+	2,  // 10: dht.v1.DHT.FindSuccessor:output_type -> dht.v1.FindSuccessorResponse
+	2,  // 11: dht.v1.DHT.FindPredecessor:output_type -> dht.v1.FindSuccessorResponse
+	0,  // 12: dht.v1.DHT.GetPredecessor:output_type -> dht.v1.Node
+	0,  // 13: dht.v1.DHT.GetSuccessor:output_type -> dht.v1.Node
+	7,  // 14: dht.v1.DHT.Notify:output_type -> google.protobuf.Empty
+	7,  // 15: dht.v1.DHT.Ping:output_type -> google.protobuf.Empty
+	7,  // 16: dht.v1.DHT.Put:output_type -> google.protobuf.Empty
+	5,  // 17: dht.v1.DHT.Get:output_type -> dht.v1.GetResponse
+	7,  // 18: dht.v1.DHT.Delete:output_type -> google.protobuf.Empty
+	10, // [10:19] is the sub-list for method output_type
+	1,  // [1:10] is the sub-list for method input_type
+	1,  // [1:1] is the sub-list for extension type_name
+	1,  // [1:1] is the sub-list for extension extendee
+	0,  // [0:1] is the sub-list for field type_name
 }
 
 func init() { file_dht_v1_node_proto_init() }

@@ -4,7 +4,7 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"errors"
-	"math/big"
+	"fmt"
 	"strings"
 )
 
@@ -62,21 +62,21 @@ func FromHexString(s string, b int) (ID, error) {
 }
 
 // Less restituisce true se id1 < id2
-func (id1 ID) Less(id2 ID) bool {
+func (id ID) Less(id2 ID) bool {
 	// normalizza lunghezze
-	if len(id1) < len(id2) {
-		diff := len(id2) - len(id1)
-		id1 = append(make([]byte, diff), id1...)
-	} else if len(id2) < len(id1) {
-		diff := len(id1) - len(id2)
+	if len(id) < len(id2) {
+		diff := len(id2) - len(id)
+		id = append(make([]byte, diff), id...)
+	} else if len(id2) < len(id) {
+		diff := len(id) - len(id2)
 		id2 = append(make([]byte, diff), id2...)
 	}
 	// confronto byte per byte
-	for i := 0; i < len(id1); i++ {
-		if id1[i] < id2[i] {
+	for i := 0; i < len(id); i++ {
+		if id[i] < id2[i] {
 			return true
 		}
-		if id1[i] > id2[i] {
+		if id[i] > id2[i] {
 			return false
 		}
 	}
@@ -84,43 +84,43 @@ func (id1 ID) Less(id2 ID) bool {
 }
 
 // Greater restituisce true se id1 > id2
-func (id1 ID) Greater(id2 ID) bool {
-	return id2.Less(id1)
+func (id ID) Greater(id2 ID) bool {
+	return id2.Less(id)
 }
 
 // Equal restituisce true se id1 == id2
-func (id1 ID) Equal(id2 ID) bool {
-	return !id1.Less(id2) && !id1.Greater(id2)
+func (id ID) Equal(id2 ID) bool {
+	return !id.Less(id2) && !id.Greater(id2)
 }
 
 // InCO restituisce true se x ∈ [a, b) modulo 2^128
-func (x ID) InCO(a, b ID) bool {
+func (id ID) InCO(a, b ID) bool {
 	if a.Less(b) {
 		// caso normale: a < b
-		return (a.Equal(x) || a.Less(x)) && x.Less(b)
+		return (a.Equal(id) || a.Less(id)) && id.Less(b)
 	}
 	// caso wrap-around: intervallo da a → max e da 0 → b
-	return a.Equal(x) || a.Less(x) || x.Less(b)
+	return a.Equal(id) || a.Less(id) || id.Less(b)
 }
 
 // InOC restituisce true se x ∈ (a, b] modulo 2^128
-func (x ID) InOC(a, b ID) bool {
+func (id ID) InOC(a, b ID) bool {
 	if a.Less(b) {
 		// caso normale: a < b
-		return a.Less(x) && (x.Equal(b) || x.Less(b))
+		return a.Less(id) && (id.Equal(b) || id.Less(b))
 	}
 	// caso wrap-around
-	return x.Less(b) || (a.Less(x) && !x.Equal(a)) || x.Equal(b)
+	return id.Less(b) || (a.Less(id) && !id.Equal(a)) || id.Equal(b)
 }
 
 // InOO restituisce true se x ∈ (a, b) modulo 2^128
-func (x ID) InOO(a, b ID) bool {
+func (id ID) InOO(a, b ID) bool {
 	if a.Less(b) {
 		// caso normale: a < b
-		return a.Less(x) && x.Less(b)
+		return a.Less(id) && id.Less(b)
 	}
 	// caso wrap-around: intervallo (a → max] ∪ [0 → b)
-	return a.Less(x) || x.Less(b)
+	return a.Less(id) || id.Less(b)
 }
 
 // Next restituisce l'identificatore successivo a id modulo 2^128.
@@ -149,27 +149,6 @@ func (id ID) Prev() ID {
 	return prev
 }
 
-// DeBruijnNext calcola (k*m + digit) mod 2^b.
-// m è l'ID corrente, k il grado del grafo, digit ∈ [0, k-1].
-func (m ID) DeBruijnNext(k, digit, b int) (ID, error) {
-	if digit < 0 || digit >= k {
-		return ID{}, InvalidDegree
-	}
-	nbytes := (b + 7) / 8
-	// Converti ID in intero grande
-	val := new(big.Int).SetBytes(m)
-	// Calcola next = (k*m + digit) mod 2^b
-	mod := new(big.Int).Lsh(big.NewInt(1), uint(b)) // 2^b
-	next := new(big.Int).Mul(val, big.NewInt(int64(k)))
-	next.Add(next, big.NewInt(int64(digit)))
-	next.Mod(next, mod)
-	// Rendi next come slice di byte lungo nbytes
-	res := make(ID, nbytes)
-	nb := next.Bytes()
-	copy(res[nbytes-len(nb):], nb)
-	return res, nil
-}
-
 // Bytes restituisce una copia del contenuto dell'ID come slice di byte.
 // La copia garantisce che le modifiche allo slice risultante non alterino
 // l'ID originale.
@@ -177,4 +156,89 @@ func (id ID) Bytes() []byte {
 	out := make([]byte, len(id))
 	copy(out, id)
 	return out
+}
+
+// AdvanceDeBruijn calcola il prossimo nodo immaginario i*d
+// in un grafo de Bruijn di base k (k deve essere potenza di 2).
+//
+// Parametri:
+//   - id: identificatore corrente come slice di byte (big-endian).
+//   - d: cifra da aggiungere (0 <= d < k).
+//   - k: base del grafo (es. 2, 4, 16, 256).
+//
+// Restituisce:
+//   - un nuovo identificatore ID dopo lo shift e append.
+//
+// Nota: la lunghezza di id rimane invariata (overflow scarta i bit più alti).
+func (id ID) AdvanceDeBruijn(d, k int) ID {
+	if (k & (k - 1)) != 0 {
+		panic("DeBruijnStepBytes: k deve essere una potenza di 2") //TODO: chageme con logger
+	}
+	if d < 0 || d >= k {
+		panic("DeBruijnStepBytes: cifra d fuori dall'intervallo [0, k)") //TODO: chageme con logger
+	}
+	shiftBits := 0
+	for x := k; x > 1; x >>= 1 {
+		shiftBits++
+	}
+	out := make([]byte, len(id))
+	carry := byte(d)
+	for i := len(id) - 1; i >= 0; i-- {
+		// prendi i bit alti che andranno come carry al byte successivo
+		newCarry := id[i] >> (8 - shiftBits)
+		// shift a sinistra e aggiungi il carry corrente nei bit bassi
+		out[i] = (id[i]<<shiftBits | carry) & 0xFF
+		// aggiorna carry per il prossimo ciclo
+		carry = newCarry
+	}
+	return out
+}
+
+// TopDigit estrae la cifra più significativa dell'ID
+// in base k (dove k deve essere potenza di 2).
+func (id ID) TopDigit(k int) (int, error) {
+	if len(id) == 0 {
+		return 0, fmt.Errorf("TopDigit: ID vuoto")
+	}
+	if (k & (k - 1)) != 0 {
+		return 0, fmt.Errorf("TopDigit: k deve essere potenza di 2")
+	}
+	// numero di bit da estrarre
+	shiftBits := 0
+	for x := k; x > 1; x >>= 1 {
+		shiftBits++
+	}
+	// prendiamo i primi shiftBits bit del primo byte
+	firstByte := id[0]
+	mask := byte((1 << shiftBits) - 1)
+	top := (firstByte >> (8 - shiftBits)) & mask
+	return int(top), nil
+}
+
+// ShiftLeftDigit ritorna un nuovo ID ottenuto spostando a sinistra di log₂(k) bit.
+// Questo equivale a "consumare" la TopDigit in base-k.
+// k deve essere potenza di 2.
+func (id ID) ShiftLeftDigit(k int) (ID, error) {
+	if len(id) == 0 {
+		return nil, fmt.Errorf("ShiftLeftDigit: ID vuoto")
+	}
+	if (k & (k - 1)) != 0 {
+		return nil, fmt.Errorf("ShiftLeftDigit: k deve essere potenza di 2")
+	}
+	// calcola quanti bit spostare
+	shiftBits := 0
+	for x := k; x > 1; x >>= 1 {
+		shiftBits++
+	}
+	out := make(ID, len(id))
+	carry := byte(0)
+	for i := len(id) - 1; i >= 0; i-- {
+		cur := id[i]
+		// salva i bit più alti che devono scivolare nel byte successivo
+		newCarry := cur >> (8 - shiftBits)
+		// shift e inserisci carry dai bit meno significativi
+		out[i] = (cur << shiftBits) | carry
+		carry = newCarry
+	}
+	return out, nil
 }
