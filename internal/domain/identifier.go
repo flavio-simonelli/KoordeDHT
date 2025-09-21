@@ -113,6 +113,16 @@ func (x ID) InOC(a, b ID) bool {
 	return x.Less(b) || (a.Less(x) && !x.Equal(a)) || x.Equal(b)
 }
 
+// InOO restituisce true se x ∈ (a, b) modulo 2^128
+func (x ID) InOO(a, b ID) bool {
+	if a.Less(b) {
+		// caso normale: a < b
+		return a.Less(x) && x.Less(b)
+	}
+	// caso wrap-around: intervallo (a → max] ∪ [0 → b)
+	return a.Less(x) || x.Less(b)
+}
+
 // Next restituisce l'identificatore successivo a id modulo 2^128.
 func (id ID) Next() ID {
 	next := make(ID, len(id))

@@ -43,7 +43,7 @@ func main() {
 		ID:   id,
 		Addr: addr,
 	}
-	n, err := node.New(domainNode, cfg.DHT.IDBits, cfg.DHT.DeBruijn.Degree, node.WithLogger(lgr.With(logger.F("component", "node"), logger.F("id", id.ToHexString()), logger.F("addr", addr))))
+	n, err := node.New(domainNode, cfg.DHT.IDBits, cfg.DHT.DeBruijn.Degree, node.WithLogger(lgr.Named("node")))
 	if err != nil {
 		lgr.Error("Errore nell'inizializzare il nodo", logger.F("error", err.Error()))
 		os.Exit(1)
@@ -62,5 +62,24 @@ func main() {
 	}
 	lgr.Info("Server started correctly")
 	// join in dht or create a new one
-
+	if len(cfg.DHT.BootstrapPeers) != 0 {
+		// join
+		peer := cfg.DHT.BootstrapPeers[0] //TODO: per ora uso solo il primo
+		lgr.Info("Joining DHT", logger.F("peer", peer))
+		err = n.Join(peer)
+		if err != nil {
+			lgr.Error("Errore nel join alla DHT", logger.F("error", err.Error()))
+			os.Exit(1) //TODO: grateful stop
+		}
+		lgr.Info("Join avvenuto con successo", logger.F("peer", peer))
+	} else {
+		// crea nuova dht
+		lgr.Info("Null Created new DHT")
+	}
+	n.StartBackgroundTasks()
+	select {
+	case err := <-serveErr:
+		lgr.Error("Server errore", logger.F("error", err.Error()))
+		os.Exit(1) //TODO: grateful stop
+	}
 }

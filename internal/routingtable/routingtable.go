@@ -20,6 +20,7 @@ type routingEntry struct {
 // RoutingTable rappresenta i link di un nodo Koorde.
 type RoutingTable struct {
 	logger      logger.Logger   // logger per la routing table (default: NopLogger)
+	idBits      int             // numero di bit dello spazio ID
 	graphGrade  int             // grado del grafo De Bruijn
 	self        *routingEntry   // il nodo locale
 	succMu      sync.RWMutex    // mutex per il successore
@@ -39,7 +40,10 @@ type RoutingTable struct {
 // Se idBits non è valido, restituisce InvalidIDBits
 // Inizialmente tutte le entry puntano al nodo locale; verranno aggiornate
 // successivamente dalle procedure di manutenzione (fix).
-func New(self domain.Node, graphGrade int, opts ...Option) (*RoutingTable, error) {
+func New(self domain.Node, idBits, graphGrade int, opts ...Option) (*RoutingTable, error) {
+	if idBits <= 0 {
+		return nil, InvalidIDBits
+	}
 	if graphGrade < 2 {
 		return nil, InvalidDegree
 	}
@@ -55,7 +59,8 @@ func New(self domain.Node, graphGrade int, opts ...Option) (*RoutingTable, error
 	for i := 0; i < graphGrade; i++ {
 		rt.deBruijn[i] = &routingEntry{Node: self}
 	}
-	// graphGrade
+	// Inizializza i parametri idBits e graphGrade
+	rt.idBits = idBits
 	rt.graphGrade = graphGrade
 	// applica le opzioni
 	for _, opt := range opts {
@@ -67,6 +72,11 @@ func New(self domain.Node, graphGrade int, opts ...Option) (*RoutingTable, error
 // Degree restituisce il grado del grafo De Bruijn.
 func (rt *RoutingTable) Degree() int {
 	return rt.graphGrade
+}
+
+// IDBits restituisce il numero di bit dello spazio ID.
+func (rt *RoutingTable) IDBits() int {
+	return rt.idBits
 }
 
 // Self restituisce il nodo locale.
