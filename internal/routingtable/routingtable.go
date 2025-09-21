@@ -20,7 +20,6 @@ type routingEntry struct {
 // RoutingTable rappresenta i link di un nodo Koorde.
 type RoutingTable struct {
 	logger      logger.Logger   // logger per la routing table (default: NopLogger)
-	idBits      int             // numero di bit dello spazio ID
 	graphGrade  int             // grado del grafo De Bruijn
 	self        *routingEntry   // il nodo locale
 	succMu      sync.RWMutex    // mutex per il successore
@@ -40,10 +39,7 @@ type RoutingTable struct {
 // Se idBits non è valido, restituisce InvalidIDBits
 // Inizialmente tutte le entry puntano al nodo locale; verranno aggiornate
 // successivamente dalle procedure di manutenzione (fix).
-func New(self domain.Node, idBits, graphGrade int, opts ...Option) (*RoutingTable, error) {
-	if idBits <= 0 {
-		return nil, InvalidIDBits
-	}
+func New(self domain.Node, graphGrade int, opts ...Option) (*RoutingTable, error) {
 	if graphGrade < 2 {
 		return nil, InvalidDegree
 	}
@@ -59,8 +55,7 @@ func New(self domain.Node, idBits, graphGrade int, opts ...Option) (*RoutingTabl
 	for i := 0; i < graphGrade; i++ {
 		rt.deBruijn[i] = &routingEntry{Node: self}
 	}
-	// Inizializza i parametri idBits e graphGrade
-	rt.idBits = idBits
+	// graphGrade
 	rt.graphGrade = graphGrade
 	// applica le opzioni
 	for _, opt := range opts {
@@ -145,4 +140,26 @@ func (rt *RoutingTable) FixDeBruijn(i int, n domain.Node) {
 		logger.F("old.id", old.ID.ToHexString()),
 		logger.F("new.id", n.ID.ToHexString()),
 	)
+}
+
+// FindSuccessor cerca il successore di id a partire dal nodo rt.
+// Restituisce il nodo successore più vicino a id. Se id è compreso tra rt e il suo successore, allora restituisce il successore e true indicando che è il successore vero.
+// Altrimenti restituisce il nodo più vicino a id tra i nodi conosciuti e false.
+func (rt *RoutingTable) FindSuccessor(id domain.ID) (domain.Node, bool) {
+	rt.succMu.RLock()
+	succ := rt.successor.Node
+	rt.succMu.RUnlock()
+	if id.InOC(rt.self.ID, succ.ID) {
+		return succ, true
+	}
+	// cerca il nodo più vicino a id tra i nodi conosciuti
+	// controlla il successore
+	// TODO: implementare sia i più link brujin che i più successori
+	rt.dbMu[0].RLock()
+	closest := rt.deBruijn[0].Node
+	rt.dbMu[0].RUnlock()
+	if closest.ID.Equal(rt.self.ID) {
+		closest = succ
+	}
+	return closest, false
 }
