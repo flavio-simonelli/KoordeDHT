@@ -25,6 +25,23 @@ message FindSuccessorResponse {
   Node node = 1;
 }
 
+message PutRequest {
+  bytes key = 1;
+  string value = 2;
+}
+
+message GetRequest {
+  bytes key = 1;
+}
+
+message GetResponse {
+  bytes value = 1;
+}
+
+message DeleteRequest {
+  bytes key = 1;
+}
+
 // ---------------------------------------------------------------
 // Service definition
 // ---------------------------------------------------------------
@@ -44,10 +61,14 @@ service DHT {
 
     // Ping per verificare se il nodo è attivo.
     rpc Ping(google.protobuf.Empty) returns (google.protobuf.Empty);
+
+    // Put una coppia chiave-valore nella DHT.
+    rpc Put(PutRequest) returns (google.protobuf.Empty);
+
+    // Get il valore associato a una chiave dalla DHT.
+    // status.Error(codes.NotFound, "key not found") se la chiave non esiste.
+    rpc Get(GetRequest) returns (GetResponse);
+
+    // Delete una coppia chiave-valore dalla DHT.
+    rpc Delete(DeleteRequest) returns (google.protobuf.Empty);
 }
-
-
-
-
-
-

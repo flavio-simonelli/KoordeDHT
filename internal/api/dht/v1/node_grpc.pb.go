@@ -25,6 +25,9 @@ const (
 	DHT_GetSuccessor_FullMethodName   = "/dht.v1.DHT/GetSuccessor"
 	DHT_Notify_FullMethodName         = "/dht.v1.DHT/Notify"
 	DHT_Ping_FullMethodName           = "/dht.v1.DHT/Ping"
+	DHT_Put_FullMethodName            = "/dht.v1.DHT/Put"
+	DHT_Get_FullMethodName            = "/dht.v1.DHT/Get"
+	DHT_Delete_FullMethodName         = "/dht.v1.DHT/Delete"
 )
 
 // DHTClient is the client API for DHT service.
@@ -41,6 +44,12 @@ type DHTClient interface {
 	Notify(ctx context.Context, in *Node, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Ping per verificare se il nodo è attivo.
 	Ping(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Put una coppia chiave-valore nella DHT.
+	Put(ctx context.Context, in *PutRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Get il valore associato a una chiave dalla DHT.
+	Get(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*GetResponse, error)
+	// Delete una coppia chiave-valore dalla DHT.
+	Delete(ctx context.Context, in *DeleteRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type dHTClient struct {
@@ -101,6 +110,36 @@ func (c *dHTClient) Ping(ctx context.Context, in *emptypb.Empty, opts ...grpc.Ca
 	return out, nil
 }
 
+func (c *dHTClient) Put(ctx context.Context, in *PutRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, DHT_Put_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *dHTClient) Get(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*GetResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetResponse)
+	err := c.cc.Invoke(ctx, DHT_Get_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *dHTClient) Delete(ctx context.Context, in *DeleteRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, DHT_Delete_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DHTServer is the server API for DHT service.
 // All implementations must embed UnimplementedDHTServer
 // for forward compatibility.
@@ -115,6 +154,12 @@ type DHTServer interface {
 	Notify(context.Context, *Node) (*emptypb.Empty, error)
 	// Ping per verificare se il nodo è attivo.
 	Ping(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
+	// Put una coppia chiave-valore nella DHT.
+	Put(context.Context, *PutRequest) (*emptypb.Empty, error)
+	// Get il valore associato a una chiave dalla DHT.
+	Get(context.Context, *GetRequest) (*GetResponse, error)
+	// Delete una coppia chiave-valore dalla DHT.
+	Delete(context.Context, *DeleteRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedDHTServer()
 }
 
@@ -139,6 +184,15 @@ func (UnimplementedDHTServer) Notify(context.Context, *Node) (*emptypb.Empty, er
 }
 func (UnimplementedDHTServer) Ping(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Ping not implemented")
+}
+func (UnimplementedDHTServer) Put(context.Context, *PutRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Put not implemented")
+}
+func (UnimplementedDHTServer) Get(context.Context, *GetRequest) (*GetResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Get not implemented")
+}
+func (UnimplementedDHTServer) Delete(context.Context, *DeleteRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Delete not implemented")
 }
 func (UnimplementedDHTServer) mustEmbedUnimplementedDHTServer() {}
 func (UnimplementedDHTServer) testEmbeddedByValue()             {}
@@ -251,6 +305,60 @@ func _DHT_Ping_Handler(srv interface{}, ctx context.Context, dec func(interface{
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DHT_Put_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PutRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DHTServer).Put(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DHT_Put_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DHTServer).Put(ctx, req.(*PutRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DHT_Get_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DHTServer).Get(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DHT_Get_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DHTServer).Get(ctx, req.(*GetRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DHT_Delete_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DHTServer).Delete(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DHT_Delete_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DHTServer).Delete(ctx, req.(*DeleteRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // DHT_ServiceDesc is the grpc.ServiceDesc for DHT service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -277,6 +385,18 @@ var DHT_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Ping",
 			Handler:    _DHT_Ping_Handler,
+		},
+		{
+			MethodName: "Put",
+			Handler:    _DHT_Put_Handler,
+		},
+		{
+			MethodName: "Get",
+			Handler:    _DHT_Get_Handler,
+		},
+		{
+			MethodName: "Delete",
+			Handler:    _DHT_Delete_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
