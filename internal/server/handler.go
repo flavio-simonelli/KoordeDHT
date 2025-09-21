@@ -54,3 +54,27 @@ func (h *Handler) Notify(ctx context.Context, req *pb.Node) (*emptypb.Empty, err
 func (h *Handler) Ping(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty, error) {
 	return &emptypb.Empty{}, nil
 }
+
+func (h *Handler) Put(ctx context.Context, req *pb.PutRequest) (*emptypb.Empty, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request cannot be nil")
+	}
+	err := h.node.Put(domain.Resource{Key: req.GetKey(), Value: req.GetValue()})
+	if err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func (h *Handler) Get(ctx context.Context, req *pb.GetRequest) (*pb.GetResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request cannot be nil")
+	}
+	res, err := h.node.Get(req.GetKey())
+	if err != nil {
+		return nil, err
+	}
+	return &pb.GetResponse{
+		Value: res.Value,
+	}, nil
+}

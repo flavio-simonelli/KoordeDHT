@@ -47,6 +47,7 @@ type DHTClient interface {
 	// Put una coppia chiave-valore nella DHT.
 	Put(ctx context.Context, in *PutRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Get il valore associato a una chiave dalla DHT.
+	// status.Error(codes.NotFound, "key not found") se la chiave non esiste.
 	Get(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*GetResponse, error)
 	// Delete una coppia chiave-valore dalla DHT.
 	Delete(ctx context.Context, in *DeleteRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -157,6 +158,7 @@ type DHTServer interface {
 	// Put una coppia chiave-valore nella DHT.
 	Put(context.Context, *PutRequest) (*emptypb.Empty, error)
 	// Get il valore associato a una chiave dalla DHT.
+	// status.Error(codes.NotFound, "key not found") se la chiave non esiste.
 	Get(context.Context, *GetRequest) (*GetResponse, error)
 	// Delete una coppia chiave-valore dalla DHT.
 	Delete(context.Context, *DeleteRequest) (*emptypb.Empty, error)

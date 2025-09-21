@@ -32,6 +32,17 @@ func FNode(key string, n domain.Node) Field {
 	}
 }
 
+// FResource serializza un domain.Resource in un campo strutturato leggibile.
+func FResource(key string, r domain.Resource) Field {
+	return Field{
+		Key: key,
+		Val: map[string]any{
+			"key":   r.Key.ToHexString(),
+			"value": r.Value,
+		},
+	}
+}
+
 // ----------------------------------------------------------------
 // NopLogger è un'implementazione di Logger che non fa nulla.
 type NopLogger struct{}

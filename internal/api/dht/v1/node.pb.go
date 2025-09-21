@@ -262,7 +262,7 @@ func (x *GetRequest) GetKey() []byte {
 
 type GetResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Value         []byte                 `protobuf:"bytes,1,opt,name=value,proto3" json:"value,omitempty"`
+	Value         string                 `protobuf:"bytes,1,opt,name=value,proto3" json:"value,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -297,11 +297,11 @@ func (*GetResponse) Descriptor() ([]byte, []int) {
 	return file_dht_v1_node_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *GetResponse) GetValue() []byte {
+func (x *GetResponse) GetValue() string {
 	if x != nil {
 		return x.Value
 	}
-	return nil
+	return ""
 }
 
 type DeleteRequest struct {
@@ -368,7 +368,7 @@ const file_dht_v1_node_proto_rawDesc = "" +
 	"GetRequest\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\fR\x03key\"#\n" +
 	"\vGetResponse\x12\x14\n" +
-	"\x05value\x18\x01 \x01(\fR\x05value\"!\n" +
+	"\x05value\x18\x01 \x01(\tR\x05value\"!\n" +
 	"\rDeleteRequest\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\fR\x03key2\xc5\x03\n" +
 	"\x03DHT\x12L\n" +
