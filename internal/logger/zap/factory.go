@@ -22,6 +22,7 @@ func New(cfg config.LoggerConfig) (*zap.Logger, error) {
 	encCfg.TimeKey = "ts"
 	encCfg.EncodeTime = zapcore.ISO8601TimeEncoder
 	encCfg.EncodeLevel = zapcore.LowercaseLevelEncoder
+	encCfg.NameKey = "component" // <— così .Named() finisce in “component”
 	var encoder zapcore.Encoder
 	if cfg.Encoding == "console" {
 		encCfg.EncodeLevel = zapcore.CapitalColorLevelEncoder

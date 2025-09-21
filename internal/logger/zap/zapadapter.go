@@ -11,10 +11,17 @@ type ZapAdapter struct {
 	L *zap.Logger
 }
 
-func NewZapAdapter(l *zap.Logger) ZapAdapter { return ZapAdapter{L: l} }
+// Applica lo skip di 1 frame per evitare che il caller sia zapadapter.go:XX
+func NewZapAdapter(l *zap.Logger) ZapAdapter {
+	return ZapAdapter{L: l.WithOptions(zap.AddCallerSkip(1))}
+}
 
 func (z ZapAdapter) With(fields ...logger.Field) logger.Logger {
 	return ZapAdapter{L: z.L.With(toZap(fields)...)}
+}
+
+func (z ZapAdapter) Named(name string) logger.Logger {
+	return ZapAdapter{L: z.L.Named(name)}
 }
 
 func (z ZapAdapter) Debug(msg string, fields ...logger.Field) {
