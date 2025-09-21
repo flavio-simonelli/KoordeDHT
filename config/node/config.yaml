@@ -16,7 +16,7 @@ dht:
   mode: "private"          # network mode: public | private
 
   deBruijn:
-    degree: 2              # de Bruijn graph degree (2 = minimal, log n = optimal)
+    degree: 2              # de Bruijn graph degree (2 = minimal, log n = optimal, utilizzare potenze di 2 per lavorare direttamente con stringhe binarie)
     backupSize: 0          # number of backup predecessors for de Bruijn pointer
     fixInterval: 10s       # refresh interval for de Bruijn pointers
 
