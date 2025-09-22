@@ -1,5 +1,5 @@
 logger:
-  level: "debug"           # log level: debug, info, warn, error
+  level: "info"           # log level: debug, info, warn, error
   encoding: "console"      # log encoding: console | json
   mode: "stdout"           # output mode: stdout | file
 
@@ -12,7 +12,7 @@ logger:
 
 dht:
   idBits: 4                # identifier size (keyspace = 2^idBits)
-  bootstrapPeers: ["192.168.1.102:37137"]       # initial peers for joining
+  bootstrapPeers: []       # initial peers for joining
   mode: "private"          # network mode: public | private
 
   deBruijn:
