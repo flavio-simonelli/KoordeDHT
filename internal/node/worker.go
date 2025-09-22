@@ -1,6 +1,7 @@
 package node
 
 import (
+	"KoordeDHT/internal/domain"
 	"KoordeDHT/internal/logger"
 	"time"
 )
@@ -41,11 +42,6 @@ func (n *Node) FixDebruijnLinks() {
 	}
 	// aggiorna il link De Bruijn all'indice 0 (anchor)
 	n.rt.FixDeBruijn(0, anchorPred)
-	n.lgr.Info("aggiornato link De Bruijn",
-		logger.F("index", 0),
-		logger.F("debruijn_id", anchorId.ToHexString()),
-		logger.FNode("predecessor", anchorPred),
-	)
 	// per ogni indice i da 1 a degreeGraph metti il successore del nodo precedente
 	current := anchorPred
 	for i := 1; i < degreeGraph+1; i++ {
@@ -53,11 +49,6 @@ func (n *Node) FixDebruijnLinks() {
 		// se il nodo precedente coincide con me, metti il mio successore
 		if current.ID.Equal(n.rt.Self().ID) {
 			n.rt.FixDeBruijn(i, n.rt.Successor())
-			n.lgr.Info("aggiornato link De Bruijn",
-				logger.F("index", i),
-				logger.F("debruijn_id", "same as self"),
-				logger.FNode("successor", n.rt.Successor()),
-			)
 			current = n.rt.Successor()
 			continue
 		}
@@ -69,10 +60,6 @@ func (n *Node) FixDebruijnLinks() {
 		}
 		// aggiorna il link De Bruijn all'indice i
 		n.rt.FixDeBruijn(i, succ)
-		n.lgr.Info("aggiornato link De Bruijn",
-			logger.F("index", i),
-			logger.FNode("successor", succ),
-		)
 		current = succ
 	}
 }
@@ -80,21 +67,28 @@ func (n *Node) FixDebruijnLinks() {
 func (n *Node) FixSuccessor() {
 	// Chiedi al mio successore il suo predecessore
 	succ := n.rt.Successor()
-	// se  successore coincide con me, non c'è nulla da fare
-	if succ.ID.Equal(n.rt.Self().ID) {
-		return
-	}
-	predOfSucc, err := n.cp.GetPredecessor(succ.Addr)
-	if err != nil {
-		n.lgr.Warn("FixSuccessor: successor not responding, fallback",
-			logger.FNode("successor", succ), logger.F("error", err.Error()))
-		// TODO: in caso di failure multipli, potrei iterare su backup/finger table (qui devo contattare i successore del successore)
-		return
-	}
 	self := n.rt.Self()
-	if predOfSucc.ID.InOO(self.ID, succ.ID) {
-		n.rt.SetSuccessor(predOfSucc)
-		succ = predOfSucc
+	var predOfSucc domain.Node
+	var err error
+	// se  successore coincide con me, prendi il tuo predecessore
+	if succ.ID.Equal(self.ID) {
+		predOfSucc = n.rt.Predecessor()
+		if !predOfSucc.ID.Equal(self.ID) {
+			n.rt.SetSuccessor(predOfSucc)
+			succ = predOfSucc
+		}
+	} else {
+		predOfSucc, err = n.cp.GetPredecessor(succ.Addr)
+		if err != nil {
+			n.lgr.Warn("FixSuccessor: successor not responding, fallback",
+				logger.FNode("successor", succ), logger.F("error", err.Error()))
+			// TODO: in caso di failure multipli, potrei iterare su backup/finger table (qui devo contattare i successore del successore)
+			return
+		}
+		if predOfSucc.ID.InOO(self.ID, succ.ID) {
+			n.rt.SetSuccessor(predOfSucc)
+			succ = predOfSucc
+		}
 	}
 	if err := n.cp.Notify(self, succ.Addr); err != nil {
 		n.lgr.Error("FixSuccessor: notify failed",

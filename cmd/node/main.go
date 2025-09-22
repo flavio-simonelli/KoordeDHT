@@ -35,7 +35,7 @@ func main() {
 	}
 	defer func() { _ = lis.Close() }() // chiude il listener alla fine del main
 	addr := lis.Addr().String()
-	lgr.Debug("Indirizzo di bind", logger.F("addr", addr))
+	lgr.Info("Indirizzo di bind", logger.F("addr", addr))
 	// inizializza nodo
 	id := domain.NewIdFromAddr(addr, cfg.DHT.IDBits)
 	lgr.Debug("ID del nodo", logger.F("id", id.ToHexString()))
@@ -74,7 +74,7 @@ func main() {
 		lgr.Info("Join avvenuto con successo", logger.F("peer", peer))
 	} else {
 		// crea nuova dht
-		lgr.Info("Null Created new DHT")
+		lgr.Info("Created new DHT")
 	}
 	n.StartBackgroundTasks()
 	select {

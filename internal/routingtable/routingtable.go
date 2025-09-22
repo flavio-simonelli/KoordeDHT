@@ -160,13 +160,15 @@ func (rt *RoutingTable) FixDeBruijn(i int, n domain.Node) {
 	old := rt.deBruijn[i].Node
 	rt.deBruijn[i] = &routingEntry{Node: n}
 	rt.dbWinMu[i].Unlock()
-	rt.logger.Info("routingtable.FixDeBruijn",
-		logger.F("index", i),
-		logger.F("old.addr", old.Addr),
-		logger.F("new.addr", n.Addr),
-		logger.F("old.id", old.ID.ToHexString()),
-		logger.F("new.id", n.ID.ToHexString()),
-	)
+	if !old.ID.Equal(n.ID) {
+		rt.logger.Info("routingtable.FixDeBruijn",
+			logger.F("index", i),
+			logger.F("old.addr", old.Addr),
+			logger.F("new.addr", n.Addr),
+			logger.F("old.id", old.ID.ToHexString()),
+			logger.F("new.id", n.ID.ToHexString()),
+		)
+	}
 }
 
 // FindSuccessor cerca il successore di id a partire dal nodo rt.

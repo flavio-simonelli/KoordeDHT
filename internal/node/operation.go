@@ -135,13 +135,13 @@ func (n *Node) FindPredecessor(target, currentI, kshift domain.ID) (domain.Node,
 
 func (n *Node) GetPredecessor() domain.Node {
 	pred := n.rt.Predecessor()
-	n.lgr.Info("GetPredecessor", logger.FNode("predecessor", pred))
+	n.lgr.Debug("GetPredecessor", logger.FNode("predecessor", pred))
 	return pred
 }
 
 func (n *Node) GetSuccessor() domain.Node {
 	succ := n.rt.Successor()
-	n.lgr.Info("GetSuccessor", logger.FNode("successor", succ))
+	n.lgr.Debug("GetSuccessor", logger.FNode("successor", succ))
 	return succ
 }
 
