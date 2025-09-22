@@ -57,7 +57,9 @@ func (n *Node) Join(bootstrapAddr string) error {
 	}
 	// aggiorno la mia routing table
 	n.rt.SetPredecessor(pred)
-	n.rt.SetSuccessor(succ)
+	n.rt.SetSuccessor(0, succ)
+	// inizializza la successor list
+
 	// inizializzare la routing table con i DebrujinLinks
 	n.FixDebruijnLinks()
 	return nil

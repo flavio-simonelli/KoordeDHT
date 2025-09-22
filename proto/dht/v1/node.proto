@@ -27,6 +27,11 @@ message FindSuccessorResponse {
   Node node = 1;
 }
 
+// Successor list
+message SuccessorList {
+  repeated Node successors = 1; // Lista di successori
+}
+
 message PutRequest {
   bytes key = 1;
   string value = 2;
@@ -58,8 +63,8 @@ service DHT {
     // Ottieni il predecessore del nodo.
     rpc GetPredecessor(google.protobuf.Empty) returns (Node);
 
-    // Ottieni il successore del nodo.
-    rpc GetSuccessor(google.protobuf.Empty) returns (Node);
+    // Ottieni la lista dei successori del nodo.
+    rpc GetSuccessorList(google.protobuf.Empty) returns (SuccessorList);
 
     // Notifica al nodo che "node" potrebbe essere il suo predecessore.
     rpc Notify(Node) returns (google.protobuf.Empty);

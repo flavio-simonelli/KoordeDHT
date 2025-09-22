@@ -19,16 +19,16 @@ type routingEntry struct {
 
 // RoutingTable rappresenta i link di un nodo Koorde.
 type RoutingTable struct {
-	logger      logger.Logger // logger per la routing table (default: NopLogger)
-	idBits      int           // numero di bit dello spazio ID
-	graphGrade  int           // grado del grafo De Bruijn
-	self        *routingEntry // il nodo locale
-	succMu      sync.RWMutex  // mutex per il successore
-	successor   *routingEntry // log(n) successori per tolleranza ai guasti // todo: implementare successor list
-	predMu      sync.RWMutex  // mutex per il predecessore
-	predecessor *routingEntry // predecessore nel ring
-	dbWinMu     []sync.RWMutex
-	deBruijn    []*routingEntry // finestra: anchor = predecessor(k*m), succ^1(anchor), ..., succ^k(anchor)
+	logger        logger.Logger   // logger per la routing table (default: NopLogger)
+	idBits        int             // numero di bit dello spazio ID
+	graphGrade    int             // grado del grafo De Bruijn
+	self          *routingEntry   // il nodo locale
+	succMu        []sync.RWMutex  // mutex per la lista di successori
+	successorList []*routingEntry // log(n) successori per tolleranza ai guasti
+	predMu        sync.RWMutex    // mutex per il predecessore
+	predecessor   *routingEntry   // predecessore nel ring
+	dbWinMu       []sync.RWMutex
+	deBruijn      []*routingEntry // finestra: anchor = predecessor(k*m), succ^1(anchor), ..., succ^k(anchor)
 }
 
 // New crea una nuova tabella di routing per il nodo specificato.
@@ -48,23 +48,22 @@ func New(self domain.Node, idBits, graphGrade int, opts ...Option) (*RoutingTabl
 		return nil, InvalidDegree
 	}
 	rt := &RoutingTable{
-		self:        &routingEntry{Node: self},
-		successor:   &routingEntry{Node: self},
-		predecessor: &routingEntry{Node: self},
-		deBruijn:    make([]*routingEntry, graphGrade),
-		dbWinMu:     make([]sync.RWMutex, graphGrade+1),
-		logger:      &logger.NopLogger{}, // default: nessun log
+		self:          &routingEntry{Node: self},
+		succMu:        make([]sync.RWMutex, idBits),
+		successorList: make([]*routingEntry, idBits),
+		predecessor:   &routingEntry{Node: self},
+		deBruijn:      make([]*routingEntry, graphGrade),
+		dbWinMu:       make([]sync.RWMutex, graphGrade+1),
+		logger:        &logger.NopLogger{}, // default: nessun log
 	}
 	// inizializza i link De Bruijn con il nodo locale
 	for i := range rt.deBruijn {
 		rt.deBruijn[i] = &routingEntry{Node: self}
 	}
-	/*
-		// inizializza la successor list con il nodo locale
-		for i := range rt.successor {
-			rt.successor[i] = &routingEntry{Node: self}
-		}
-	*/
+	// inizializza la successor list con il nodo locale
+	for i := range rt.successorList {
+		rt.successorList[i] = &routingEntry{Node: self}
+	}
 	// Inizializza i parametri idBits e graphGrade
 	rt.idBits = idBits
 	rt.graphGrade = graphGrade
@@ -91,19 +90,35 @@ func (rt *RoutingTable) Self() domain.Node {
 }
 
 // Successor restituisce il successore del nodo locale.
-func (rt *RoutingTable) Successor() domain.Node {
-	rt.succMu.RLock()
-	n := rt.successor.Node
-	rt.succMu.RUnlock()
-	return n
+func (rt *RoutingTable) Successor(i int) (domain.Node, error) {
+	if i < 0 || i >= len(rt.successorList) {
+		return domain.Node{}, errors.New("index out of range")
+	}
+	rt.succMu[i].RLock()
+	n := rt.successorList[i].Node
+	rt.succMu[i].RUnlock()
+	return n, nil
+}
+
+func (rt *RoutingTable) SuccessorList() []domain.Node {
+	nodes := make([]domain.Node, len(rt.successorList))
+	for i := range rt.successorList {
+		rt.succMu[i].RLock()
+		nodes[i] = rt.successorList[i].Node
+		rt.succMu[i].RUnlock()
+	}
+	return nodes
 }
 
 // SetSuccessor aggiorna il successore del nodo locale.
-func (rt *RoutingTable) SetSuccessor(n domain.Node) {
-	rt.succMu.Lock()
-	old := rt.successor.Node
-	rt.successor = &routingEntry{Node: n}
-	rt.succMu.Unlock()
+func (rt *RoutingTable) SetSuccessor(i int, n domain.Node) { //TODO: mettere error
+	if i < 0 || i >= len(rt.successorList) {
+		return
+	}
+	rt.succMu[i].Lock()
+	old := rt.successorList[i].Node
+	rt.successorList[i] = &routingEntry{Node: n}
+	rt.succMu[i].Unlock()
 	if !old.ID.Equal(n.ID) {
 		rt.logger.Info("routingtable.SetSuccessor",
 			logger.F("old.addr", old.Addr),
@@ -173,28 +188,6 @@ func (rt *RoutingTable) FixDeBruijn(i int, n domain.Node) {
 			logger.F("new.id", n.ID.ToHexString()),
 		)
 	}
-}
-
-// FindSuccessor cerca il successore di id a partire dal nodo rt.
-// Restituisce il nodo successore più vicino a id. Se id è compreso tra rt e il suo successore, allora restituisce il successore e true indicando che è il successore vero.
-// Altrimenti restituisce il nodo più vicino a id tra i nodi conosciuti e false.
-func (rt *RoutingTable) FindSuccessor(id domain.ID) (domain.Node, bool) {
-	rt.succMu.RLock()
-	succ := rt.successor.Node
-	rt.succMu.RUnlock()
-	if id.InOC(rt.self.ID, succ.ID) {
-		return succ, true
-	}
-	// cerca il nodo più vicino a id tra i nodi conosciuti
-	// controlla il successore
-	// TODO: implementare sia i più link brujin che i più successori
-	rt.dbWinMu[0].RLock()
-	closest := rt.deBruijn[0].Node
-	rt.dbWinMu[0].RUnlock()
-	if closest.ID.Equal(rt.self.ID) {
-		closest = succ
-	}
-	return closest, false
 }
 
 // FindPredecessor prova a trovare rapidamente il predecessore reale di id

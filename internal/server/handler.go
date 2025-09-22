@@ -72,12 +72,17 @@ func (h *Handler) GetPredecessor(ctx context.Context, req *emptypb.Empty) (*pb.N
 	}, nil
 }
 
-func (h *Handler) GetSuccessor(ctx context.Context, req *emptypb.Empty) (*pb.Node, error) {
-	succ := h.node.GetSuccessor()
-	return &pb.Node{
-		Id:      succ.ID,
-		Address: succ.Addr,
-	}, nil
+func (h *Handler) GetSuccessorList(ctx context.Context, req *emptypb.Empty) (*pb.SuccessorList, error) {
+	successorList := h.node.GetSuccessorList()
+	resp := &pb.SuccessorList{}
+	for succ := range successorList {
+		resp.Successors = append(resp.Successors, &pb.Node{
+			Id:      successorList[succ].ID,
+			Address: successorList[succ].Addr,
+		})
+
+	}
+	return resp, nil
 }
 
 func (h *Handler) Notify(ctx context.Context, req *pb.Node) (*emptypb.Empty, error) {

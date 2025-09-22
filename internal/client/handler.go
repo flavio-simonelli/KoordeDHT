@@ -113,11 +113,11 @@ func (cp *ClientPool) GetPredecessor(serverAddr string) (domain.Node, error) {
 	}, nil
 }
 
-func (cp *ClientPool) GetSuccessor(serverAddr string) (domain.Node, error) {
+func (cp *ClientPool) GetSuccessorList(serverAddr string) ([]domain.Node, error) {
 	// recupera la connessione dal pool
 	conn, err := cp.GetConn(serverAddr)
 	if err != nil {
-		return domain.Node{}, err
+		return []domain.Node{}, err
 	}
 	// crea il client gRPC
 	client := pb.NewDHTClient(conn)
@@ -125,15 +125,19 @@ func (cp *ClientPool) GetSuccessor(serverAddr string) (domain.Node, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second) //TODO: modificare questa configurazione
 	defer cancel()
 	// invia la richiesta GetSuccessor
-	resp, err := client.GetSuccessor(ctx, &emptypb.Empty{})
+	resp, err := client.GetSuccessorList(ctx, &emptypb.Empty{})
 	if err != nil {
-		return domain.Node{}, err
+		return []domain.Node{}, err
 	}
 	// converte la risposta in domain.Node
-	return domain.Node{
-		ID:   resp.Id,
-		Addr: resp.Address,
-	}, nil
+	nodes := make([]domain.Node, len(resp.Successors))
+	for i, n := range resp.Successors {
+		nodes[i] = domain.Node{
+			ID:   n.Id,
+			Addr: n.Address,
+		}
+	}
+	return nodes, nil
 }
 
 func (cp *ClientPool) Notify(self domain.Node, serverAddr string) error {

@@ -12,7 +12,10 @@ import (
 func (n *Node) FindSuccessor(target, currentI, kshift domain.ID) (domain.Node, error) {
 	// se target è tra (myID, succ] allora succ è il successore di target
 	self := n.rt.Self()
-	succ := n.rt.Successor()
+	succ, err := n.rt.Successor(0)
+	if err != nil {
+		return domain.Node{}, err
+	}
 	if target.InOC(self.ID, succ.ID) {
 		return succ, nil
 	} else if currentI.InOC(self.ID, succ.ID) {
@@ -45,7 +48,10 @@ func (n *Node) FindSuccessor(target, currentI, kshift domain.ID) (domain.Node, e
 func (n *Node) FindSuccessorInit(target domain.ID) (domain.Node, error) {
 	// se target è tra (myID, succ] allora succ è il successore di target
 	self := n.rt.Self()
-	succ := n.rt.Successor()
+	succ, err := n.rt.Successor(0)
+	if err != nil {
+		return domain.Node{}, err
+	}
 	if target.InOC(self.ID, succ.ID) {
 		return succ, nil
 	}
@@ -76,7 +82,10 @@ func (n *Node) FindSuccessorInit(target domain.ID) (domain.Node, error) {
 func (n *Node) FindPredecessorInit(target domain.ID) (domain.Node, error) {
 	// se target è tra (myID, succ] allora io sono il predecessore di target
 	self := n.rt.Self()
-	succ := n.rt.Successor()
+	succ, err := n.rt.Successor(0)
+	if err != nil {
+		return domain.Node{}, err
+	}
 	if target.InOC(self.ID, succ.ID) {
 		return self, nil
 	}
@@ -109,7 +118,10 @@ func (n *Node) FindPredecessorInit(target domain.ID) (domain.Node, error) {
 func (n *Node) FindPredecessor(target, currentI, kshift domain.ID) (domain.Node, error) {
 	// se target è tra (myID, succ] allora io sono il predecessore di target
 	self := n.rt.Self()
-	succ := n.rt.Successor()
+	succ, err := n.rt.Successor(0)
+	if err != nil {
+		return domain.Node{}, err
+	}
 	if target.InOC(self.ID, succ.ID) {
 		return self, nil
 	} else if currentI.InOC(self.ID, succ.ID) {
@@ -144,10 +156,8 @@ func (n *Node) GetPredecessor() domain.Node {
 	return pred
 }
 
-func (n *Node) GetSuccessor() domain.Node {
-	succ := n.rt.Successor()
-	n.lgr.Debug("GetSuccessor", logger.FNode("successor", succ))
-	return succ
+func (n *Node) GetSuccessorList() []domain.Node {
+	return n.rt.SuccessorList()
 }
 
 func (n *Node) Notify(m domain.Node) {
