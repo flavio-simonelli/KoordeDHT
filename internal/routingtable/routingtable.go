@@ -104,12 +104,14 @@ func (rt *RoutingTable) SetSuccessor(n domain.Node) {
 	old := rt.successor.Node
 	rt.successor = &routingEntry{Node: n}
 	rt.succMu.Unlock()
-	rt.logger.Info("routingtable.SetSuccessor",
-		logger.F("old.addr", old.Addr),
-		logger.F("new.addr", n.Addr),
-		logger.F("old.id", old.ID.ToHexString()),
-		logger.F("new.id", n.ID.ToHexString()),
-	)
+	if !old.ID.Equal(n.ID) {
+		rt.logger.Info("routingtable.SetSuccessor",
+			logger.F("old.addr", old.Addr),
+			logger.F("new.addr", n.Addr),
+			logger.F("old.id", old.ID.ToHexString()),
+			logger.F("new.id", n.ID.ToHexString()),
+		)
+	}
 }
 
 // Predecessor restituisce il predecessore del nodo locale.
@@ -126,12 +128,14 @@ func (rt *RoutingTable) SetPredecessor(n domain.Node) {
 	old := rt.predecessor.Node
 	rt.predecessor = &routingEntry{Node: n}
 	rt.predMu.Unlock()
-	rt.logger.Info("routingtable.SetPredecessor",
-		logger.F("old.addr", old.Addr),
-		logger.F("new.addr", n.Addr),
-		logger.F("old.id", old.ID.ToHexString()),
-		logger.F("new.id", n.ID.ToHexString()),
-	)
+	if !old.ID.Equal(n.ID) {
+		rt.logger.Info("routingtable.SetPredecessor",
+			logger.F("old.addr", old.Addr),
+			logger.F("new.addr", n.Addr),
+			logger.F("old.id", old.ID.ToHexString()),
+			logger.F("new.id", n.ID.ToHexString()),
+		)
+	}
 }
 
 // DeBruijn restituisce il nodo De Bruijn all'indice specificato.

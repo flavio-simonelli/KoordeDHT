@@ -38,7 +38,7 @@ func main() {
 	lgr.Info("Indirizzo di bind", logger.F("addr", addr))
 	// inizializza nodo
 	id := domain.NewIdFromAddr(addr, cfg.DHT.IDBits)
-	lgr.Debug("ID del nodo", logger.F("id", id.ToHexString()))
+	lgr.Info("ID del nodo", logger.F("id", id.ToHexString()))
 	domainNode := domain.Node{
 		ID:   id,
 		Addr: addr,

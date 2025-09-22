@@ -40,6 +40,30 @@ func (h *Handler) FindSuccessor(ctx context.Context, req *pb.FindSuccessorReques
 	}, nil
 }
 
+func (h *Handler) FindPredecessor(ctx context.Context, req *pb.FindSuccessorRequest) (*pb.FindSuccessorResponse, error) {
+	targetID := req.TargetID
+	currentI := req.CurrentI
+	kshift := req.Kshift
+	var predecessor domain.Node
+	var err error
+	// Caso INIT: currentI e kshift vuoti
+	if len(req.CurrentI) == 0 && len(req.Kshift) == 0 {
+		predecessor, err = h.node.FindPredecessorInit(targetID)
+	} else {
+		// Caso normale
+		predecessor, err = h.node.FindPredecessor(targetID, currentI, kshift)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &pb.FindSuccessorResponse{
+		Node: &pb.Node{
+			Id:      predecessor.ID,
+			Address: predecessor.Addr,
+		},
+	}, nil
+}
+
 func (h *Handler) GetPredecessor(ctx context.Context, req *emptypb.Empty) (*pb.Node, error) {
 	pred := h.node.GetPredecessor()
 	return &pb.Node{
