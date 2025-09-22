@@ -34,7 +34,7 @@ func (n *Node) FixDebruijnLinks() {
 	// calcola l'id anchor (De Bruijn all'indice 0)
 	anchorId := myId.AdvanceDeBruijn(0, degreeGraph)
 	// trova il predecessore dell'id anchor
-	anchorPred, err := n.FindPredecessor(anchorId, anchorId, anchorId)
+	anchorPred, err := n.FindPredecessorInit(anchorId)
 	if err != nil {
 		n.lgr.Error("errore nel trovare il predecessore dell'id anchor", logger.F("anchor_id", anchorId.ToHexString()), logger.F("error", err))
 		return

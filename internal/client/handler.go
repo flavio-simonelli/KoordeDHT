@@ -9,6 +9,33 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
+func (cp *ClientPool) FindSuccessorInit(target domain.ID, serverAddr string) (domain.Node, error) {
+	// recupera la connessione dal pool
+	conn, err := cp.GetConn(serverAddr) //TODO: attenzione che il nodo di bootstrap non viene mai chiuso il suo client contection
+	if err != nil {
+		return domain.Node{}, err
+	}
+	// crea il client gRPC
+	client := pb.NewDHTClient(conn)
+	// context con timeout (es. 2 secondi)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second) //TODO: modificare questa configurazione
+	defer cancel()
+	// invia la richiesta FindSuccessor
+	resp, err := client.FindSuccessor(ctx, &pb.FindSuccessorRequest{
+		TargetID: target,
+		CurrentI: domain.ID{},
+		Kshift:   domain.ID{},
+	})
+	if err != nil {
+		return domain.Node{}, err
+	}
+	// converte la risposta in domain.Node
+	return domain.Node{
+		ID:   resp.Node.Id,
+		Addr: resp.Node.Address,
+	}, nil
+}
+
 func (cp *ClientPool) FindSuccessor(target, currentI, kShift domain.ID, serverAddr string) (domain.Node, error) {
 	// recupera la connessione dal pool
 	conn, err := cp.GetConn(serverAddr) //TODO: attenzione che il nodo di bootstrap non viene mai chiuso il suo client contection

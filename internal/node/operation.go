@@ -42,6 +42,65 @@ func (n *Node) FindSuccessor(target, currentI, kshift domain.ID) (domain.Node, e
 	return n.cp.FindSuccessor(target, nextI, nextKShift, pred.Addr)
 }
 
+// FindSuccessorInit è la versione iniziale di FindSuccessor, usata per il primo hop.
+func (n *Node) FindSuccessorInit(target domain.ID) (domain.Node, error) {
+	// se target è tra (myID, succ] allora succ è il successore di target
+	succ := n.rt.Successor()
+	if target.InOC(n.rt.Self().ID, succ.ID) {
+		return succ, nil
+	}
+	// Determina la prossima cifra di kshift da usare (la più significativa base degreeGraph)
+	d, err := target.TopDigit(n.rt.Degree())
+	if err != nil {
+		return domain.Node{}, err
+	}
+	// Calcola il nodo immaginario successivo nextI = (currentI + d*2^(m/b)) mod 2^m
+	nextI := n.rt.Self().ID.AdvanceDeBruijn(d, n.rt.Degree())
+	// Calcola il prossimo kshift = kshift shiftato a sinistra di una cifra in base degreeGraph
+	nextKShift, err := target.ShiftLeftDigit(n.rt.Degree())
+	if err != nil {
+		return domain.Node{}, err
+	}
+	// Trova il miglior nodo vicino (closest preceding node) per target
+	pred := n.rt.FindPredecessor(target)
+	if pred.ID.Equal(n.rt.Self().ID) {
+		// se il predecessore è me stesso, allora effettua un altra iterazione
+		return n.FindSuccessor(target, nextI, nextKShift)
+	}
+	// altrimenti inoltra la richiesta a pred
+	return n.cp.FindSuccessor(target, nextI, nextKShift, pred.Addr)
+}
+
+// FindPredecessorInit funziona allo stesso modo di FindSuccessorInit ma restituisce il predecessore.
+// target   = chiave finale da risolvere
+func (n *Node) FindPredecessorInit(target domain.ID) (domain.Node, error) {
+	// se target è tra (myID, succ] allora io sono il predecessore di target
+	succ := n.rt.Successor()
+	if target.InOC(n.rt.Self().ID, succ.ID) {
+		return n.rt.Self(), nil
+	}
+	// Determina la prossima cifra di kshift da usare (la più significativa base degreeGraph)
+	d, err := target.TopDigit(n.rt.Degree())
+	if err != nil {
+		return domain.Node{}, err
+	}
+	// Calcola il nodo immaginario successivo nextI = (currentI + d*2^(m/b)) mod 2^m
+	nextI := n.rt.Self().ID.AdvanceDeBruijn(d, n.rt.Degree())
+	// Calcola il prossimo kshift = kshift shiftato a sinistra di una cifra in base degreeGraph
+	nextKShift, err := target.ShiftLeftDigit(n.rt.Degree())
+	if err != nil {
+		return domain.Node{}, err
+	}
+	// Trova il miglior nodo vicino (closest preceding node) per target
+	pred := n.rt.FindPredecessor(target)
+	if pred.ID.Equal(n.rt.Self().ID) {
+		// se il predecessore è me stesso, allora effettua un altra iterazione
+		return n.FindPredecessor(target, nextI, nextKShift)
+	}
+	// altrimenti inoltra la richiesta a pred
+	return n.cp.FindPredecessor(target, nextI, nextKShift, pred.Addr)
+}
+
 // FindPredecessor funziona allo stesso modo di FindSuccessor ma restituisce il predecessore.
 // target   = chiave finale da risolvere
 // currentI = nodo immaginario corrente

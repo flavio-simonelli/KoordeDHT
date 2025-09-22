@@ -39,7 +39,7 @@ func New(self domain.Node, idBits, degree int, opts ...Option) (*Node, error) {
 
 func (n *Node) Join(bootstrapAddr string) error {
 	// richiesta al nodo di bootstrap per trovare il mio successore
-	succ, err := n.cp.FindSuccessor(n.rt.Self().ID, n.rt.Self().ID, n.rt.Self().ID, bootstrapAddr)
+	succ, err := n.cp.FindSuccessorInit(n.rt.Self().ID, bootstrapAddr)
 	if err != nil {
 		return err
 	}
@@ -51,7 +51,10 @@ func (n *Node) Join(bootstrapAddr string) error {
 	}
 	n.lgr.Info("Il predecessore del mio successore è", logger.FNode("predecessor", pred))
 	// contatto il mio successore per aggiornare il suo predecessore a me
-	n.cp.Notify(n.rt.Self(), succ.Addr)
+	err = n.cp.Notify(n.rt.Self(), succ.Addr)
+	if err != nil {
+		return err
+	}
 	// aggiorno la mia routing table
 	n.rt.SetPredecessor(pred)
 	n.rt.SetSuccessor(succ)

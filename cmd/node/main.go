@@ -33,12 +33,12 @@ func main() {
 	if err != nil {
 		zapLog.Fatal("Errore nel risolvere l'indirizzo di bind", zap.Error(err))
 	}
-	defer lis.Close()
+	defer func() { _ = lis.Close() }() // chiude il listener alla fine del main
 	addr := lis.Addr().String()
-	lgr.Info("Indirizzo di bind", logger.F("addr", addr))
+	lgr.Debug("Indirizzo di bind", logger.F("addr", addr))
 	// inizializza nodo
 	id := domain.NewIdFromAddr(addr, cfg.DHT.IDBits)
-	lgr.Info("ID del nodo", logger.F("id", id.ToHexString()))
+	lgr.Debug("ID del nodo", logger.F("id", id.ToHexString()))
 	domainNode := domain.Node{
 		ID:   id,
 		Addr: addr,
@@ -60,12 +60,12 @@ func main() {
 	default:
 		// nessun errore ancora
 	}
-	lgr.Info("Server started correctly")
+	lgr.Debug("Server started correctly")
 	// join in dht or create a new one
 	if len(cfg.DHT.BootstrapPeers) != 0 {
 		// join
 		peer := cfg.DHT.BootstrapPeers[0] //TODO: per ora uso solo il primo
-		lgr.Info("Joining DHT", logger.F("peer", peer))
+		lgr.Debug("Joining DHT", logger.F("peer", peer))
 		err = n.Join(peer)
 		if err != nil {
 			lgr.Error("Errore nel join alla DHT", logger.F("error", err.Error()))

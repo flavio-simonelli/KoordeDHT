@@ -20,7 +20,15 @@ func (h *Handler) FindSuccessor(ctx context.Context, req *pb.FindSuccessorReques
 	targetID := req.TargetID
 	currentI := req.CurrentI
 	kshift := req.Kshift
-	successor, err := h.node.FindSuccessor(targetID, currentI, kshift)
+	var successor domain.Node
+	var err error
+	// Caso INIT: currentI e kshift vuoti
+	if len(req.CurrentI) == 0 && len(req.Kshift) == 0 {
+		successor, err = h.node.FindSuccessorInit(targetID)
+	} else {
+		// Caso normale
+		successor, err = h.node.FindSuccessor(targetID, currentI, kshift)
+	}
 	if err != nil {
 		return nil, err
 	}
