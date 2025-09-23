@@ -16,26 +16,26 @@ message Node {
 }
 
 // Richiesta per trovare il successore responsabile di "id".
-message FindSuccessorHopRequest {
+message FindSuccessorRequest {
   bytes targetID = 1; // ID target nel ring
   bytes current_i = 2; // ID del nodo immaginario (hop nel grafo de bruijn)
   bytes kshift = 3; // kshift dell'Id terget corrente con il numero di passi già effettuati
 }
 
 // Risposta: nodo successore responsabile di "id".
-message FindSuccessorHopResponse {
+message FindSuccessorResponse {
   Node node = 1;
 }
 
 // Richiesta per trovare il predecessore di "id".
-message FindPredecessorHopRequest {
+message FindPredecessorRequest {
   bytes targetID = 1; // ID target nel ring
   bytes current_i = 2; // ID del nodo immaginario (hop nel grafo de bruijn)
   bytes kshift = 3; // kshift dell'Id terget corrente con il numero di passi già effettuati
 }
 
 // Risposta: nodo predecessore di "id".
-message FindPredecessorHopResponse {
+message FindPredecessorResponse {
   Node node = 1;
 }
 
@@ -68,10 +68,10 @@ message DeleteRequest {
 
 service DHT {
     // Trova il successore responsabile di "id".
-    rpc FindSuccessorHop(FindSuccessorRequest) returns (FindSuccessorResponse);
+    rpc FindSuccessor(FindSuccessorRequest) returns (FindSuccessorResponse);
 
     // Trova il predecessore responsabile di "id".
-    rpc FindPredecessorHop(FindSuccessorRequest) returns (FindSuccessorResponse); //TODO: cambiare nome a FindSuccessorResponse e FindSuccessorRequest
+    rpc FindPredecessor(FindPredecessorRequest) returns (FindPredecessorResponse);
 
     // Ottieni il predecessore del nodo.
     rpc GetPredecessor(google.protobuf.Empty) returns (Node);

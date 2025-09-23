@@ -22,16 +22,16 @@ func NewMemoryStorage(log logger.Logger) *MemoryStorage {
 
 func (m *MemoryStorage) Put(resource domain.Resource) error {
 	m.mu.Lock()
-	m.data[resource.Key.ToHexString()] = resource.Value
+	m.data[resource.Key.Hex()] = resource.Value
 	m.mu.Unlock()
-	m.lgr.Info("Add new Resource", logger.F("key", resource.Key.ToHexString()), logger.F("value", resource.Value))
+	m.lgr.Info("Add new Resource", logger.F("key", resource.Key.Hex()), logger.F("value", resource.Value))
 	return nil
 }
 
 func (m *MemoryStorage) Get(id domain.ID) (domain.Resource, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	val, ok := m.data[id.ToHexString()]
+	val, ok := m.data[id.Hex()]
 	if !ok {
 		return domain.Resource{}, ErrNotFound
 	}
@@ -44,18 +44,20 @@ func (m *MemoryStorage) Get(id domain.ID) (domain.Resource, error) {
 
 func (m *MemoryStorage) Delete(id domain.ID) error {
 	m.mu.Lock()
-	delete(m.data, id.ToHexString())
+	delete(m.data, id.Hex())
 	m.mu.Unlock()
-	m.lgr.Info("Delete Resource", logger.F("key", id.ToHexString()))
+	m.lgr.Info("Delete Resource", logger.F("key", id.Hex()))
 	return nil
 }
+
+/*
 
 func (m *MemoryStorage) Between(from, to domain.ID) ([]domain.Resource, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	result := make([]domain.Resource, 0)
 	for k, v := range m.data {
-		id, err := domain.FromHexString(k, len(from)*8)
+		id, err := domain.(k, len(from)*8)
 		if err != nil {
 			continue
 		}
@@ -68,3 +70,5 @@ func (m *MemoryStorage) Between(from, to domain.ID) ([]domain.Resource, error) {
 	}
 	return result, nil
 }
+
+*/

@@ -69,8 +69,8 @@ func (rt *RoutingTable) Space() domain.Space {
 }
 
 // Self restituisce il nodo locale.
-func (rt *RoutingTable) Self() *domain.Node {
-	return rt.self
+func (rt *RoutingTable) Self() domain.Node {
+	return *rt.self
 }
 
 // GetSuccessor ritorna l'i-esimo successore dalla lista.

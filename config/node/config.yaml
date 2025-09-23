@@ -12,7 +12,6 @@ logger:
 
 dht:
   idBits: 4                # identifier size (keyspace = 2^idBits)
-  expectedNodes: 16     # expected number of nodes in the network (serve per calcolare la dimensione ottimale della successor list)
   bootstrapPeers: []       # initial peers for joining
   mode: "private"          # network mode: public | private
 

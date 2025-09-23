@@ -6,7 +6,9 @@ import (
 	"KoordeDHT/internal/logger"
 	zapfactory "KoordeDHT/internal/logger/zap"
 	"KoordeDHT/internal/node"
+	"KoordeDHT/internal/routingtable"
 	"KoordeDHT/internal/server"
+	"context"
 	"log"
 	"os"
 
@@ -33,7 +35,7 @@ func main() {
 	}
 	defer func() { _ = zapLog.Sync() }()    // prima di chiudere il nodo svuotiamo il buffer del logger
 	lgr := zapfactory.NewZapAdapter(zapLog) // inizializza il logger globale
-	// inizializza ip:port
+	// inizializza la listen socket
 	lis, err := cfg.Listen()
 	if err != nil {
 		zapLog.Fatal("Errore nel risolvere l'indirizzo di bind", zap.Error(err))
@@ -41,18 +43,22 @@ func main() {
 	defer func() { _ = lis.Close() }() // chiude il listener alla fine del main
 	addr := lis.Addr().String()
 	lgr.Info("Indirizzo di bind", logger.F("addr", addr))
+	// inizializza lo spazio degli ID
+	space, err := domain.NewSpace(cfg.DHT.IDBits, cfg.DHT.DeBruijn.Degree)
+	if err != nil {
+		lgr.Error("Errore nell'inizializzare lo spazio degli ID", logger.F("error", err.Error()))
+		os.Exit(1)
+	}
 	// inizializza nodo
-	id := domain.NewIdFromAddr(addr, cfg.DHT.IDBits)
-	lgr.Info("ID del nodo", logger.F("id", id.ToHexString()))
+	id := space.NewIdFromAddr(addr)
+	lgr.Info("ID del nodo", logger.F("id", id.String()))
 	domainNode := domain.Node{
 		ID:   id,
 		Addr: addr,
 	}
-	n, err := node.New(domainNode, cfg.DHT.IDBits, cfg.DHT.DeBruijn.Degree, node.WithLogger(lgr.Named("node")))
-	if err != nil {
-		lgr.Error("Errore nell'inizializzare il nodo", logger.F("error", err.Error()))
-		os.Exit(1)
-	}
+	// inizializza la tabella di routing
+	rt := routingtable.New(&domainNode, space, cfg.DHT.FaultTolerance.SuccessorListSize, routingtable.WithLogger(lgr.Named("routingtable")))
+	n := node.New(rt, node.WithLogger(lgr.Named("node")))
 	// avvia server
 	s := server.New(n)
 	serveErr := make(chan error, 1)
@@ -79,9 +85,12 @@ func main() {
 		lgr.Info("Join avvenuto con successo", logger.F("peer", peer))
 	} else {
 		// crea nuova dht
-		lgr.Info("Created new DHT")
+		n.CreateNewDHT()
+		lgr.Info("Nuova DHT creata con successo")
 	}
-	n.StartBackgroundTasks()
+	// avvia i worker di stabilizzazione
+	ctx, _ := context.WithCancel(context.Background())
+	n.StartStabilizer(ctx, cfg.DHT.FaultTolerance.StabilizationInterval)
 	select {
 	case err := <-serveErr:
 		lgr.Error("Server errore", logger.F("error", err.Error()))
