@@ -4,62 +4,47 @@ package dht.v1;
 
 option go_package = "github.com/flaviosimonelli/KoordeDHT/internal/api/dht/v1;dhtv1";
 
-import "google/protobuf/empty.proto"; // usato come empty message
+import "google/protobuf/empty.proto";
 
 // ---------------------------------------------------------------
-// Message definitions
+// Base types
 // ---------------------------------------------------------------
 
 message Node {
-    bytes id = 1; // Unique identifier for the node (endianess non importante perchè vengono creati e usati come byte array e non vengono mai interpretati come numeri)
-    string address = 2; // Network address of the node (e.g., IP:Port)
+  bytes id = 1;       // Node identifier (big-endian hash)
+  string address = 2; // Network address (IP:Port)
 }
 
-// Richiesta per trovare il successore responsabile di "id".
+// ---------------------------------------------------------------
+// Lookup & routing (Koorde-specific)
+// ---------------------------------------------------------------
+
 message FindSuccessorRequest {
-  bytes targetID = 1; // ID target nel ring
-  bytes current_i = 2; // ID del nodo immaginario (hop nel grafo de bruijn)
-  bytes kshift = 3; // kshift dell'Id terget corrente con il numero di passi già effettuati
+  bytes target_id = 1;  // ID to resolve
+  oneof mode {
+    Initial initial = 2; // first step
+    Step step = 3; // subsequent steps
+  }
 }
 
-// Risposta: nodo successore responsabile di "id".
+message Initial {}
+
+message Step {
+  bytes current_i = 1; // imaginary node
+  bytes k_shift   = 2; // key shifted state
+}
+
 message FindSuccessorResponse {
-  Node node = 1;
+  Node node = 1; // successor responsible for target_id
 }
 
-// Richiesta per trovare il predecessore di "id".
-message FindPredecessorRequest {
-  bytes targetID = 1; // ID target nel ring
-  bytes current_i = 2; // ID del nodo immaginario (hop nel grafo de bruijn)
-  bytes kshift = 3; // kshift dell'Id terget corrente con il numero di passi già effettuati
-}
-
-// Risposta: nodo predecessore di "id".
-message FindPredecessorResponse {
-  Node node = 1;
-}
-
+// ---------------------------------------------------------------
+// Maintenance
+// ---------------------------------------------------------------
 
 // Successor list
 message SuccessorList {
-  repeated Node successors = 1; // Lista di successori
-}
-
-message PutRequest {
-  bytes key = 1;
-  string value = 2;
-}
-
-message GetRequest {
-  bytes key = 1;
-}
-
-message GetResponse {
-  string value = 1;
-}
-
-message DeleteRequest {
-  bytes key = 1;
+  repeated Node successors = 1; // list of successors
 }
 
 // ---------------------------------------------------------------
@@ -67,31 +52,21 @@ message DeleteRequest {
 // ---------------------------------------------------------------
 
 service DHT {
-    // Trova il successore responsabile di "id".
+    // Lookup in the Koorde overlay.
+    // Returns the successor responsible for target_id.
     rpc FindSuccessor(FindSuccessorRequest) returns (FindSuccessorResponse);
 
-    // Trova il predecessore responsabile di "id".
-    rpc FindPredecessor(FindPredecessorRequest) returns (FindPredecessorResponse);
-
-    // Ottieni il predecessore del nodo.
+    // Returns this node's predecessor.
+    // If unknown, returns NotFound.
     rpc GetPredecessor(google.protobuf.Empty) returns (Node);
 
-    // Ottieni la lista dei successori del nodo.
+    // Returns this node's successor list.
     rpc GetSuccessorList(google.protobuf.Empty) returns (SuccessorList);
 
-    // Notifica al nodo che "node" potrebbe essere il suo predecessore.
+    // Notify a node that "node" may be its predecessor.
+    // The callee updates state if the notification is valid.
     rpc Notify(Node) returns (google.protobuf.Empty);
 
-    // Ping per verificare se il nodo è attivo.
+    // Ping to check liveness of the node (debug).
     rpc Ping(google.protobuf.Empty) returns (google.protobuf.Empty);
-
-    // Put una coppia chiave-valore nella DHT.
-    rpc Put(PutRequest) returns (google.protobuf.Empty);
-
-    // Get il valore associato a una chiave dalla DHT.
-    // status.Error(codes.NotFound, "key not found") se la chiave non esiste.
-    rpc Get(GetRequest) returns (GetResponse);
-
-    // Delete una coppia chiave-valore dalla DHT.
-    rpc Delete(DeleteRequest) returns (google.protobuf.Empty);
 }
