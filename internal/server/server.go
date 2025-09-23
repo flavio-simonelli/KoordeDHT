@@ -1,30 +1,60 @@
 package server
 
 import (
+	clientv1 "KoordeDHT/internal/api/client/v1"
 	dhtv1 "KoordeDHT/internal/api/dht/v1"
+	"KoordeDHT/internal/logger"
 	"KoordeDHT/internal/node"
-	"google.golang.org/grpc"
+	"fmt"
 	"net"
+
+	"google.golang.org/grpc"
 )
 
+// Server wraps a gRPC server hosting both the client and DHT services.
 type Server struct {
-	node       *node.Node // la struttura nodo della dht per gestire le richieste
 	grpcServer *grpc.Server
+	listener   net.Listener
+	lgr        logger.Logger
 }
 
-func New(node *node.Node) *Server {
+// New creates a new gRPC server bound to the given address
+// and registers both Client and DHT services.
+// You can pass both grpc.ServerOptions and custom server.Options.
+func New(lis net.Listener, n *node.Node, grpcOpts []grpc.ServerOption, srvOpts ...Option) (*Server, error) {
 	s := &Server{
-		grpcServer: grpc.NewServer(),
-		node:       node,
+		grpcServer: grpc.NewServer(grpcOpts...),
+		listener:   lis,
+		lgr:        &logger.NopLogger{}, // default: no logging
 	}
-	dhtv1.RegisterDHTServer(s.grpcServer, &Handler{node: node})
-	return s
+	// Apply functional options (logger)
+	for _, opt := range srvOpts {
+		opt(s)
+	}
+	// Register services with a reference to node
+	clientv1.RegisterClientAPIServer(s.grpcServer, NewClientService(n))
+	dhtv1.RegisterDHTServer(s.grpcServer, NewDHTService(n))
+	return s, nil
 }
 
-func (s *Server) Run(lis net.Listener) error {
-	return s.grpcServer.Serve(lis)
+// Start launches the gRPC server asynchronously.
+// This call does not block: the server runs in a separate goroutine.
+func (s *Server) Start() {
+	go func() {
+		if err := s.grpcServer.Serve(s.listener); err != nil {
+			// TODO: replace with structured logger
+			fmt.Printf("gRPC server stopped: %v\n", err)
+		}
+	}()
 }
 
+// Stop immediately stops the server and closes all active connections.
 func (s *Server) Stop() {
+	s.grpcServer.Stop()
+}
+
+// GracefulStop gracefully shuts down the server,
+// waiting for in-flight RPCs to complete.
+func (s *Server) GracefulStop() {
 	s.grpcServer.GracefulStop()
 }
