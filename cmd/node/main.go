@@ -21,6 +21,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Errore nel caricamento del file di configurazione: %v", err)
 	}
+	// valida la configurazione
+	err = cfg.ValidateConfig()
+	if err != nil {
+		log.Fatalf("Errore nella validazione della configurazione: %v", err)
+	}
 	// istanzia il logger
 	zapLog, err := zapfactory.New(cfg.Logger)
 	if err != nil {

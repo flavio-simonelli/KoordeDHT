@@ -29,7 +29,7 @@ func (cp *ClientPool) FindSuccessorInit(target domain.ID, serverAddr string) (do
 	if err != nil {
 		return domain.Node{}, err
 	}
-	// converte la risposta in domain.Node
+	// converte la risposta in domain.node
 	return domain.Node{
 		ID:   resp.Node.Id,
 		Addr: resp.Node.Address,
@@ -56,7 +56,7 @@ func (cp *ClientPool) FindSuccessor(target, currentI, kShift domain.ID, serverAd
 	if err != nil {
 		return domain.Node{}, err
 	}
-	// converte la risposta in domain.Node
+	// converte la risposta in domain.node
 	return domain.Node{
 		ID:   resp.Node.Id,
 		Addr: resp.Node.Address,
@@ -83,7 +83,7 @@ func (cp *ClientPool) FindPredecessor(target domain.ID, currentI domain.ID, kShi
 	if err != nil {
 		return domain.Node{}, err
 	}
-	// converte la risposta in domain.Node
+	// converte la risposta in domain.node
 	return domain.Node{
 		ID:   resp.Node.Id,
 		Addr: resp.Node.Address,
@@ -106,7 +106,7 @@ func (cp *ClientPool) GetPredecessor(serverAddr string) (domain.Node, error) {
 	if err != nil {
 		return domain.Node{}, err
 	}
-	// converte la risposta in domain.Node
+	// converte la risposta in domain.node
 	return domain.Node{
 		ID:   resp.Id,
 		Addr: resp.Address,
@@ -129,7 +129,7 @@ func (cp *ClientPool) GetSuccessorList(serverAddr string) ([]domain.Node, error)
 	if err != nil {
 		return []domain.Node{}, err
 	}
-	// converte la risposta in domain.Node
+	// converte la risposta in domain.node
 	nodes := make([]domain.Node, len(resp.Successors))
 	for i, n := range resp.Successors {
 		nodes[i] = domain.Node{

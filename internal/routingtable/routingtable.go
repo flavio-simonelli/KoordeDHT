@@ -4,213 +4,165 @@ import (
 	"KoordeDHT/internal/domain"
 	"KoordeDHT/internal/logger"
 
-	"errors"
 	"sync"
 )
 
-var (
-	InvalidDegree = errors.New("invalid graph degree")
-	InvalidIDBits = errors.New("invalid ID bits")
-)
-
+// routingEntry rappresenta una entry della tabella di routing, include il nodo di dominio e può essere estesa in futuro.
 type routingEntry struct {
-	domain.Node
+	node *domain.Node
+	mu   sync.RWMutex // mutex per sincronizzare l'accesso al campo node
 }
 
-// RoutingTable rappresenta i link di un nodo Koorde.
+// RoutingTable rappresenta la tabella di routing di un nodo nella rete Koorde.
 type RoutingTable struct {
-	logger        logger.Logger   // logger per la routing table (default: NopLogger)
-	idBits        int             // numero di bit dello spazio ID
-	graphGrade    int             // grado del grafo De Bruijn
-	self          *routingEntry   // il nodo locale
-	succMu        []sync.RWMutex  // mutex per la lista di successori
+	logger        logger.Logger   // logger per le operazioni della tabella di routing
+	space         *domain.Space   // spazio degli ID e grado del grafo De Bruijn
+	self          *domain.Node    // nodo che possiede la tabella di routing
 	successorList []*routingEntry // log(n) successori per tolleranza ai guasti
-	predMu        sync.RWMutex    // mutex per il predecessore
 	predecessor   *routingEntry   // predecessore nel ring
-	dbWinMu       []sync.RWMutex
 	deBruijn      []*routingEntry // finestra: anchor = predecessor(k*m), succ^1(anchor), ..., succ^k(anchor)
 }
 
 // New crea una nuova tabella di routing per il nodo specificato.
-// idBits è il numero di bit dello spazio ID (es. 128).
-// graphGrade è il grado del grafo De Bruijn (es. 4).
-// k = log2(graphGrade) deve essere un intero positivo.
 // Restituisce un puntatore alla nuova RoutingTable.
-// Se graphGrade non è valido, restituisce InvalidDegree
-// Se idBits non è valido, restituisce InvalidIDBits
-// Inizialmente tutte le entry puntano al nodo locale; verranno aggiornate
-// successivamente dalle procedure di manutenzione (fix).
-func New(self domain.Node, idBits, graphGrade int, opts ...Option) (*RoutingTable, error) {
-	if idBits <= 0 {
-		return nil, InvalidIDBits
-	}
-	if graphGrade < 2 {
-		return nil, InvalidDegree
-	}
+func New(self *domain.Node, space *domain.Space, succListSize int, opts ...Option) *RoutingTable {
 	rt := &RoutingTable{
-		self:          &routingEntry{Node: self},
-		succMu:        make([]sync.RWMutex, idBits),
-		successorList: make([]*routingEntry, idBits),
-		predecessor:   &routingEntry{Node: self},
-		deBruijn:      make([]*routingEntry, graphGrade),
-		dbWinMu:       make([]sync.RWMutex, graphGrade+1),
-		logger:        &logger.NopLogger{}, // default: nessun log
+		self:          self,
+		space:         space,
+		successorList: make([]*routingEntry, succListSize),     // lista dei successori inizializzata a nil
+		predecessor:   &routingEntry{},                         // inizializzato a nil
+		deBruijn:      make([]*routingEntry, space.GraphGrade), // predecessor(km) + k-1 successori settati a nil
+		logger:        &logger.NopLogger{},                     // default: nessun log
 	}
-	// inizializza i link De Bruijn con il nodo locale
-	for i := range rt.deBruijn {
-		rt.deBruijn[i] = &routingEntry{Node: self}
-	}
-	// inizializza la successor list con il nodo locale
 	for i := range rt.successorList {
-		rt.successorList[i] = &routingEntry{Node: self}
+		rt.successorList[i] = &routingEntry{} // node = nil, mutex pronto
 	}
-	// Inizializza i parametri idBits e graphGrade
-	rt.idBits = idBits
-	rt.graphGrade = graphGrade
+	for i := range rt.deBruijn {
+		rt.deBruijn[i] = &routingEntry{} // idem per i puntatori de Bruijn
+	}
 	// applica le opzioni
 	for _, opt := range opts {
 		opt(rt)
 	}
-	return rt, nil
+	return rt
 }
 
-// Degree restituisce il grado del grafo De Bruijn.
-func (rt *RoutingTable) Degree() int {
-	return rt.graphGrade
+// InitSingleNode configura la tabella come rete di un solo nodo.
+// Tutti i puntatori (successori, predecessore, de Bruijn) puntano alla stessa routingEntry.
+func (rt *RoutingTable) InitSingleNode() {
+	single := &routingEntry{node: rt.self}
+
+	for i := range rt.successorList {
+		rt.successorList[i] = single
+	}
+	rt.predecessor = single
+	for i := range rt.deBruijn {
+		rt.deBruijn[i] = single
+	}
+
+	rt.logger.Info("routing table initialized for single-node network")
 }
 
-// IDBits restituisce il numero di bit dello spazio ID.
-func (rt *RoutingTable) IDBits() int {
-	return rt.idBits
+// Space restituisce lo spazio degli ID e il grado del grafo De Bruijn.
+func (rt *RoutingTable) Space() domain.Space {
+	return *rt.space
 }
 
 // Self restituisce il nodo locale.
-func (rt *RoutingTable) Self() domain.Node {
-	return rt.self.Node
+func (rt *RoutingTable) Self() *domain.Node {
+	return rt.self
 }
 
-// Successor restituisce il successore del nodo locale.
-func (rt *RoutingTable) Successor(i int) (domain.Node, error) {
+// GetSuccessor ritorna l'i-esimo successore dalla lista.
+// Se l'indice è fuori range o la voce è nil, restituisce nil.
+func (rt *RoutingTable) GetSuccessor(i int) *domain.Node {
 	if i < 0 || i >= len(rt.successorList) {
-		return domain.Node{}, errors.New("index out of range")
+		return nil
 	}
-	rt.succMu[i].RLock()
-	n := rt.successorList[i].Node
-	rt.succMu[i].RUnlock()
-	return n, nil
+	entry := rt.successorList[i]
+	entry.mu.RLock()
+	defer entry.mu.RUnlock()
+	return entry.node
 }
 
-func (rt *RoutingTable) SuccessorList() []domain.Node {
-	nodes := make([]domain.Node, len(rt.successorList))
-	for i := range rt.successorList {
-		rt.succMu[i].RLock()
-		nodes[i] = rt.successorList[i].Node
-		rt.succMu[i].RUnlock()
-	}
-	return nodes
+// FirstSuccessor ritorna il primo successore (successore principale).
+func (rt *RoutingTable) FirstSuccessor() *domain.Node {
+	return rt.GetSuccessor(0)
 }
 
-// SetSuccessor aggiorna il successore del nodo locale.
-func (rt *RoutingTable) SetSuccessor(i int, n domain.Node) { //TODO: mettere error
+// SetSuccessor aggiorna l'i-esimo successore con il nodo specificato.
+// Se l'indice è fuori range, non fa nulla.
+func (rt *RoutingTable) SetSuccessor(i int, node *domain.Node) {
 	if i < 0 || i >= len(rt.successorList) {
+		rt.logger.Warn("SetSuccessor index out of range", logger.F("index", i), logger.F("max", len(rt.successorList)-1))
 		return
 	}
-	rt.succMu[i].Lock()
-	old := rt.successorList[i].Node
-	rt.successorList[i] = &routingEntry{Node: n}
-	rt.succMu[i].Unlock()
-	if !old.ID.Equal(n.ID) {
-		rt.logger.Info("routingtable.SetSuccessor",
-			logger.F("old.addr", old.Addr),
-			logger.F("new.addr", n.Addr),
-			logger.F("old.id", old.ID.ToHexString()),
-			logger.F("new.id", n.ID.ToHexString()),
-		)
+	entry := rt.successorList[i]
+	entry.mu.Lock()
+	defer entry.mu.Unlock()
+	entry.node = node
+}
+
+// SuccessorList restituisce una copia della lista dei successori come slice di *domain.Node.
+// Le entry nil vengono mantenute come nil.
+func (rt *RoutingTable) SuccessorList() []*domain.Node {
+	out := make([]*domain.Node, len(rt.successorList))
+	for i, entry := range rt.successorList {
+		entry.mu.RLock()
+		out[i] = entry.node
+		entry.mu.RUnlock()
 	}
+	return out
 }
 
-// Predecessor restituisce il predecessore del nodo locale.
-func (rt *RoutingTable) Predecessor() domain.Node {
-	rt.predMu.RLock()
-	n := rt.predecessor.Node
-	rt.predMu.RUnlock()
-	return n
+// GetPredecessor restituisce il predecessore del nodo.
+// Se non è stato impostato, restituisce nil.
+func (rt *RoutingTable) GetPredecessor() *domain.Node {
+	rt.predecessor.mu.RLock()
+	defer rt.predecessor.mu.RUnlock()
+	return rt.predecessor.node
 }
 
-// SetPredecessor aggiorna il predecessore del nodo locale.
-func (rt *RoutingTable) SetPredecessor(n domain.Node) {
-	rt.predMu.Lock()
-	old := rt.predecessor.Node
-	rt.predecessor = &routingEntry{Node: n}
-	rt.predMu.Unlock()
-	if !old.ID.Equal(n.ID) {
-		rt.logger.Info("routingtable.SetPredecessor",
-			logger.F("old.addr", old.Addr),
-			logger.F("new.addr", n.Addr),
-			logger.F("old.id", old.ID.ToHexString()),
-			logger.F("new.id", n.ID.ToHexString()),
-		)
+// SetPredecessor aggiorna il predecessore con il nodo specificato.
+func (rt *RoutingTable) SetPredecessor(node *domain.Node) {
+	rt.predecessor.mu.Lock()
+	defer rt.predecessor.mu.Unlock()
+	rt.predecessor.node = node
+}
+
+// GetDeBruijn ritorna il puntatore de Bruijn per la cifra digit.
+// Se digit è fuori range, restituisce nil.
+func (rt *RoutingTable) GetDeBruijn(digit int) *domain.Node {
+	if digit < 0 || digit >= len(rt.deBruijn) {
+		return nil
 	}
+	entry := rt.deBruijn[digit]
+	entry.mu.RLock()
+	defer entry.mu.RUnlock()
+	return entry.node
 }
 
-// DeBruijn restituisce il nodo De Bruijn all'indice specificato.
-// l'indice deve essere compreso tra 0 e graphGrade.
-// l'indice 0 è la radice (anchor).
-// Se l'indice non è valido, restituisce errore.
-func (rt *RoutingTable) DeBruijn(i int) (domain.Node, error) {
-	if i < 0 || i >= len(rt.deBruijn) {
-		return domain.Node{}, errors.New("index out of range")
-	}
-	rt.dbWinMu[i].RLock()
-	n := rt.deBruijn[i].Node
-	rt.dbWinMu[i].RUnlock()
-	return n, nil
-}
-
-// FixDeBruijn aggiorna il nodo De Bruijn all'indice specificato.
-// l'indice deve essere compreso tra 0 e graphGrade.
-// l'indice 0 è la radice (anchor).
-// Se l'indice non è valido, la funzione non fa nulla.
-func (rt *RoutingTable) FixDeBruijn(i int, n domain.Node) {
-	if i < 0 || i >= len(rt.deBruijn) {
+// SetDeBruijn aggiorna il puntatore de Bruijn per la cifra digit.
+// Se digit è fuori range, non fa nulla.
+func (rt *RoutingTable) SetDeBruijn(digit int, node *domain.Node) {
+	if digit < 0 || digit >= len(rt.deBruijn) {
+		rt.logger.Warn("SetDeBruijn index out of range", logger.F("index", digit), logger.F("max", len(rt.deBruijn)-1))
 		return
 	}
-	rt.dbWinMu[i].Lock()
-	old := rt.deBruijn[i].Node
-	rt.deBruijn[i] = &routingEntry{Node: n}
-	rt.dbWinMu[i].Unlock()
-	if !old.ID.Equal(n.ID) {
-		rt.logger.Info("routingtable.FixDeBruijn",
-			logger.F("index", i),
-			logger.F("old.addr", old.Addr),
-			logger.F("new.addr", n.Addr),
-			logger.F("old.id", old.ID.ToHexString()),
-			logger.F("new.id", n.ID.ToHexString()),
-		)
-	}
+	entry := rt.deBruijn[digit]
+	entry.mu.Lock()
+	defer entry.mu.Unlock()
+	entry.node = node
 }
 
-// FindPredecessor prova a trovare rapidamente il predecessore reale di id
-// usando l'ancora predecessor(k·m) e la finestra dei k successori.
-// FindPredecessorDB restituisce il predecessore reale di id
-// usando anchor + finestra de Bruijn.
-// Cerca dal k-esimo successore verso anchor.
-func (rt *RoutingTable) FindPredecessor(id domain.ID) domain.Node {
-	rt.dbWinMu[len(rt.deBruijn)-1].RLock()
-	next := rt.deBruijn[len(rt.deBruijn)-1].Node
-	rt.dbWinMu[len(rt.deBruijn)-1].RUnlock()
-
-	// scendi a ritroso fino ad anchor (index 0)
-	for i := len(rt.deBruijn) - 2; i >= 0; i-- {
-		rt.dbWinMu[i].RLock()
-		candidate := rt.deBruijn[i].Node
-		rt.dbWinMu[i].RUnlock()
-
-		if id.InOC(candidate.ID, next.ID) {
-			return candidate
-		}
-		next = candidate
+// DeBruijnList restituisce una snapshot dei puntatori de Bruijn come slice di *domain.Node.
+// Le posizioni non inizializzate restano nil.
+func (rt *RoutingTable) DeBruijnList() []*domain.Node {
+	out := make([]*domain.Node, len(rt.deBruijn))
+	for i, entry := range rt.deBruijn {
+		entry.mu.RLock()
+		out[i] = entry.node
+		entry.mu.RUnlock()
 	}
-	// fallback: se non trovato, ritorna anchor
-	return rt.deBruijn[0].Node
+	return out
 }

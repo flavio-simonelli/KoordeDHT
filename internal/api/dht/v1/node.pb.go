@@ -55,7 +55,7 @@ func (x *Node) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Node.ProtoReflect.Descriptor instead.
+// Deprecated: Use node.ProtoReflect.Descriptor instead.
 func (*Node) Descriptor() ([]byte, []int) {
 	return file_dht_v1_node_proto_rawDescGZIP(), []int{0}
 }
@@ -441,9 +441,9 @@ const file_dht_v1_node_proto_rawDesc = "" +
 	"\x03DHT\x12L\n" +
 	"\rFindSuccessor\x12\x1c.dht.v1.FindSuccessorRequest\x1a\x1d.dht.v1.FindSuccessorResponse\x12N\n" +
 	"\x0fFindPredecessor\x12\x1c.dht.v1.FindSuccessorRequest\x1a\x1d.dht.v1.FindSuccessorResponse\x126\n" +
-	"\x0eGetPredecessor\x12\x16.google.protobuf.Empty\x1a\f.dht.v1.Node\x12A\n" +
+	"\x0eGetPredecessor\x12\x16.google.protobuf.Empty\x1a\f.dht.v1.node\x12A\n" +
 	"\x10GetSuccessorList\x12\x16.google.protobuf.Empty\x1a\x15.dht.v1.SuccessorList\x12.\n" +
-	"\x06Notify\x12\f.dht.v1.Node\x1a\x16.google.protobuf.Empty\x126\n" +
+	"\x06Notify\x12\f.dht.v1.node\x1a\x16.google.protobuf.Empty\x126\n" +
 	"\x04Ping\x12\x16.google.protobuf.Empty\x1a\x16.google.protobuf.Empty\x121\n" +
 	"\x03Put\x12\x12.dht.v1.PutRequest\x1a\x16.google.protobuf.Empty\x12.\n" +
 	"\x03Get\x12\x12.dht.v1.GetRequest\x1a\x13.dht.v1.GetResponse\x127\n" +
@@ -463,7 +463,7 @@ func file_dht_v1_node_proto_rawDescGZIP() []byte {
 
 var file_dht_v1_node_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_dht_v1_node_proto_goTypes = []any{
-	(*Node)(nil),                  // 0: dht.v1.Node
+	(*Node)(nil),                  // 0: dht.v1.node
 	(*FindSuccessorRequest)(nil),  // 1: dht.v1.FindSuccessorRequest
 	(*FindSuccessorResponse)(nil), // 2: dht.v1.FindSuccessorResponse
 	(*SuccessorList)(nil),         // 3: dht.v1.SuccessorList
@@ -474,20 +474,20 @@ var file_dht_v1_node_proto_goTypes = []any{
 	(*emptypb.Empty)(nil),         // 8: google.protobuf.Empty
 }
 var file_dht_v1_node_proto_depIdxs = []int32{
-	0,  // 0: dht.v1.FindSuccessorResponse.node:type_name -> dht.v1.Node
-	0,  // 1: dht.v1.SuccessorList.successors:type_name -> dht.v1.Node
+	0,  // 0: dht.v1.FindSuccessorResponse.node:type_name -> dht.v1.node
+	0,  // 1: dht.v1.SuccessorList.successors:type_name -> dht.v1.node
 	1,  // 2: dht.v1.DHT.FindSuccessor:input_type -> dht.v1.FindSuccessorRequest
 	1,  // 3: dht.v1.DHT.FindPredecessor:input_type -> dht.v1.FindSuccessorRequest
 	8,  // 4: dht.v1.DHT.GetPredecessor:input_type -> google.protobuf.Empty
 	8,  // 5: dht.v1.DHT.GetSuccessorList:input_type -> google.protobuf.Empty
-	0,  // 6: dht.v1.DHT.Notify:input_type -> dht.v1.Node
+	0,  // 6: dht.v1.DHT.Notify:input_type -> dht.v1.node
 	8,  // 7: dht.v1.DHT.Ping:input_type -> google.protobuf.Empty
 	4,  // 8: dht.v1.DHT.Put:input_type -> dht.v1.PutRequest
 	5,  // 9: dht.v1.DHT.Get:input_type -> dht.v1.GetRequest
 	7,  // 10: dht.v1.DHT.Delete:input_type -> dht.v1.DeleteRequest
 	2,  // 11: dht.v1.DHT.FindSuccessor:output_type -> dht.v1.FindSuccessorResponse
 	2,  // 12: dht.v1.DHT.FindPredecessor:output_type -> dht.v1.FindSuccessorResponse
-	0,  // 13: dht.v1.DHT.GetPredecessor:output_type -> dht.v1.Node
+	0,  // 13: dht.v1.DHT.GetPredecessor:output_type -> dht.v1.node
 	3,  // 14: dht.v1.DHT.GetSuccessorList:output_type -> dht.v1.SuccessorList
 	8,  // 15: dht.v1.DHT.Notify:output_type -> google.protobuf.Empty
 	8,  // 16: dht.v1.DHT.Ping:output_type -> google.protobuf.Empty

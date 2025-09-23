@@ -66,3 +66,8 @@ func LoadConfig(path string) (*NodeConfig, error) {
 
 	return &cfg, nil
 }
+
+func (cfg *NodeConfig) ValidateConfig() error {
+	//TODO: Aggiungi qui le validazioni specifiche per i campi della configurazione
+	return nil
+}

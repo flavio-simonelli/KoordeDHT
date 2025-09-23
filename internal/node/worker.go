@@ -167,20 +167,3 @@ func (n *Node) FixSuccessorList() {
 		n.rt.SetSuccessor(i, succList[i-1])
 	}
 }
-
-/*
-func (n *Node) FixPredecessor() {
-	pred := n.rt.Predecessor()
-	// se predecessore coincide con me, non c'è nulla da fare
-	if pred.ID.Equal(n.rt.Self().ID) {
-		return
-	}
-	// provo a pingarlo
-	err := n.cp.Ping(pred.Addr)
-	if err != nil {
-		n.lgr.Warn("FixPredecessor: predecessor not responding, resetting",
-			logger.FNode("predecessor", pred), logger.F("error", err.Error()))
-		n.rt.SetPredecessor(n.rt.Self()) //TODO: dovrei fare find node per trovare il predecessore
-	}
-}
-*/
