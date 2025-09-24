@@ -4,6 +4,7 @@ import (
 	"KoordeDHT/internal/domain"
 	"KoordeDHT/internal/logger"
 	"context"
+	"fmt"
 	"time"
 )
 
@@ -21,11 +22,16 @@ func (n *Node) StartStabilizers(ctx context.Context, interval time.Duration) {
 			case <-ticker.C:
 				n.stabilizeSuccessor() // keep successor pointer consistent
 				//n.fixSuccessorList()   // refresh successor list
-				//n.checkPredecessor()   // remove dead predecessor if needed
+				n.checkPredecessor() // remove dead predecessor if needed
 				//n.fixDeBruijn()        // maintain de Bruijn pointer
+				n.printRoutingTable()
 			}
 		}
 	}()
+}
+
+func (n *Node) printRoutingTable() {
+	fmt.Println(n.rt.DebugString())
 }
 
 // stabilizeSuccessor checks whether our successor is still valid
@@ -34,7 +40,7 @@ func (n *Node) stabilizeSuccessor() {
 	self := n.rt.Self()
 	succ := n.rt.FirstSuccessor()
 	if succ == nil {
-		n.lgr.Warn("stabilize: successor not set")
+		n.lgr.Warn("IMPOSSIBLE -> stabilize: successor nil")
 		return
 	}
 	// Ask successor for its predecessor
@@ -59,8 +65,8 @@ func (n *Node) stabilizeSuccessor() {
 			//TODO: qui due volte avrò il successore in memorai perche lo scrivo in prima oposizone e rimane enlla posizone in cui era prima
 			break
 		}
-		// Nothing more to do this round
-		// TODO: dobbimao mettere che se non c'è nessun successore allora si ferma tutto e si fa la join da capo
+		// If no successor found, we are probably alone in the DHT
+		n.rt.InitSingleNode()
 		return
 	}
 	// If successor’s predecessor is closer, promote it
@@ -142,6 +148,7 @@ func (n *Node) checkPredecessor() {
 	}
 }
 
+/*
 // fixDeBruijn refreshes the de Bruijn window.
 // It finds the anchor (predecessor of k*m mod 2^b), updates digit 0,
 // then fills the remaining digits using the anchor's successor list.
@@ -220,3 +227,5 @@ func (n *Node) fixDeBruijn() {
 	n.lgr.Debug("fixDeBruijn: updated de Bruijn window",
 		logger.F("degree", n.rt.Space().GraphGrade))
 }
+
+*/

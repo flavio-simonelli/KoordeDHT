@@ -3,6 +3,8 @@ package routingtable
 import (
 	"KoordeDHT/internal/domain"
 	"KoordeDHT/internal/logger"
+	"fmt"
+	"strings"
 
 	"sync"
 )
@@ -102,17 +104,10 @@ func New(self *domain.Node, space domain.Space, succListSize int, opts ...Option
 //   - The predecessor points to self.
 //   - Every de Bruijn entry points to self.
 func (rt *RoutingTable) InitSingleNode() {
-	single := &routingEntry{node: rt.self}
-	// Successor list: all entries point to self.
-	for i := range rt.successorList {
-		rt.successorList[i] = single
-	}
-	// Predecessor: points to self.
-	rt.predecessor = single
-	// De Bruijn window: all entries point to self.
-	for i := range rt.deBruijn {
-		rt.deBruijn[i] = single
-	}
+	rt.successorList[0] = &routingEntry{node: rt.self}
+	rt.predecessor = &routingEntry{node: rt.self}
+	rt.deBruijn[0] = &routingEntry{node: rt.self}
+
 	rt.logger.Info("routing table initialized for single-node network")
 }
 
@@ -285,4 +280,51 @@ func (rt *RoutingTable) DeBruijnList() []*domain.Node {
 		entry.mu.RUnlock()
 	}
 	return out
+}
+
+// DebugString restituisce una rappresentazione leggibile dell’intera routing table.
+//
+// Include:
+//   - Self node
+//   - Predecessore
+//   - Successor list (solo non-nil, con indici)
+//   - De Bruijn list (solo non-nil, con indici)
+func (rt *RoutingTable) DebugString() string {
+	var b strings.Builder
+
+	fmt.Fprintf(&b, "=== Routing Table Debug ===\n")
+	fmt.Fprintf(&b, "Self: %s (%s)\n", rt.self.ID.String(), rt.self.Addr)
+
+	// Predecessore
+	pred := rt.GetPredecessor()
+	if pred != nil {
+		fmt.Fprintf(&b, "Predecessor: %s (%s)\n", pred.ID.String(), pred.Addr)
+	} else {
+		fmt.Fprintf(&b, "Predecessor: <nil>\n")
+	}
+
+	// Successor list
+	fmt.Fprintf(&b, "Successor List:\n")
+	for i := 0; i < rt.SuccListSize(); i++ {
+		succ := rt.GetSuccessor(i)
+		if succ != nil {
+			fmt.Fprintf(&b, "  [%d] %s (%s)\n", i, succ.ID.String(), succ.Addr)
+		} else {
+			fmt.Fprintf(&b, "  [%d] <nil>\n", i)
+		}
+	}
+
+	// De Bruijn list
+	fmt.Fprintf(&b, "De Bruijn List:\n")
+	for i := 0; i < rt.space.GraphGrade; i++ {
+		node := rt.GetDeBruijn(i)
+		if node != nil {
+			fmt.Fprintf(&b, "  [%d] %s (%s)\n", i, node.ID.String(), node.Addr)
+		} else {
+			fmt.Fprintf(&b, "  [%d] <nil>\n", i)
+		}
+	}
+
+	fmt.Fprintf(&b, "===========================\n")
+	return b.String()
 }
