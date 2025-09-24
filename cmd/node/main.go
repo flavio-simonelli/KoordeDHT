@@ -1,6 +1,7 @@
 package main
 
 import (
+	"KoordeDHT/internal/client"
 	"KoordeDHT/internal/config"
 	"KoordeDHT/internal/domain"
 	"KoordeDHT/internal/logger"
@@ -11,89 +12,151 @@ import (
 	"context"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
 )
 
 var configPath = "config/node/config.yaml"
 
 func main() {
-	// carica la configurazione
+	// Load configuration
 	cfg, err := config.LoadConfig(configPath)
 	if err != nil {
-		log.Fatalf("Errore nel caricamento del file di configurazione: %v", err)
+		log.Fatalf("failed to load configuration from %q: %v", configPath, err)
 	}
-	// valida la configurazione
-	err = cfg.ValidateConfig()
-	if err != nil {
-		log.Fatalf("Errore nella validazione della configurazione: %v", err)
+	if err := cfg.ValidateConfig(); err != nil {
+		log.Fatalf("invalid configuration: %v", err)
 	}
-	// istanzia il logger
+
+	// Initialize logger
 	zapLog, err := zapfactory.New(cfg.Logger)
 	if err != nil {
-		log.Fatalf("Errore nel caricamento del file di logger: %v", err)
+		log.Fatalf("failed to initialize logger: %v", err)
 	}
-	defer func() { _ = zapLog.Sync() }()    // prima di chiudere il nodo svuotiamo il buffer del logger
-	lgr := zapfactory.NewZapAdapter(zapLog) // inizializza il logger globale
-	// inizializza la listen socket
+	defer func() { _ = zapLog.Sync() }() // flush logger buffers before exit
+	lgr := zapfactory.NewZapAdapter(zapLog)
+	lgr.Info("configuration loaded and validated successfully", logger.F("path", configPath))
+
+	// Initialize listener for incoming connections (to determine server address and port)
 	lis, err := cfg.Listen()
 	if err != nil {
-		zapLog.Fatal("Errore nel risolvere l'indirizzo di bind", zap.Error(err))
+		zapLog.Fatal("failed to bind listener", zap.Error(err))
 	}
-	defer func() { _ = lis.Close() }() // chiude il listener alla fine del main
+	defer func() { _ = lis.Close() }() // close listener on shutdown
 	addr := lis.Addr().String()
-	lgr.Info("Indirizzo di bind", logger.F("addr", addr))
-	// inizializza lo spazio degli ID
+	lgr.Info("listener initialized successfully", logger.F("addr", addr))
+
+	// Initialize the identifier space
 	space, err := domain.NewSpace(cfg.DHT.IDBits, cfg.DHT.DeBruijn.Degree)
 	if err != nil {
-		lgr.Error("Errore nell'inizializzare lo spazio degli ID", logger.F("error", err.Error()))
+		lgr.Error("failed to initialize identifier space", logger.F("id_bits", cfg.DHT.IDBits), logger.F("degree", cfg.DHT.DeBruijn.Degree), logger.F("err", err))
 		os.Exit(1)
 	}
-	// inizializza nodo
+
+	// Initialize the local node
 	id := space.NewIdFromAddr(addr)
-	lgr.Info("ID del nodo", logger.F("id", id.String()))
+	lgr.Info("node identifier assigned", logger.F("id", id.String()))
 	domainNode := domain.Node{
 		ID:   id,
 		Addr: addr,
 	}
-	// inizializza la tabella di routing
-	rt := routingtable.New(&domainNode, space, cfg.DHT.FaultTolerance.SuccessorListSize, routingtable.WithLogger(lgr.Named("routingtable")))
-	n := node.New(rt, node.WithLogger(lgr.Named("node")))
-	// avvia server
-	s := server.New(n)
+
+	// Initialize the routing table
+	rt := routingtable.New(
+		&domainNode,
+		space,
+		cfg.DHT.FaultTolerance.SuccessorListSize,
+		routingtable.WithLogger(lgr.Named("routingtable")),
+	)
+
+	// Initialize the client pool
+	cp := client.New(
+		cfg.DHT.FaultTolerance.FailureTimeout,
+		client.WithLogger(lgr.Named("clientpool")),
+	)
+
+	// Initialize the node
+	n := node.New(
+		rt,
+		cp,
+		node.WithLogger(lgr.Named("node")),
+	)
+
+	// Initialize the gRPC server
+	s, err := server.New(
+		lis,
+		n,
+		[]grpc.ServerOption{},
+		server.WithLogger(lgr.Named("server")),
+	)
+	if err != nil {
+		lgr.Error("failed to initialize gRPC server", logger.F("err", err))
+		os.Exit(1)
+	}
+
+	// Run server in background
 	serveErr := make(chan error, 1)
-	go func() { serveErr <- s.Run(lis) }()
-	// check se il server ha errori
-	select {
-	case err := <-serveErr:
-		lgr.Error("Server errore", logger.F("error", err.Error()))
-		os.Exit(1) //TODO: grateful stop
-	default:
-		// nessun errore ancora
-	}
-	lgr.Debug("Server started correctly")
-	// join in dht or create a new one
+	go func() { serveErr <- s.Start() }()
+	lgr.Info("gRPC server started successfully", logger.F("addr", addr))
+
+	// Join an existing DHT or create a new one
 	if len(cfg.DHT.BootstrapPeers) != 0 {
-		// join
-		peer := cfg.DHT.BootstrapPeers[0] //TODO: per ora uso solo il primo
-		lgr.Debug("Joining DHT", logger.F("peer", peer))
-		err = n.Join(peer)
-		if err != nil {
-			lgr.Error("Errore nel join alla DHT", logger.F("error", err.Error()))
-			os.Exit(1) //TODO: grateful stop
+		peer := cfg.DHT.BootstrapPeers[0] // TODO: use multiple peers
+		lgr.Debug("joining DHT", logger.F("peer", peer))
+
+		if err := n.Join(peer); err != nil {
+			lgr.Error("failed to join DHT", logger.F("peer", peer), logger.F("err", err))
+			// cleanup before exit
+			n.Stop()
+			s.Stop()
+			os.Exit(1)
 		}
-		lgr.Info("Join avvenuto con successo", logger.F("peer", peer))
+
+		lgr.Info("successfully joined DHT", logger.F("peer", peer))
 	} else {
-		// crea nuova dht
 		n.CreateNewDHT()
-		lgr.Info("Nuova DHT creata con successo")
+		lgr.Info("new DHT created successfully")
 	}
-	// avvia i worker di stabilizzazione
-	ctx, _ := context.WithCancel(context.Background())
-	n.StartStabilizer(ctx, cfg.DHT.FaultTolerance.StabilizationInterval)
+
+	// Setup signal handler for graceful shutdown
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	// Start periodic stabilization workers (run until ctx is canceled)
+	n.StartStabilizers(ctx, cfg.DHT.FaultTolerance.StabilizationInterval)
+	lgr.Info("Stabilization workers started")
+
 	select {
+	case <-ctx.Done():
+		lgr.Info("shutdown signal received, stopping server gracefully...")
+
+		n.Stop() // stop node
+
+		// Allow some time for graceful stop
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		done := make(chan struct{})
+		go func() {
+			s.GracefulStop()
+			close(done)
+		}()
+
+		select {
+		case <-done:
+			lgr.Info("server stopped gracefully")
+		case <-shutdownCtx.Done():
+			lgr.Warn("graceful stop timed out, forcing shutdown")
+			s.Stop()
+		}
+
 	case err := <-serveErr:
-		lgr.Error("Server errore", logger.F("error", err.Error()))
-		os.Exit(1) //TODO: grateful stop
+		lgr.Error("gRPC server terminated unexpectedly", logger.F("err", err))
+		n.Stop()
+		os.Exit(1)
 	}
 }

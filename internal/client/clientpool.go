@@ -83,16 +83,29 @@ func (p *Pool) AddRef(addr string) error {
 }
 
 // Get returns a gRPC client for the given node.
-// It assumes the node is already tracked in the pool via AddRef.
-// If the node is nil or the connection is missing, an error is returned.
+// If the connection exists in the pool, it reuses it.
+// Otherwise, it creates a one-shot connection that is not tracked
+// in the pool and will be closed by the caller after use.
 func (p *Pool) Get(addr string) (dhtv1.DHTClient, error) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	rc, ok := p.clients[addr]
-	if !ok {
-		return nil, fmt.Errorf("clientpool: no connection found for node %s", addr)
+	if addr == "" {
+		return nil, fmt.Errorf("clientpool: empty address")
 	}
-	return dhtv1.NewDHTClient(rc.conn), nil
+	p.mu.Lock()
+	rc, ok := p.clients[addr]
+	p.mu.Unlock()
+	if ok {
+		// Connection managed by pool, caller must NOT close it
+		return dhtv1.NewDHTClient(rc.conn), nil
+	}
+	// Create ephemeral connection (not pooled, caller must close it)
+	conn, err := grpc.NewClient(
+		addr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()), // plaintext, no TLS
+	)
+	if err != nil {
+		return nil, fmt.Errorf("clientpool: failed to dial %s: %w", addr, err)
+	}
+	return dhtv1.NewDHTClient(conn), nil
 }
 
 // Release decreases the reference count for the given node.

@@ -5,6 +5,7 @@ import (
 	dhtv1 "KoordeDHT/internal/api/dht/v1"
 	"KoordeDHT/internal/logger"
 	"KoordeDHT/internal/node"
+	"fmt"
 	"net"
 
 	"google.golang.org/grpc"
@@ -36,14 +37,13 @@ func New(lis net.Listener, n *node.Node, grpcOpts []grpc.ServerOption, srvOpts .
 	return s, nil
 }
 
-// Start launches the gRPC server asynchronously.
-// This call does not block: the server runs in a separate goroutine.
-func (s *Server) Start() {
-	go func() {
-		if err := s.grpcServer.Serve(s.listener); err != nil {
-			s.lgr.Warn("The gRPC server has stopped:", logger.F("error", err))
-		}
-	}()
+// Start runs the gRPC server and blocks until it stops.
+// It returns any error from grpc.Server.Serve.
+func (s *Server) Start() error {
+	if err := s.grpcServer.Serve(s.listener); err != nil {
+		return fmt.Errorf("gRPC server stopped: %w", err)
+	}
+	return nil
 }
 
 // Stop immediately stops the server and closes all active connections.

@@ -5,62 +5,110 @@ import (
 	"KoordeDHT/internal/logger"
 	"KoordeDHT/internal/routingtable"
 	"KoordeDHT/internal/storage"
+	"fmt"
 )
 
 type Node struct {
 	lgr logger.Logger
 	rt  *routingtable.RoutingTable
 	s   storage.Storage
-	cp  *client.ClientPool
+	cp  *client.Pool
 }
 
-func New(rout *routingtable.RoutingTable, opts ...Option) *Node {
+func New(rout *routingtable.RoutingTable, clientpool *client.Pool, opts ...Option) *Node {
 	n := &Node{
 		lgr: &logger.NopLogger{},
+		rt:  rout,
+		cp:  clientpool,
 	}
 	// applica le opzioni
 	for _, opt := range opts {
 		opt(n)
 	}
-	n.rt = rout
-	// inizializza lo storage
-	n.s = storage.NewMemoryStorage(n.lgr.Named("storage"))
-	// inizializza il client pool
-	n.cp = client.NewClientPool(n.lgr.Named("clientpool"))
 	return n
 }
 
+// Join connects this node to an existing Koorde ring using the given bootstrap peer.
+// It sets predecessor/successor pointers, initializes the successor list,
+// and refreshes de Bruijn links.
 func (n *Node) Join(bootstrapAddr string) error {
-	// richiesta al nodo di bootstrap per trovare il mio successore
-	succ, err := n.cp.FindSuccessorInit(n.rt.Self().ID, bootstrapAddr)
+	self := n.rt.Self()
+
+	// 1. Ask bootstrap to find our successor
+	succ, err := n.cp.FindSuccessorStart(self.ID, bootstrapAddr)
 	if err != nil {
-		return err
+		return fmt.Errorf("join: failed to find successor via bootstrap %s: %w", bootstrapAddr, err)
 	}
-	n.lgr.Info("Il mio possibile successore è", logger.FNode("successor", succ))
-	// contatto il mio possibile successore per ottenere il suo predecessore
+	if succ == nil {
+		return fmt.Errorf("join: bootstrap %s returned nil successor", bootstrapAddr)
+	}
+	// AddRef on successor before using it
+	if err := n.cp.AddRef(succ.Addr); err != nil {
+		n.lgr.Warn("join: failed to addref successor",
+			logger.FNode("succ", *succ), logger.F("err", err))
+	}
+	n.lgr.Info("join: candidate successor found", logger.FNode("successor", *succ))
+
+	// 2. Ask successor for its predecessor
 	pred, err := n.cp.GetPredecessor(succ.Addr)
 	if err != nil {
-		return err
+		n.cp.Release(succ.Addr) // release successor if join fails here
+		return fmt.Errorf("join: failed to get predecessor of successor %s: %w", succ.Addr, err)
 	}
-	n.lgr.Info("Il predecessore del mio successore è", logger.FNode("predecessor", pred))
-	// contatto il mio successore per aggiornare il suo predecessore a me
-	err = n.cp.Notify(n.rt.Self(), succ.Addr)
-	if err != nil {
-		return err
+	if pred != nil {
+		if err := n.cp.AddRef(pred.Addr); err != nil {
+			n.lgr.Warn("join: failed to addref predecessor",
+				logger.FNode("pred", *pred), logger.F("err", err))
+		}
+		n.lgr.Info("join: successor has predecessor", logger.FNode("predecessor", *pred))
 	}
-	// aggiorno la mia routing table
-	n.rt.SetPredecessor(&pred)
-	n.rt.SetSuccessor(0, &succ)
-	// inizializza la successor list
-	err := n.updateSuccessorList()
-	if err != nil {
-		return err
+
+	// 3. Notify successor that we may be its predecessor
+	if err := n.cp.Notify(self, succ.Addr); err != nil {
+		n.cp.Release(succ.Addr)
+		if pred != nil {
+			n.cp.Release(pred.Addr)
+		}
+		return fmt.Errorf("join: failed to notify successor %s: %w", succ.Addr, err)
 	}
-	// inizializzare la routing table con i DebrujinLinks
-	n.stabilizeDeBruijn()
+
+	// 4. Update local routing table (release old, set new)
+	if oldPred := n.rt.GetPredecessor(); oldPred != nil {
+		n.cp.Release(oldPred.Addr)
+	}
+	n.rt.SetPredecessor(pred)
+
+	if oldSucc := n.rt.FirstSuccessor(); oldSucc != nil {
+		n.cp.Release(oldSucc.Addr)
+	}
+	n.rt.SetSuccessor(0, succ)
+
+	// 5. Initialize successor list using the new successor
+	n.fixSuccessorList()
+
+	// 6. Initialize de Bruijn pointers
+	n.fixDeBruijn()
+
+	n.lgr.Info("join: completed successfully",
+		logger.FNode("self", *self),
+		logger.FNode("successor", *succ))
 	return nil
 }
 
 func (n *Node) CreateNewDHT() {
 	n.rt.InitSingleNode()
+}
+
+// Stop releases all resources owned by the node.
+// Should be called on shutdown.
+func (n *Node) Stop() {
+	if n == nil {
+		return
+	}
+	// Example: close client pool, timers, background workers...
+	if n.cp != nil {
+		n.cp.Close()
+	}
+	// TODO: add other cleanup if needed
+	n.lgr.Info("node stopped gracefully")
 }

@@ -12,7 +12,7 @@ logger:
 
 dht:
   idBits: 4                # identifier size (keyspace = 2^idBits)
-  bootstrapPeers: []       # initial peers for joining
+  bootstrapPeers: ["192.168.1.102:38453"]       # initial peers for joining
   mode: "private"          # network mode: public | private
 
   deBruijn:

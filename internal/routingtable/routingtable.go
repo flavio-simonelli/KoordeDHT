@@ -45,6 +45,7 @@ type RoutingTable struct {
 	space         domain.Space    // identifier space and de Bruijn graph degree
 	self          *domain.Node    // the local node owning this routing table
 	successorList []*routingEntry // O(log n) (set by configuration) successors for fault tolerance
+	succListSize  int             // configured size of the successor list
 	predecessor   *routingEntry   // immediate predecessor in the ring
 	deBruijn      []*routingEntry // de Bruijn window entries for base-k routing
 }
@@ -69,6 +70,7 @@ func New(self *domain.Node, space domain.Space, succListSize int, opts ...Option
 		self:          self,
 		space:         space,
 		successorList: make([]*routingEntry, succListSize),     // successors initially nil
+		succListSize:  succListSize,                            // configured size of the successor list
 		predecessor:   &routingEntry{},                         // predecessor initially nil
 		deBruijn:      make([]*routingEntry, space.GraphGrade), // base-k de Bruijn window initially nil
 		logger:        &logger.NopLogger{},                     // default: no logging
@@ -120,8 +122,12 @@ func (rt *RoutingTable) Space() domain.Space {
 }
 
 // Self returns the local node owning this routing table.
-func (rt *RoutingTable) Self() domain.Node {
-	return *rt.self
+func (rt *RoutingTable) Self() *domain.Node {
+	return rt.self
+}
+
+func (rt *RoutingTable) SuccListSize() int {
+	return rt.succListSize
 }
 
 // GetSuccessor returns the i-th successor from the successor list.
@@ -183,6 +189,26 @@ func (rt *RoutingTable) SuccessorList() []*domain.Node {
 		entry.mu.RUnlock()
 	}
 	return out
+}
+
+// SetSuccessorList replaces the entire successor list with the given slice.
+//
+// The provided slice must have the same length as the internal successor list.
+// Each entry is updated under a write lock to ensure thread safety.
+// If the slice length does not match, the method logs a warning and does nothing.
+func (rt *RoutingTable) SetSuccessorList(nodes []*domain.Node) {
+	if len(nodes) != len(rt.successorList) {
+		rt.logger.Warn(
+			"SetSuccessorList: length mismatch",
+			logger.F("expected", len(rt.successorList)),
+			logger.F("got", len(nodes)),
+		)
+		return
+	}
+
+	for i, node := range nodes {
+		rt.SetSuccessor(i, node)
+	}
 }
 
 // GetPredecessor return the current predecessor node.
