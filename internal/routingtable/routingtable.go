@@ -173,12 +173,12 @@ func (rt *RoutingTable) SetSuccessor(i int, node *domain.Node) {
 // The returned slice contains only initialized successors; entries with a nil
 // node are skipped. Callers receive a shallow copy of the successor list and
 // may safely modify it without affecting the internal state.
-func (rt *RoutingTable) SuccessorList() []domain.Node {
-	var out []domain.Node
+func (rt *RoutingTable) SuccessorList() []*domain.Node {
+	out := make([]*domain.Node, 0, len(rt.successorList))
 	for _, entry := range rt.successorList {
 		entry.mu.RLock()
 		if entry.node != nil {
-			out = append(out, *entry.node)
+			out = append(out, entry.node)
 		}
 		entry.mu.RUnlock()
 	}
