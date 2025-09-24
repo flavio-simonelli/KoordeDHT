@@ -57,9 +57,7 @@ service DHT {
     rpc FindSuccessor(FindSuccessorRequest) returns (FindSuccessorResponse);
 
     // Returns this node's predecessor.
-    // If unknown, returns NotFound.
-    rpc GetPredecessor(google.protobuf.Empty) returns (Node);
-
+    rpc GetPredecessor(google.protobuf.Empty) returns (Node); // status.Error(codes.NotFound, "key not found") se non ha predecessore
     // Returns this node's successor list.
     rpc GetSuccessorList(google.protobuf.Empty) returns (SuccessorList);
 

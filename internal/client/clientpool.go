@@ -2,10 +2,10 @@ package client
 
 import (
 	dhtv1 "KoordeDHT/internal/api/dht/v1"
-	"KoordeDHT/internal/domain"
 	"KoordeDHT/internal/logger"
 	"fmt"
 	"sync"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -35,14 +35,16 @@ type Pool struct {
 	lgr     logger.Logger
 	mu      sync.Mutex
 	clients map[string]*refConn
+	timeout time.Duration // default timeout for RPC calls
 }
 
 // New creates a new empty Pool. It accepts a list of functional options
 // to configure the pool (logger).
-func New(opt ...Option) *Pool {
+func New(timeout time.Duration, opt ...Option) *Pool {
 	p := &Pool{
 		clients: make(map[string]*refConn),
 		lgr:     &logger.NopLogger{}, // default: no logging
+		timeout: timeout,
 	}
 	// Apply functional options
 	for _, o := range opt {
@@ -57,11 +59,7 @@ func New(opt ...Option) *Pool {
 //
 // This method should be called whenever a node is added to the RoutingTable
 // (e.g., as successor or de Bruijn pointer).
-func (p *Pool) AddRef(node *domain.Node) error {
-	if node == nil {
-		return fmt.Errorf("clientpool: node is nil")
-	}
-	addr := node.Addr
+func (p *Pool) AddRef(addr string) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	// If a connection already exists, just bump the refcount.
@@ -87,11 +85,7 @@ func (p *Pool) AddRef(node *domain.Node) error {
 // Get returns a gRPC client for the given node.
 // It assumes the node is already tracked in the pool via AddRef.
 // If the node is nil or the connection is missing, an error is returned.
-func (p *Pool) Get(node *domain.Node) (dhtv1.DHTClient, error) {
-	if node == nil {
-		return nil, fmt.Errorf("clientpool: node is nil")
-	}
-	addr := node.Addr
+func (p *Pool) Get(addr string) (dhtv1.DHTClient, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	rc, ok := p.clients[addr]
@@ -107,11 +101,7 @@ func (p *Pool) Get(node *domain.Node) (dhtv1.DHTClient, error) {
 //
 // This method must be called whenever a node is removed from
 // the RoutingTable (e.g., no longer a successor or de Bruijn pointer).
-func (p *Pool) Release(node *domain.Node) error {
-	if node == nil {
-		return fmt.Errorf("clientpool: node is nil")
-	}
-	addr := node.Addr
+func (p *Pool) Release(addr string) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	rc, ok := p.clients[addr]
