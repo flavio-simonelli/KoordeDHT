@@ -51,6 +51,7 @@ func (n *Node) stabilizeSuccessor() {
 			logger.F("err", err))
 
 		// Promote next available successor from the list
+		promoted := false
 		for i := 1; i < n.rt.SuccListSize(); i++ {
 			candidate := n.rt.GetSuccessor(i)
 			if candidate == nil {
@@ -62,11 +63,14 @@ func (n *Node) stabilizeSuccessor() {
 
 			n.rt.PromoteCandidate(i)
 			succ = candidate
+			promoted = true
 			break
 		}
-		// If no successor found, we are probably alone in the DHT
-		n.rt.InitSingleNode()
-		return
+		if !promoted {
+			// no valid candidate found
+			n.rt.InitSingleNode()
+			return
+		}
 	}
 	// If successor’s predecessor is closer, promote it
 	if pred != nil && pred.ID.Between(self.ID, succ.ID) && !pred.ID.Equal(self.ID) {
