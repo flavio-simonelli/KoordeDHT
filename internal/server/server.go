@@ -5,7 +5,6 @@ import (
 	dhtv1 "KoordeDHT/internal/api/dht/v1"
 	"KoordeDHT/internal/logger"
 	"KoordeDHT/internal/node"
-	"fmt"
 	"net"
 
 	"google.golang.org/grpc"
@@ -42,8 +41,7 @@ func New(lis net.Listener, n *node.Node, grpcOpts []grpc.ServerOption, srvOpts .
 func (s *Server) Start() {
 	go func() {
 		if err := s.grpcServer.Serve(s.listener); err != nil {
-			// TODO: replace with structured logger
-			fmt.Printf("gRPC server stopped: %v\n", err)
+			s.lgr.Warn("The gRPC server has stopped:", logger.F("error", err))
 		}
 	}()
 }
