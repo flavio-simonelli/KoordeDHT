@@ -57,15 +57,17 @@ func (p *Pool) FindSuccessorStart(target domain.ID, serverAddr string) (*domain.
 	return domain.NodeFromProto(resp.Node), nil
 }
 
-// FindSuccessorStep performs a FindSuccessor RPC in "Step" mode.
+// FindSuccessorStepWithContext performs a FindSuccessor RPC in "Step" mode.
 // It continues a lookup for the given target ID, providing the current
 // imaginary node (currentI) and the shifted key state (kshift) as required
 // by the Koorde de Bruijn routing algorithm.
 //
+// Using the provided context. This allows propagating cancellation and deadlines across multiple hops in a lookup.
+//
 // Returns:
 //   - *domain.Node: the successor node returned by the remote server
 //   - error: ErrClientNotInPool, ErrTimeout, or a wrapped RPC error
-func (p *Pool) FindSuccessorStep(target, currentI, kshift domain.ID, serverAddr string) (*domain.Node, error) {
+func (p *Pool) FindSuccessorStepWithContext(ctx context.Context, target, currentI, kshift domain.ID, serverAddr string) (*domain.Node, error) {
 	// Retrieve the client from the pool
 	client, err := p.Get(serverAddr)
 	if err != nil {
@@ -73,9 +75,6 @@ func (p *Pool) FindSuccessorStep(target, currentI, kshift domain.ID, serverAddr 
 			logger.F("addr", serverAddr), logger.F("err", err))
 		return nil, fmt.Errorf("%w: %s", ErrClientNotInPool, serverAddr)
 	}
-	// Context with timeout for the RPC
-	ctx, cancel := context.WithTimeout(context.Background(), p.timeout)
-	defer cancel()
 	// Build the request in "Step" mode (subsequent hop of the lookup)
 	req := &pb.FindSuccessorRequest{
 		TargetId: target,
@@ -96,6 +95,15 @@ func (p *Pool) FindSuccessorStep(target, currentI, kshift domain.ID, serverAddr 
 	}
 	// Convert the protobuf Node into a domain.Node
 	return domain.NodeFromProto(resp.Node), nil
+}
+
+// FindSuccessorStep performs a FindSuccessor RPC in "Step" mode, creating
+// a new context with the default timeout configured in the pool.
+// This is used at the first hop when starting a lookup locally.
+func (p *Pool) FindSuccessorStep(target, currentI, kshift domain.ID, serverAddr string) (*domain.Node, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), p.timeout)
+	defer cancel()
+	return p.FindSuccessorStepWithContext(ctx, target, currentI, kshift, serverAddr)
 }
 
 // GetPredecessor contacts the given remote node and asks for its predecessor.
