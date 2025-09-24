@@ -161,6 +161,30 @@ func (sp Space) FromHexString(s string) (ID, error) {
 	return id, nil
 }
 
+// FromUint64 converts a uint64 value into an identifier (ID) within the given Space.
+//
+// The returned ID has exactly sp.ByteLen bytes and is interpreted as a big-endian
+// integer. The conversion masks off any unused high-order bits if sp.Bits is not
+// a multiple of 8, ensuring that the ID is always a valid element of the identifier
+// space defined by sp.
+//
+// This function is typically used when a numeric digit (e.g., from NextDigitBaseK)
+// must be combined with other IDs through modular arithmetic (AddMod, MulKMod, etc.).
+func (sp Space) FromUint64(x uint64) ID {
+	id := make(ID, sp.ByteLen)
+	for i := sp.ByteLen - 1; i >= 0 && x > 0; i-- {
+		id[i] = byte(x & 0xFF)
+		x >>= 8
+	}
+	// mask unused high-order bits
+	extraBits := sp.ByteLen*8 - sp.Bits
+	if extraBits > 0 {
+		mask := byte(0xFF >> extraBits)
+		id[0] &= mask
+	}
+	return id
+}
+
 // Cmp compare two ID in big-endian order.
 // returns:
 //
