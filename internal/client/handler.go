@@ -19,15 +19,52 @@ var (
 	ErrTimeout         = errors.New("client: RPC timed out, no response from remote node")
 )
 
+// checkContext checks whether the provided context has been canceled
+// or has exceeded its deadline. If so, it returns the corresponding
+// gRPC status error. Otherwise, it returns nil.
+func checkContext(ctx context.Context) error {
+	switch err := ctx.Err(); {
+	case errors.Is(err, context.Canceled):
+		return status.Error(codes.Canceled, "request was canceled by client")
+	case errors.Is(err, context.DeadlineExceeded):
+		return status.Error(codes.DeadlineExceeded, "request deadline exceeded")
+	default:
+		return nil
+	}
+}
+
 // FindSuccessorStart performs the initial FindSuccessor RPC call on the given server.
 // It starts a lookup for the provided target ID by sending a request in "Initial" mode.
 // The method retrieves a client connection from the pool, builds the request, executes
 // the RPC with a timeout, and converts the response into a domain.Node.
 //
+// This method uses the default timeout configured in the pool.
+//
 // Returns:
 //   - *domain.Node: the successor node returned by the remote server
 //   - error: ErrClientNotInPool, ErrTimeout, or a wrapped RPC error
 func (p *Pool) FindSuccessorStart(target domain.ID, serverAddr string) (*domain.Node, error) {
+	// Context with timeout for the RPC
+	ctx, cancel := context.WithTimeout(context.Background(), p.timeout)
+	defer cancel()
+	return p.FindSuccessorStartWithContext(ctx, target, serverAddr)
+}
+
+// FindSuccessorStartWithContext performs the initial FindSuccessor RPC call on the given server.
+// It starts a lookup for the provided target ID by sending a request in "Initial" mode.
+// The method retrieves a client connection from the pool, builds the request, executes
+// the RPC with a timeout, and converts the response into a domain.Node.
+//
+// Using the provided context. This allows propagating cancellation and deadlines across multiple hops in a lookup.
+//
+// Returns:
+//   - *domain.Node: the successor node returned by the remote server
+//   - error: ErrClientNotInPool, ErrTimeout, or a wrapped RPC error
+func (p *Pool) FindSuccessorStartWithContext(ctx context.Context, target domain.ID, serverAddr string) (*domain.Node, error) {
+	// Check for canceled/expired context
+	if err := checkContext(ctx); err != nil {
+		return nil, err
+	}
 	// Retrieve the client from the pool
 	client, err := p.Get(serverAddr)
 	if err != nil {
@@ -35,9 +72,6 @@ func (p *Pool) FindSuccessorStart(target domain.ID, serverAddr string) (*domain.
 			logger.F("addr", serverAddr), logger.F("err", err))
 		return nil, fmt.Errorf("%w: %s", ErrClientNotInPool, serverAddr)
 	}
-	// Context with timeout for the RPC
-	ctx, cancel := context.WithTimeout(context.Background(), p.timeout)
-	defer cancel()
 	// Build the request in "Initial" mode (first hop of the lookup)
 	req := &pb.FindSuccessorRequest{
 		TargetId: target,
@@ -68,6 +102,10 @@ func (p *Pool) FindSuccessorStart(target domain.ID, serverAddr string) (*domain.
 //   - *domain.Node: the successor node returned by the remote server
 //   - error: ErrClientNotInPool, ErrTimeout, or a wrapped RPC error
 func (p *Pool) FindSuccessorStepWithContext(ctx context.Context, target, currentI, kshift domain.ID, serverAddr string) (*domain.Node, error) {
+	// Check for canceled/expired context
+	if err := checkContext(ctx); err != nil {
+		return nil, err
+	}
 	// Retrieve the client from the pool
 	client, err := p.Get(serverAddr)
 	if err != nil {
