@@ -154,6 +154,7 @@ func (p *Pool) FindSuccessorStep(target, currentI, kshift domain.ID, serverAddr 
 //     ErrNoPredecessor if the remote node has no predecessor,
 //     or a wrapped RPC error otherwise.
 func (p *Pool) GetPredecessor(serverAddr string) (*domain.Node, error) {
+	// TODO: considera che se sei te stesso allora non fai la chiamata
 	// Retrieve the client from the pool
 	client, err := p.Get(serverAddr)
 	if err != nil {

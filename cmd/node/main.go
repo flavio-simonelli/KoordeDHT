@@ -10,6 +10,7 @@ import (
 	"KoordeDHT/internal/routingtable"
 	"KoordeDHT/internal/server"
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -121,6 +122,8 @@ func main() {
 		n.CreateNewDHT()
 		lgr.Info("new DHT created successfully")
 	}
+
+	fmt.Println("successor 0:", rt.FirstSuccessor())
 
 	// Setup signal handler for graceful shutdown
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)

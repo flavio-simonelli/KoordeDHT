@@ -20,9 +20,9 @@ func (n *Node) StartStabilizers(ctx context.Context, interval time.Duration) {
 				return
 			case <-ticker.C:
 				n.stabilizeSuccessor() // keep successor pointer consistent
-				n.fixSuccessorList()   // refresh successor list
-				n.checkPredecessor()   // remove dead predecessor if needed
-				n.fixDeBruijn()        // maintain de Bruijn pointer
+				//n.fixSuccessorList()   // refresh successor list
+				//n.checkPredecessor()   // remove dead predecessor if needed
+				//n.fixDeBruijn()        // maintain de Bruijn pointer
 			}
 		}
 	}()
@@ -64,7 +64,7 @@ func (n *Node) stabilizeSuccessor() {
 		return
 	}
 	// If successor’s predecessor is closer, promote it
-	if pred != nil && pred.ID.Between(self.ID, succ.ID) {
+	if pred != nil && pred.ID.Between(self.ID, succ.ID) && !pred.ID.Equal(self.ID) {
 		n.lgr.Info("stabilize: successor updated",
 			logger.FNode("old_successor", *succ),
 			logger.FNode("new_successor", *pred))
@@ -130,7 +130,7 @@ func (n *Node) fixSuccessorList() {
 // If it does not respond, we drop it.
 func (n *Node) checkPredecessor() {
 	pred := n.rt.GetPredecessor()
-	if pred == nil {
+	if pred == nil || pred.ID.Equal(n.rt.Self().ID) {
 		return
 	}
 	// Try a lightweight ping
