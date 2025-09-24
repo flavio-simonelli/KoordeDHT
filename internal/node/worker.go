@@ -21,8 +21,8 @@ func (n *Node) StartStabilizers(ctx context.Context, interval time.Duration) {
 				return
 			case <-ticker.C:
 				n.stabilizeSuccessor() // keep successor pointer consistent
-				//n.fixSuccessorList()   // refresh successor list
-				n.checkPredecessor() // remove dead predecessor if needed
+				n.fixSuccessorList()   // refresh successor list
+				n.checkPredecessor()   // remove dead predecessor if needed
 				//n.fixDeBruijn()        // maintain de Bruijn pointer
 				n.printRoutingTable()
 			}
@@ -60,9 +60,8 @@ func (n *Node) stabilizeSuccessor() {
 				logger.FNode("old", *succ),
 				logger.FNode("new", *candidate))
 
-			n.rt.SetSuccessor(0, candidate)
+			n.rt.PromoteCandidate(i)
 			succ = candidate
-			//TODO: qui due volte avrò il successore in memorai perche lo scrivo in prima oposizone e rimane enlla posizone in cui era prima
 			break
 		}
 		// If no successor found, we are probably alone in the DHT

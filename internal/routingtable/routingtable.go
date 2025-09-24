@@ -206,6 +206,43 @@ func (rt *RoutingTable) SetSuccessorList(nodes []*domain.Node) {
 	}
 }
 
+// PromoteCandidate restructures the successor list by promoting the
+// successor at position i to the head of the list.
+//
+// Behavior:
+//   - The node at index i becomes the new successor at position 0.
+//   - All successors after position i are shifted forward,
+//     preserving their relative order.
+//   - All successors before position i are discarded.
+//   - The list is padded with nil entries until it reaches
+//     the configured successor list size.
+//
+// Parameters:
+//   - i: the index of the candidate successor to promote.
+//     If i <= 0 or out of range, the function does nothing.
+func (rt *RoutingTable) PromoteCandidate(i int) {
+	if i <= 0 || i >= rt.succListSize {
+		return
+	}
+	// Build a new list: candidate + all successors after it
+	newList := make([]*domain.Node, 0, rt.succListSize)
+	candidate := rt.GetSuccessor(i)
+	if candidate == nil {
+		return
+	}
+	newList = append(newList, candidate)
+	for j := i + 1; j < rt.succListSize; j++ {
+		if succ := rt.GetSuccessor(j); succ != nil {
+			newList = append(newList, succ)
+		}
+	}
+	// Pad the list with nil to reach the configured size
+	for len(newList) < rt.succListSize {
+		newList = append(newList, nil)
+	}
+	rt.SetSuccessorList(newList)
+}
+
 // GetPredecessor return the current predecessor node.
 // If the predecessor is not set, it returns nil.
 // Access is synchronized with a read lock for thread safety.
