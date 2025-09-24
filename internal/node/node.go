@@ -33,7 +33,6 @@ func New(rout *routingtable.RoutingTable, clientpool *client.Pool, opts ...Optio
 // and refreshes de Bruijn links.
 func (n *Node) Join(bootstrapAddr string) error {
 	self := n.rt.Self()
-
 	// 1. Ask bootstrap to find our successor
 	succ, err := n.cp.FindSuccessorStart(self.ID, bootstrapAddr)
 	if err != nil {
@@ -42,45 +41,23 @@ func (n *Node) Join(bootstrapAddr string) error {
 	if succ == nil {
 		return fmt.Errorf("join: bootstrap %s returned nil successor", bootstrapAddr)
 	}
-	// AddRef on successor before using it
-	if err := n.cp.AddRef(succ.Addr); err != nil {
-		n.lgr.Warn("join: failed to addref successor",
-			logger.FNode("succ", *succ), logger.F("err", err))
-	}
 	n.lgr.Info("join: candidate successor found", logger.FNode("successor", *succ))
-
 	// 2. Ask successor for its predecessor
 	pred, err := n.cp.GetPredecessor(succ.Addr)
 	if err != nil {
-		n.cp.Release(succ.Addr) // release successor if join fails here
 		return fmt.Errorf("join: failed to get predecessor of successor %s: %w", succ.Addr, err)
 	}
 	if pred != nil {
-		if err := n.cp.AddRef(pred.Addr); err != nil {
-			n.lgr.Warn("join: failed to addref predecessor",
-				logger.FNode("pred", *pred), logger.F("err", err))
-		}
 		n.lgr.Info("join: successor has predecessor", logger.FNode("predecessor", *pred))
 	}
-
 	// 3. Notify successor that we may be its predecessor
 	if err := n.cp.Notify(self, succ.Addr); err != nil {
-		n.cp.Release(succ.Addr)
-		if pred != nil {
-			n.cp.Release(pred.Addr)
-		}
 		return fmt.Errorf("join: failed to notify successor %s: %w", succ.Addr, err)
 	}
-
 	// 4. Update local routing table (release old, set new)
-	if oldPred := n.rt.GetPredecessor(); oldPred != nil {
-		n.cp.Release(oldPred.Addr)
-	}
+	n.cp.AddRef(pred.Addr)
 	n.rt.SetPredecessor(pred)
-
-	if oldSucc := n.rt.FirstSuccessor(); oldSucc != nil {
-		n.cp.Release(oldSucc.Addr)
-	}
+	n.cp.AddRef(succ.Addr)
 	n.rt.SetSuccessor(0, succ)
 
 	// 5. Initialize successor list using the new successor

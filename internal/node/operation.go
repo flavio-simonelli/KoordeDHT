@@ -174,8 +174,7 @@ func (n *Node) Notify(p *domain.Node) {
 	}
 	pred := n.rt.GetPredecessor()
 	if pred == nil || p.ID.Between(pred.ID, n.rt.Self().ID) {
-		n.lgr.Info("Notify: updating predecessor",
-			logger.F("old", pred), logger.F("new", p))
+		n.lgr.Info("Notify: updating predecessor", logger.FNode("new", *p))
 
 		if pred != nil {
 			if err := n.cp.Release(pred.Addr); err != nil {

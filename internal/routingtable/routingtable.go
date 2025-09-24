@@ -104,15 +104,11 @@ func New(self *domain.Node, space domain.Space, succListSize int, opts ...Option
 func (rt *RoutingTable) InitSingleNode() {
 	single := &routingEntry{node: rt.self}
 	// Successor list: all entries point to self.
-	for i := range rt.successorList {
-		rt.successorList[i] = single
-	}
+	rt.successorList[0] = single
 	// Predecessor: points to self.
 	rt.predecessor = single
 	// De Bruijn window: all entries point to self.
-	for i := range rt.deBruijn {
-		rt.deBruijn[i] = single
-	}
+	rt.deBruijn[0] = single
 	rt.logger.Info("routing table initialized for single-node network")
 }
 
