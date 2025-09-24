@@ -206,24 +206,25 @@ func (n *Node) fixDeBruijn() {
 	}
 
 	// Fill positions 1..k-1 with successors of the anchor
-	for i := 1; i < n.rt.Space().GraphGrade && i-1 < len(list); i++ {
-		cand := list[i-1]
-		if cand == nil {
-			continue
+	for i := 1; i < n.rt.Space().GraphGrade; i++ {
+		var cand *domain.Node
+		if i-1 < len(list) {
+			cand = list[i-1]
 		}
-
 		old := n.rt.GetDeBruijn(i)
-		if old != nil && !old.ID.Equal(cand.ID) {
+		if old != nil && (cand == nil || !old.ID.Equal(cand.ID)) {
 			if err := n.cp.Release(old.Addr); err != nil {
 				n.lgr.Warn("fixDeBruijn: failed to release old de Bruijn pointer",
 					logger.FNode("old", *old), logger.F("err", err))
 			}
 		}
-
-		if err := n.cp.AddRef(cand.Addr); err != nil {
-			n.lgr.Warn("fixDeBruijn: failed to addref de Bruijn pointer",
-				logger.FNode("node", *cand), logger.F("err", err))
+		if cand != nil {
+			if err := n.cp.AddRef(cand.Addr); err != nil {
+				n.lgr.Warn("fixDeBruijn: failed to addref de Bruijn pointer",
+					logger.FNode("node", *cand), logger.F("err", err))
+			}
 		}
+		// if candidate is nil, it's ok, we just clear that entry
 		n.rt.SetDeBruijn(i, cand)
 	}
 
