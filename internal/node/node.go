@@ -61,7 +61,7 @@ func (n *Node) Join(bootstrapAddr string) error {
 	n.rt.SetSuccessor(0, succ)
 
 	// 5. Initialize successor list using the new successor
-	//n.fixSuccessorList()
+	n.fixSuccessorList()
 
 	// 6. Initialize de Bruijn pointers
 	//n.fixDeBruijn()

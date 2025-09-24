@@ -23,7 +23,7 @@ func (n *Node) StartStabilizers(ctx context.Context, interval time.Duration) {
 				n.stabilizeSuccessor() // keep successor pointer consistent
 				n.fixSuccessorList()   // refresh successor list
 				n.checkPredecessor()   // remove dead predecessor if needed
-				//n.fixDeBruijn()        // maintain de Bruijn pointer
+				n.fixDeBruijn()        // maintain de Bruijn pointer
 				n.printRoutingTable()
 			}
 		}
@@ -151,7 +151,6 @@ func (n *Node) checkPredecessor() {
 	}
 }
 
-/*
 // fixDeBruijn refreshes the de Bruijn window.
 // It finds the anchor (predecessor of k*m mod 2^b), updates digit 0,
 // then fills the remaining digits using the anchor's successor list.
@@ -160,6 +159,7 @@ func (n *Node) fixDeBruijn() {
 
 	// 1. Compute target = (k * self.ID) mod 2^b
 	target := n.rt.Space().MulKMod(self.ID)
+	n.lgr.Info("fixDeBruijn: checking target", logger.F("target", target.String()))
 
 	// 2. Lookup successor of target
 	succ, err := n.FindSuccessorInit(context.Background(), target)
@@ -230,5 +230,3 @@ func (n *Node) fixDeBruijn() {
 	n.lgr.Debug("fixDeBruijn: updated de Bruijn window",
 		logger.F("degree", n.rt.Space().GraphGrade))
 }
-
-*/

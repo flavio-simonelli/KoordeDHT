@@ -34,7 +34,7 @@ func (n *Node) FindSuccessorInit(ctx context.Context, target domain.ID) (*domain
 	currentI := n.rt.Space().MulKMod(self.ID)
 	currentI = n.rt.Space().AddMod(currentI, n.rt.Space().FromUint64(digit))
 	// find the closest preceding node to currentI
-	var startIdx int = -1
+	var startIdx = -1
 	for i := 0; i < len(debruijn)-2; i++ {
 		cand, nxt := debruijn[i], debruijn[i+1]
 		if cand == nil || nxt == nil {
