@@ -180,6 +180,8 @@ func (n *Node) Notify(p *domain.Node) {
 			n.lgr.Warn("Notify: failed to add new predecessor to pool",
 				logger.F("node", p), logger.F("err", err))
 		}
+		// set new predecessor
+		n.rt.SetPredecessor(p)
 		// release old predecessor (if p not nil)
 		if pred != nil {
 			if err := n.cp.Release(pred.Addr); err != nil {
@@ -187,7 +189,5 @@ func (n *Node) Notify(p *domain.Node) {
 					logger.F("node", pred), logger.F("err", err))
 			}
 		}
-		// set new predecessor
-		n.rt.SetPredecessor(p)
 	}
 }

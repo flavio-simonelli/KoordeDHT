@@ -66,18 +66,44 @@ func (n *Node) stabilizeSuccessor() {
 				logger.FNode("old", *succ),
 				logger.FNode("new", *candidate))
 
+			n.rt.PromoteCandidate(i)
+
 			if err := n.cp.Release(succ.Addr); err != nil {
 				n.lgr.Warn("stabilize: failed to release old successor",
 					logger.FNode("old", *succ), logger.F("err", err))
 			}
 
-			n.rt.PromoteCandidate(i)
 			succ = candidate
 			promoted = true
 			break
 		}
 		if !promoted {
 			// no candidate found
+			// Release predecessor
+			if pred := n.rt.GetPredecessor(); pred != nil {
+				if err := n.cp.Release(pred.Addr); err != nil {
+					n.lgr.Warn("stabilize: failed to release predecessor",
+						logger.FNode("pred", *pred), logger.F("err", err))
+				}
+			}
+			// Release successor list
+			for _, nd := range n.rt.SuccessorList() {
+				if nd != nil {
+					if err := n.cp.Release(nd.Addr); err != nil {
+						n.lgr.Warn("stabilize: failed to release successor",
+							logger.FNode("succ", *nd), logger.F("err", err))
+					}
+				}
+			}
+			// Release de Bruijn list
+			for _, nd := range n.rt.DeBruijnList() {
+				if nd != nil {
+					if err := n.cp.Release(nd.Addr); err != nil {
+						n.lgr.Warn("stabilize: failed to release deBruijn entry",
+							logger.FNode("node", *nd), logger.F("err", err))
+					}
+				}
+			}
 			n.rt.InitSingleNode()
 			return
 		}
@@ -92,13 +118,13 @@ func (n *Node) stabilizeSuccessor() {
 			n.lgr.Warn("stabilize: failed to add new successor to pool",
 				logger.FNode("new", *pred), logger.F("err", err))
 		}
+		// Update routing table
+		n.rt.SetSuccessor(0, pred)
 		// Release old successor
 		if err := n.cp.Release(succ.Addr); err != nil {
 			n.lgr.Warn("stabilize: failed to release old successor",
 				logger.FNode("old", *succ), logger.F("err", err))
 		}
-		// Update routing table
-		n.rt.SetSuccessor(0, pred)
 		succ = pred
 	}
 	// Notify successor that we might be its predecessor
@@ -140,7 +166,7 @@ func (n *Node) fixSuccessorList() {
 	newList[0] = succ
 	for i := 1; i < size; i++ {
 		if i-1 < len(remoteList) {
-			if remoteList[i-1] != nil && !remoteList[i-1].ID.Equal(succ.ID) {
+			if remoteList[i-1] != nil && !remoteList[i-1].ID.Equal(n.rt.Self().ID) {
 				newList[i] = remoteList[i-1]
 			}
 		}
