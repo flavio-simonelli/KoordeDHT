@@ -33,19 +33,21 @@ type refConn struct {
 // It uses reference counting to avoid closing connections that are still in use
 // (a node can appear in multiple roles, e.g., successor and de Bruijn pointer).
 type Pool struct {
-	lgr     logger.Logger
-	mu      sync.Mutex
-	clients map[string]*refConn
-	timeout time.Duration // default timeout for RPC calls
+	selfAddr string
+	lgr      logger.Logger
+	mu       sync.Mutex
+	clients  map[string]*refConn
+	timeout  time.Duration // default timeout for RPC calls
 }
 
 // New creates a new empty Pool. It accepts a list of functional options
 // to configure the pool (logger).
-func New(timeout time.Duration, opt ...Option) *Pool {
+func New(selfAddr string, timeout time.Duration, opt ...Option) *Pool {
 	p := &Pool{
-		clients: make(map[string]*refConn),
-		lgr:     &logger.NopLogger{}, // default: no logging
-		timeout: timeout,
+		selfAddr: selfAddr,
+		clients:  make(map[string]*refConn),
+		lgr:      &logger.NopLogger{}, // default: no logging
+		timeout:  timeout,
 	}
 	// Apply functional options
 	for _, o := range opt {
@@ -61,6 +63,10 @@ func New(timeout time.Duration, opt ...Option) *Pool {
 // This method should be called whenever a node is added to the RoutingTable
 // (e.g., as successor or de Bruijn pointer).
 func (p *Pool) AddRef(addr string) error {
+	if addr == p.selfAddr {
+		// no need to connect to self
+		return nil
+	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	// If a connection already exists, just bump the refcount.
@@ -116,6 +122,10 @@ func (p *Pool) Get(addr string) (dhtv1.DHTClient, error) {
 // This method must be called whenever a node is removed from
 // the RoutingTable (e.g., no longer a successor or de Bruijn pointer).
 func (p *Pool) Release(addr string) error {
+	if addr == p.selfAddr {
+		// no connection to self
+		return nil
+	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	rc, ok := p.clients[addr]
