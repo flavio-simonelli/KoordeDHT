@@ -324,8 +324,8 @@ func (p *Pool) Ping(serverAddr string) error {
 	return nil
 }
 
-// StoreRemote sends a StoreValue RPC to the given remote node to store
-func (p *Pool) StoreRemote(res domain.Resource, serverAddr string) error {
+// StoreRemoteWithContext sends a StoreValue RPC to the given remote node to store
+func (p *Pool) StoreRemoteWithContext(ctx context.Context, res domain.Resource, serverAddr string) error {
 	// RetrieveLocal the client from the pool
 	client, err := p.Get(serverAddr)
 	if err != nil {
@@ -333,9 +333,6 @@ func (p *Pool) StoreRemote(res domain.Resource, serverAddr string) error {
 			logger.F("addr", serverAddr), logger.F("err", err))
 		return fmt.Errorf("%w: %s", ErrClientNotInPool, serverAddr)
 	}
-	// Context with timeout for the RPC
-	ctx, cancel := context.WithTimeout(context.Background(), p.timeout)
-	defer cancel()
 	// Build the request from the domain.Resource
 	req := &pb.StoreRequest{
 		Key:   res.Key,
@@ -352,7 +349,7 @@ func (p *Pool) StoreRemote(res domain.Resource, serverAddr string) error {
 	return nil
 }
 
-// RetrieveRemote sends a RetrieveValue RPC to the given remote node to fetch
+// RetrieveRemoteWithContext sends a RetrieveValue RPC to the given remote node to fetch
 // a resource by its key. It returns the resource if found.
 //
 // Returns:
@@ -360,7 +357,7 @@ func (p *Pool) StoreRemote(res domain.Resource, serverAddr string) error {
 //   - error: ErrClientNotInPool if the client is not in the pool,
 //     ErrTimeout if the RPC timed out,
 //     or a wrapped RPC error otherwise.
-func (p *Pool) RetrieveRemote(key domain.ID, serverAddr string) (*domain.Resource, error) {
+func (p *Pool) RetrieveRemoteWithContext(ctx context.Context, key domain.ID, serverAddr string) (*domain.Resource, error) {
 	// RetrieveLocal the client from the pool
 	client, err := p.Get(serverAddr)
 	if err != nil {
@@ -391,7 +388,7 @@ func (p *Pool) RetrieveRemote(key domain.ID, serverAddr string) (*domain.Resourc
 	return res, nil
 }
 
-// RemoveRemote sends a RemoveValue RPC to the given remote node to delete
+// RemoveRemoteWithContext sends a RemoveValue RPC to the given remote node to delete
 // a resource by its key.
 //
 // Returns:
@@ -399,7 +396,7 @@ func (p *Pool) RetrieveRemote(key domain.ID, serverAddr string) (*domain.Resourc
 //   - ErrClientNotInPool if the client is not in the pool
 //   - ErrTimeout if the RPC timed out
 //   - a wrapped RPC error otherwise
-func (p *Pool) RemoveRemote(key domain.ID, serverAddr string) error {
+func (p *Pool) RemoveRemoteWithContext(ctx context.Context, key domain.ID, serverAddr string) error {
 	// RetrieveLocal the client from the pool
 	client, err := p.Get(serverAddr)
 	if err != nil {

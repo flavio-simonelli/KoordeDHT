@@ -26,20 +26,6 @@ func NewDHTService(n *node.Node) dhtv1.DHTServer {
 	return &dhtService{node: n}
 }
 
-// checkContext checks whether the provided context has been canceled
-// or has exceeded its deadline. If so, it returns the corresponding
-// gRPC status error. Otherwise, it returns nil.
-func checkContext(ctx context.Context) error {
-	switch err := ctx.Err(); {
-	case errors.Is(err, context.Canceled):
-		return status.Error(codes.Canceled, "request was canceled by client")
-	case errors.Is(err, context.DeadlineExceeded):
-		return status.Error(codes.DeadlineExceeded, "request deadline exceeded")
-	default:
-		return nil
-	}
-}
-
 // FindSuccessor handles a request to locate the successor of a given target ID.
 // Depending on the mode, the request is treated as either:
 //   - Initial: the first hop of a lookup

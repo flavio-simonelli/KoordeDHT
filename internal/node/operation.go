@@ -6,6 +6,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // FindSuccessorInit questa funzione è quella che viene chiamata dal server se riceve una richiesta di FindSuccessor in modalità INIT
@@ -196,21 +199,118 @@ func (n *Node) CheckIdValidity(id domain.ID) error {
 	return n.rt.Space().IsValidID(id)
 }
 
-// operazione di store di una risorsa nella DHT chiamata da un client
-func (n *Node) Put(key string, value string) error {
-	// TODO: implementare
+// Put stores a resource in the DHT on behalf of an external client.
+// The node computes the ID of the key, finds the successor responsible for it,
+// and either stores the resource locally (if it is the successor) or forwards
+// the request to the successor node.
+//
+// Context is propagated so that timeouts and cancellations from the client
+// apply also to the routing and storage steps.
+func (n *Node) Put(ctx context.Context, key string, value string) error {
+	// Check if the context has already been canceled or expired
+	if err := checkContext(ctx); err != nil {
+		return err
+	}
+	// Translate the client key into a DHT identifier
+	id := n.rt.Space().NewIdFromString(key)
+	// Find the successor node responsible for this ID
+	succ, err := n.FindSuccessorInit(ctx, id)
+	if err != nil {
+		return fmt.Errorf("Put: failed to find successor for key %s: %w", key, err)
+	}
+	if succ == nil {
+		return fmt.Errorf("Put: no successor found for key %s", key)
+	}
+	// Build the resource object
+	res := domain.Resource{
+		Key:   id,
+		Value: value,
+	}
+	// If this node is the successor, store locally
+	if succ.ID.Equal(n.rt.Self().ID) {
+		return n.StoreLocal(res)
+	}
+	// Otherwise, forward the resource to the successor
+	if err := n.cp.StoreRemoteWithContext(ctx, res, succ.Addr); err != nil {
+		return fmt.Errorf("Put: failed to store resource at successor %s: %w", succ.Addr, err)
+	}
+	// Log success
+	n.lgr.Info("Put: resource stored at successor", logger.F("key", key), logger.FNode("successor", *succ))
 	return nil
 }
 
-// operazione di get di una risorsa nella DHT chiamata da un client
-func (n *Node) Get(key string) (domain.Resource, error) {
-	// TODO: implementare
-	return domain.Resource{}, nil
+// Get retrieves a resource from the DHT on behalf of an external client.
+// The node computes the ID of the key, finds the successor responsible for it,
+// and either fetches the resource locally or forwards the request to the
+// successor node.
+//
+// Returns:
+//   - *domain.Resource if found
+//   - status.Error(codes.NotFound, ...) if the resource does not exist
+//   - error in case of routing or RPC issues
+func (n *Node) Get(ctx context.Context, key string) (*domain.Resource, error) {
+	if err := checkContext(ctx); err != nil {
+		return nil, err
+	}
+	id := n.rt.Space().NewIdFromString(key)
+	succ, err := n.FindSuccessorInit(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("Get: failed to find successor for key %s: %w", key, err)
+	}
+	if succ == nil {
+		return nil, fmt.Errorf("Get: no successor found for key %s", key)
+	}
+	// If this node is the successor, retrieve locally
+	if succ.ID.Equal(n.rt.Self().ID) {
+		res, err := n.RetrieveLocal(id)
+		if err != nil {
+			if errors.Is(err, domain.ErrResourceNotFound) {
+				return nil, status.Error(codes.NotFound, "key not found")
+			}
+			return nil, err
+		}
+		return &res, nil
+	}
+	// Otherwise, forward the request to the successor
+	res, err := n.cp.RetrieveRemoteWithContext(ctx, id, succ.Addr)
+	if err != nil {
+		return nil, fmt.Errorf("Get: failed to retrieve resource from successor %s: %w", succ.Addr, err)
+	}
+	return res, nil
 }
 
-// operazione di delete di una risorsa nella DHT chiamata da un client
-func (n *Node) Delete(key string) error {
-	// TODO: implementare
+// Delete removes a resource from the DHT on behalf of an external client.
+// The node computes the ID of the key, finds the successor responsible for it,
+// and either deletes the resource locally or forwards the request to the
+// successor node.
+//
+// Returns NotFound if the resource does not exist.
+func (n *Node) Delete(ctx context.Context, key string) error {
+	if err := checkContext(ctx); err != nil {
+		return err
+	}
+	id := n.rt.Space().NewIdFromString(key)
+	succ, err := n.FindSuccessorInit(ctx, id)
+	if err != nil {
+		return fmt.Errorf("Delete: failed to find successor for key %s: %w", key, err)
+	}
+	if succ == nil {
+		return fmt.Errorf("Delete: no successor found for key %s", key)
+	}
+	// If this node is the successor, delete locally
+	if succ.ID.Equal(n.rt.Self().ID) {
+		if err := n.RemoveLocal(id); err != nil {
+			if errors.Is(err, domain.ErrResourceNotFound) {
+				return status.Error(codes.NotFound, "key not found")
+			}
+			return err
+		}
+		return nil
+	}
+	// Otherwise, forward the request to the successor
+	if err := n.cp.RemoveRemoteWithContext(ctx, id, succ.Addr); err != nil {
+		return fmt.Errorf("Delete: failed to remove resource at successor %s: %w", succ.Addr, err)
+	}
 	return nil
 }
 
@@ -227,4 +327,18 @@ func (n *Node) RetrieveLocal(id domain.ID) (domain.Resource, error) {
 // RemoveLocal rimuove la risorsa con la chiave specificata dal nodo locale utilizzando lo storage interno. (chiamata da operazioni node -> node)
 func (n *Node) RemoveLocal(id domain.ID) error {
 	return n.s.Delete(id)
+}
+
+// checkContext checks whether the provided context has been canceled
+// or has exceeded its deadline. If so, it returns the corresponding
+// gRPC status error. Otherwise, it returns nil.
+func checkContext(ctx context.Context) error {
+	switch err := ctx.Err(); {
+	case errors.Is(err, context.Canceled):
+		return status.Error(codes.Canceled, "request was canceled by client")
+	case errors.Is(err, context.DeadlineExceeded):
+		return status.Error(codes.DeadlineExceeded, "request deadline exceeded")
+	default:
+		return nil
+	}
 }
