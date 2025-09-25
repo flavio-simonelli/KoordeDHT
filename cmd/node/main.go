@@ -59,7 +59,7 @@ func main() {
 	}
 
 	// Initialize the local node
-	id := space.NewIdFromAddr(addr)
+	id := space.NewIdFromString(addr) // derive ID from address
 	lgr.Info("node identifier assigned", logger.F("id", id.String()))
 	domainNode := domain.Node{
 		ID:   id,
