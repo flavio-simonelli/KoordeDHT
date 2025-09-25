@@ -75,21 +75,20 @@ func NewSpace(b int, degree int) (Space, error) {
 // graph calculations).
 type ID []byte
 
-// NewIdFromAddr generates a new identifier (ID) for a given network address
-// (e.g., "ip:port") within the current identifier space.
+// NewIdFromString generates a new identifier (ID) for a given string within the current identifier space.
 //
-// The ID is derived by computing the SHA-1 hash of the address string.
+// The ID is derived by computing the SHA-1 hash of the string.
 // The resulting 160-bit digest is then truncated or padded to match
 // the bit-length specified by the Space.
 //
 // Steps:
-//  1. Compute SHA-1 of the input address.
+//  1. Compute SHA-1 of the input string.
 //  2. Copy the most significant bytes (big-endian order) into a buffer
 //     of length sp.ByteLen.
 //  3. If Bits is not a multiple of 8, mask the unused high-order bits
 //     in the first byte to ensure the ID fits exactly into [0, 2^Bits - 1].
-func (sp Space) NewIdFromAddr(addr string) ID {
-	h := sha1.Sum([]byte(addr)) // [20]byte (160 bits)
+func (sp Space) NewIdFromString(s string) ID {
+	h := sha1.Sum([]byte(s)) // [20]byte (160 bits)
 	// Allocate buffer of correct length
 	buf := make([]byte, sp.ByteLen)
 	// Copy the most significant bytes (big-endian)
@@ -101,6 +100,29 @@ func (sp Space) NewIdFromAddr(addr string) ID {
 		buf[0] &= mask // max one byte to mask
 	}
 	return buf
+}
+
+// IsValidID checks whether the given byte slice is a valid ID
+// in the current identifier space (0 <= id < 2^Bits).
+//
+// Rules:
+//  1. The length must be exactly sp.ByteLen.
+//  2. If Bits is not a multiple of 8, the unused high-order bits
+//     in the first byte must be zero.
+func (sp Space) IsValidID(id []byte) bool {
+	// must have correct length
+	if len(id) != sp.ByteLen {
+		return false
+	}
+	// mask unused high-order bits
+	extraBits := sp.ByteLen*8 - sp.Bits
+	if extraBits > 0 {
+		mask := byte(0xFF << (8 - extraBits))
+		if id[0]&mask != 0 {
+			return false
+		}
+	}
+	return true
 }
 
 // Hex returns the identifier as a lowercase hexadecimal string.
