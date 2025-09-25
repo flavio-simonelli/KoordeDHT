@@ -20,4 +20,6 @@ type Storage interface {
 	Delete(id domain.ID) error
 	// Between restituisce tutte le coppie (k,v) con k ∈ (from, to]
 	Between(from, to domain.ID) ([]domain.Resource, error)
+	// All restituisce tutte le coppie (k,v) memorizzate
+	All() ([]domain.Resource, error)
 }
