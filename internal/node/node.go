@@ -11,15 +11,16 @@ import (
 type Node struct {
 	lgr logger.Logger
 	rt  *routingtable.RoutingTable
-	s   storage.Storage
+	s   *storage.Storage
 	cp  *client.Pool
 }
 
-func New(rout *routingtable.RoutingTable, clientpool *client.Pool, opts ...Option) *Node {
+func New(rout *routingtable.RoutingTable, clientpool *client.Pool, storage *storage.Storage, opts ...Option) *Node {
 	n := &Node{
 		lgr: &logger.NopLogger{},
 		rt:  rout,
 		cp:  clientpool,
+		s:   storage,
 	}
 	// applica le opzioni
 	for _, opt := range opts {

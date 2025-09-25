@@ -9,6 +9,7 @@ import (
 	"KoordeDHT/internal/node"
 	"KoordeDHT/internal/routingtable"
 	"KoordeDHT/internal/server"
+	"KoordeDHT/internal/storage"
 	"context"
 	"log"
 	"os"
@@ -80,10 +81,14 @@ func main() {
 		client.WithLogger(lgr.Named("clientpool")),
 	)
 
+	// Initialize the storage
+	store := storage.NewMemoryStorage()
+
 	// Initialize the node
 	n := node.New(
 		rt,
 		cp,
+		store,
 		node.WithLogger(lgr.Named("node")),
 	)
 
