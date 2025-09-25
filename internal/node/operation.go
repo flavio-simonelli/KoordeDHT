@@ -175,18 +175,19 @@ func (n *Node) Notify(p *domain.Node) {
 	pred := n.rt.GetPredecessor()
 	if pred == nil || p.ID.Between(pred.ID, n.rt.Self().ID) {
 		n.lgr.Info("Notify: updating predecessor", logger.FNode("new", *p))
-
+		// addRef new predecessor
+		if err := n.cp.AddRef(p.Addr); err != nil {
+			n.lgr.Warn("Notify: failed to add new predecessor to pool",
+				logger.F("node", p), logger.F("err", err))
+		}
+		// release old predecessor (if p not nil)
 		if pred != nil {
 			if err := n.cp.Release(pred.Addr); err != nil {
 				n.lgr.Warn("Notify: failed to release old predecessor",
 					logger.F("node", pred), logger.F("err", err))
 			}
 		}
-		if err := n.cp.AddRef(p.Addr); err != nil {
-			n.lgr.Warn("Notify: failed to add new predecessor to pool",
-				logger.F("node", p), logger.F("err", err))
-		}
-
+		// set new predecessor
 		n.rt.SetPredecessor(p)
 	}
 }

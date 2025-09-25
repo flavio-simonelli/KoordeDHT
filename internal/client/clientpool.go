@@ -4,6 +4,7 @@ import (
 	dhtv1 "KoordeDHT/internal/api/dht/v1"
 	"KoordeDHT/internal/logger"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -149,4 +150,26 @@ func (p *Pool) Close() error {
 		delete(p.clients, addr)
 	}
 	return firstErr
+}
+
+// DebugDump stampa su stdout una tabella con tutti i client nel pool
+// e i rispettivi reference count.
+func (p *Pool) DebugDump() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	fmt.Println("=== ClientPool Debug Dump ===")
+	if len(p.clients) == 0 {
+		fmt.Println("No active clients.")
+		return
+	}
+
+	// intestazione tabella
+	fmt.Printf("%-25s | %s\n", "Address", "Refs")
+	fmt.Println(strings.Repeat("-", 40))
+
+	for addr, rc := range p.clients {
+		fmt.Printf("%-25s | %d\n", addr, rc.refs)
+	}
+	fmt.Println()
 }

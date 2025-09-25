@@ -319,6 +319,28 @@ func (rt *RoutingTable) DeBruijnList() []*domain.Node {
 	return out
 }
 
+// SetDeBruijnList sovrascrive l'intera finestra de Bruijn con i nodi forniti.
+// La slice deve avere lunghezza pari al grado del grafo (GraphGrade).
+// Per ogni posizione:
+//   - se node è nil, l'entry viene svuotata;
+//   - se node è non-nil, viene scritto come nuovo puntatore.
+//
+// L'aggiornamento è thread-safe (ogni entry viene protetta dal suo lock).
+func (rt *RoutingTable) SetDeBruijnList(nodes []*domain.Node) {
+	if len(nodes) != len(rt.deBruijn) {
+		// in caso di mismatch logghiamo un warning e aggiorniamo solo fino al minimo
+		rt.logger.Warn("SetDeBruijnList: length mismatch",
+			logger.F("expected", len(rt.deBruijn)),
+			logger.F("got", len(nodes)))
+		return
+	}
+	for i := 0; i < len(rt.deBruijn); i++ {
+		rt.deBruijn[i].mu.Lock()
+		rt.deBruijn[i].node = nodes[i]
+		rt.deBruijn[i].mu.Unlock()
+	}
+}
+
 // DebugString restituisce una rappresentazione leggibile dell’intera routing table.
 //
 // Include:
