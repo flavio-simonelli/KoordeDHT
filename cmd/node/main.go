@@ -75,6 +75,7 @@ func main() {
 
 	// Initialize the client pool
 	cp := client.New(
+		addr,
 		cfg.DHT.FaultTolerance.FailureTimeout,
 		client.WithLogger(lgr.Named("clientpool")),
 	)

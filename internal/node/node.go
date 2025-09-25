@@ -34,6 +34,9 @@ func New(rout *routingtable.RoutingTable, clientpool *client.Pool, opts ...Optio
 func (n *Node) Join(bootstrapAddr string) error {
 	self := n.rt.Self()
 	// 1. Ask bootstrap to find our successor
+	if bootstrapAddr == self.Addr {
+		return fmt.Errorf("join: bootstrap address cannot be self address %s", bootstrapAddr)
+	}
 	succ, err := n.cp.FindSuccessorStart(self.ID, bootstrapAddr)
 	if err != nil {
 		return fmt.Errorf("join: failed to find successor via bootstrap %s: %w", bootstrapAddr, err)
