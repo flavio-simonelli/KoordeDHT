@@ -27,7 +27,7 @@ const (
 // ---------------------------------------------------------------
 type PutRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Key           []byte                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
 	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -63,11 +63,11 @@ func (*PutRequest) Descriptor() ([]byte, []int) {
 	return file_client_v1_client_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *PutRequest) GetKey() []byte {
+func (x *PutRequest) GetKey() string {
 	if x != nil {
 		return x.Key
 	}
-	return nil
+	return ""
 }
 
 func (x *PutRequest) GetValue() string {
@@ -79,7 +79,7 @@ func (x *PutRequest) GetValue() string {
 
 type GetRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Key           []byte                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -114,11 +114,11 @@ func (*GetRequest) Descriptor() ([]byte, []int) {
 	return file_client_v1_client_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *GetRequest) GetKey() []byte {
+func (x *GetRequest) GetKey() string {
 	if x != nil {
 		return x.Key
 	}
-	return nil
+	return ""
 }
 
 type GetResponse struct {
@@ -167,7 +167,7 @@ func (x *GetResponse) GetValue() string {
 
 type DeleteRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Key           []byte                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -202,11 +202,11 @@ func (*DeleteRequest) Descriptor() ([]byte, []int) {
 	return file_client_v1_client_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *DeleteRequest) GetKey() []byte {
+func (x *DeleteRequest) GetKey() string {
 	if x != nil {
 		return x.Key
 	}
-	return nil
+	return ""
 }
 
 var File_client_v1_client_proto protoreflect.FileDescriptor
@@ -216,15 +216,15 @@ const file_client_v1_client_proto_rawDesc = "" +
 	"\x16client/v1/client.proto\x12\tclient.v1\x1a\x1bgoogle/protobuf/empty.proto\"4\n" +
 	"\n" +
 	"PutRequest\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\fR\x03key\x12\x14\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value\"\x1e\n" +
 	"\n" +
 	"GetRequest\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\fR\x03key\"#\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\"#\n" +
 	"\vGetResponse\x12\x14\n" +
 	"\x05value\x18\x01 \x01(\tR\x05value\"!\n" +
 	"\rDeleteRequest\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\fR\x03key2\xb3\x01\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key2\xb3\x01\n" +
 	"\tClientAPI\x124\n" +
 	"\x03Put\x12\x15.client.v1.PutRequest\x1a\x16.google.protobuf.Empty\x124\n" +
 	"\x03Get\x12\x15.client.v1.GetRequest\x1a\x16.client.v1.GetResponse\x12:\n" +

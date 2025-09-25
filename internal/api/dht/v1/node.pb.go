@@ -341,6 +341,193 @@ func (x *SuccessorList) GetSuccessors() []*Node {
 	return nil
 }
 
+// Store a resource (Put).
+type StoreRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Key           []byte                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StoreRequest) Reset() {
+	*x = StoreRequest{}
+	mi := &file_dht_v1_node_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StoreRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StoreRequest) ProtoMessage() {}
+
+func (x *StoreRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_dht_v1_node_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StoreRequest.ProtoReflect.Descriptor instead.
+func (*StoreRequest) Descriptor() ([]byte, []int) {
+	return file_dht_v1_node_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *StoreRequest) GetKey() []byte {
+	if x != nil {
+		return x.Key
+	}
+	return nil
+}
+
+func (x *StoreRequest) GetValue() string {
+	if x != nil {
+		return x.Value
+	}
+	return ""
+}
+
+// Retrieve a resource (Get).
+type RetrieveRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Key           []byte                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RetrieveRequest) Reset() {
+	*x = RetrieveRequest{}
+	mi := &file_dht_v1_node_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RetrieveRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RetrieveRequest) ProtoMessage() {}
+
+func (x *RetrieveRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_dht_v1_node_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RetrieveRequest.ProtoReflect.Descriptor instead.
+func (*RetrieveRequest) Descriptor() ([]byte, []int) {
+	return file_dht_v1_node_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *RetrieveRequest) GetKey() []byte {
+	if x != nil {
+		return x.Key
+	}
+	return nil
+}
+
+type RetrieveResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Value         string                 `protobuf:"bytes,1,opt,name=value,proto3" json:"value,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RetrieveResponse) Reset() {
+	*x = RetrieveResponse{}
+	mi := &file_dht_v1_node_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RetrieveResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RetrieveResponse) ProtoMessage() {}
+
+func (x *RetrieveResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_dht_v1_node_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RetrieveResponse.ProtoReflect.Descriptor instead.
+func (*RetrieveResponse) Descriptor() ([]byte, []int) {
+	return file_dht_v1_node_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *RetrieveResponse) GetValue() string {
+	if x != nil {
+		return x.Value
+	}
+	return ""
+}
+
+// Remove a resource (Delete).
+type RemoveRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Key           []byte                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoveRequest) Reset() {
+	*x = RemoveRequest{}
+	mi := &file_dht_v1_node_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveRequest) ProtoMessage() {}
+
+func (x *RemoveRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_dht_v1_node_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveRequest.ProtoReflect.Descriptor instead.
+func (*RemoveRequest) Descriptor() ([]byte, []int) {
+	return file_dht_v1_node_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *RemoveRequest) GetKey() []byte {
+	if x != nil {
+		return x.Key
+	}
+	return nil
+}
+
 var File_dht_v1_node_proto protoreflect.FileDescriptor
 
 const file_dht_v1_node_proto_rawDesc = "" +
@@ -363,13 +550,25 @@ const file_dht_v1_node_proto_rawDesc = "" +
 	"\rSuccessorList\x12,\n" +
 	"\n" +
 	"successors\x18\x01 \x03(\v2\f.dht.v1.NodeR\n" +
-	"successors2\xb6\x02\n" +
+	"successors\"6\n" +
+	"\fStoreRequest\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\fR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value\"#\n" +
+	"\x0fRetrieveRequest\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\fR\x03key\"(\n" +
+	"\x10RetrieveResponse\x12\x14\n" +
+	"\x05value\x18\x01 \x01(\tR\x05value\"!\n" +
+	"\rRemoveRequest\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\fR\x03key2\xe5\x03\n" +
 	"\x03DHT\x12L\n" +
 	"\rFindSuccessor\x12\x1c.dht.v1.FindSuccessorRequest\x1a\x1d.dht.v1.FindSuccessorResponse\x126\n" +
 	"\x0eGetPredecessor\x12\x16.google.protobuf.Empty\x1a\f.dht.v1.Node\x12A\n" +
 	"\x10GetSuccessorList\x12\x16.google.protobuf.Empty\x1a\x15.dht.v1.SuccessorList\x12.\n" +
 	"\x06Notify\x12\f.dht.v1.Node\x1a\x16.google.protobuf.Empty\x126\n" +
-	"\x04Ping\x12\x16.google.protobuf.Empty\x1a\x16.google.protobuf.EmptyB@Z>github.com/flaviosimonelli/KoordeDHT/internal/api/dht/v1;dhtv1b\x06proto3"
+	"\x04Ping\x12\x16.google.protobuf.Empty\x1a\x16.google.protobuf.Empty\x125\n" +
+	"\x05Store\x12\x14.dht.v1.StoreRequest\x1a\x16.google.protobuf.Empty\x12=\n" +
+	"\bRetrieve\x12\x17.dht.v1.RetrieveRequest\x1a\x18.dht.v1.RetrieveResponse\x127\n" +
+	"\x06Remove\x12\x15.dht.v1.RemoveRequest\x1a\x16.google.protobuf.EmptyB@Z>github.com/flaviosimonelli/KoordeDHT/internal/api/dht/v1;dhtv1b\x06proto3"
 
 var (
 	file_dht_v1_node_proto_rawDescOnce sync.Once
@@ -383,7 +582,7 @@ func file_dht_v1_node_proto_rawDescGZIP() []byte {
 	return file_dht_v1_node_proto_rawDescData
 }
 
-var file_dht_v1_node_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_dht_v1_node_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_dht_v1_node_proto_goTypes = []any{
 	(*Node)(nil),                  // 0: dht.v1.Node
 	(*FindSuccessorRequest)(nil),  // 1: dht.v1.FindSuccessorRequest
@@ -391,28 +590,38 @@ var file_dht_v1_node_proto_goTypes = []any{
 	(*Step)(nil),                  // 3: dht.v1.Step
 	(*FindSuccessorResponse)(nil), // 4: dht.v1.FindSuccessorResponse
 	(*SuccessorList)(nil),         // 5: dht.v1.SuccessorList
-	(*emptypb.Empty)(nil),         // 6: google.protobuf.Empty
+	(*StoreRequest)(nil),          // 6: dht.v1.StoreRequest
+	(*RetrieveRequest)(nil),       // 7: dht.v1.RetrieveRequest
+	(*RetrieveResponse)(nil),      // 8: dht.v1.RetrieveResponse
+	(*RemoveRequest)(nil),         // 9: dht.v1.RemoveRequest
+	(*emptypb.Empty)(nil),         // 10: google.protobuf.Empty
 }
 var file_dht_v1_node_proto_depIdxs = []int32{
-	2, // 0: dht.v1.FindSuccessorRequest.initial:type_name -> dht.v1.Initial
-	3, // 1: dht.v1.FindSuccessorRequest.step:type_name -> dht.v1.Step
-	0, // 2: dht.v1.FindSuccessorResponse.node:type_name -> dht.v1.Node
-	0, // 3: dht.v1.SuccessorList.successors:type_name -> dht.v1.Node
-	1, // 4: dht.v1.DHT.FindSuccessor:input_type -> dht.v1.FindSuccessorRequest
-	6, // 5: dht.v1.DHT.GetPredecessor:input_type -> google.protobuf.Empty
-	6, // 6: dht.v1.DHT.GetSuccessorList:input_type -> google.protobuf.Empty
-	0, // 7: dht.v1.DHT.Notify:input_type -> dht.v1.Node
-	6, // 8: dht.v1.DHT.Ping:input_type -> google.protobuf.Empty
-	4, // 9: dht.v1.DHT.FindSuccessor:output_type -> dht.v1.FindSuccessorResponse
-	0, // 10: dht.v1.DHT.GetPredecessor:output_type -> dht.v1.Node
-	5, // 11: dht.v1.DHT.GetSuccessorList:output_type -> dht.v1.SuccessorList
-	6, // 12: dht.v1.DHT.Notify:output_type -> google.protobuf.Empty
-	6, // 13: dht.v1.DHT.Ping:output_type -> google.protobuf.Empty
-	9, // [9:14] is the sub-list for method output_type
-	4, // [4:9] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	2,  // 0: dht.v1.FindSuccessorRequest.initial:type_name -> dht.v1.Initial
+	3,  // 1: dht.v1.FindSuccessorRequest.step:type_name -> dht.v1.Step
+	0,  // 2: dht.v1.FindSuccessorResponse.node:type_name -> dht.v1.Node
+	0,  // 3: dht.v1.SuccessorList.successors:type_name -> dht.v1.Node
+	1,  // 4: dht.v1.DHT.FindSuccessor:input_type -> dht.v1.FindSuccessorRequest
+	10, // 5: dht.v1.DHT.GetPredecessor:input_type -> google.protobuf.Empty
+	10, // 6: dht.v1.DHT.GetSuccessorList:input_type -> google.protobuf.Empty
+	0,  // 7: dht.v1.DHT.Notify:input_type -> dht.v1.Node
+	10, // 8: dht.v1.DHT.Ping:input_type -> google.protobuf.Empty
+	6,  // 9: dht.v1.DHT.Store:input_type -> dht.v1.StoreRequest
+	7,  // 10: dht.v1.DHT.Retrieve:input_type -> dht.v1.RetrieveRequest
+	9,  // 11: dht.v1.DHT.Remove:input_type -> dht.v1.RemoveRequest
+	4,  // 12: dht.v1.DHT.FindSuccessor:output_type -> dht.v1.FindSuccessorResponse
+	0,  // 13: dht.v1.DHT.GetPredecessor:output_type -> dht.v1.Node
+	5,  // 14: dht.v1.DHT.GetSuccessorList:output_type -> dht.v1.SuccessorList
+	10, // 15: dht.v1.DHT.Notify:output_type -> google.protobuf.Empty
+	10, // 16: dht.v1.DHT.Ping:output_type -> google.protobuf.Empty
+	10, // 17: dht.v1.DHT.Store:output_type -> google.protobuf.Empty
+	8,  // 18: dht.v1.DHT.Retrieve:output_type -> dht.v1.RetrieveResponse
+	10, // 19: dht.v1.DHT.Remove:output_type -> google.protobuf.Empty
+	12, // [12:20] is the sub-list for method output_type
+	4,  // [4:12] is the sub-list for method input_type
+	4,  // [4:4] is the sub-list for extension type_name
+	4,  // [4:4] is the sub-list for extension extendee
+	0,  // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_dht_v1_node_proto_init() }
@@ -430,7 +639,7 @@ func file_dht_v1_node_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_dht_v1_node_proto_rawDesc), len(file_dht_v1_node_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

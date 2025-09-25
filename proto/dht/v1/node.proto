@@ -48,6 +48,30 @@ message SuccessorList {
 }
 
 // ---------------------------------------------------------------
+// Storage operations (node-to-node)
+// ---------------------------------------------------------------
+
+// Store a resource (Put).
+message StoreRequest {
+  bytes key = 1;
+  string value = 2;
+}
+
+// Retrieve a resource (Get).
+message RetrieveRequest {
+  bytes key = 1;
+}
+
+message RetrieveResponse {
+  string value = 1;
+}
+
+// Remove a resource (Delete).
+message RemoveRequest {
+  bytes key = 1;
+}
+
+// ---------------------------------------------------------------
 // Service definition
 // ---------------------------------------------------------------
 
@@ -67,4 +91,15 @@ service DHT {
 
     // Ping to check liveness of the node (debug).
     rpc Ping(google.protobuf.Empty) returns (google.protobuf.Empty);
+
+    // Store a resource (Put). If the key already exists, overwrite it.
+    rpc Store(StoreRequest) returns (google.protobuf.Empty);
+
+    // Retrieve a resource (Get).
+    // Returns NotFound if the key does not exist.
+    rpc Retrieve(RetrieveRequest) returns (RetrieveResponse);
+
+    // Remove a resource (Delete).
+    // Returns NotFound if the key does not exist.
+    rpc Remove(RemoveRequest) returns (google.protobuf.Empty);
 }

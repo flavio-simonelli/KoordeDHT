@@ -25,6 +25,9 @@ const (
 	DHT_GetSuccessorList_FullMethodName = "/dht.v1.DHT/GetSuccessorList"
 	DHT_Notify_FullMethodName           = "/dht.v1.DHT/Notify"
 	DHT_Ping_FullMethodName             = "/dht.v1.DHT/Ping"
+	DHT_Store_FullMethodName            = "/dht.v1.DHT/Store"
+	DHT_Retrieve_FullMethodName         = "/dht.v1.DHT/Retrieve"
+	DHT_Remove_FullMethodName           = "/dht.v1.DHT/Remove"
 )
 
 // DHTClient is the client API for DHT service.
@@ -35,7 +38,6 @@ type DHTClient interface {
 	// Returns the successor responsible for target_id.
 	FindSuccessor(ctx context.Context, in *FindSuccessorRequest, opts ...grpc.CallOption) (*FindSuccessorResponse, error)
 	// Returns this node's predecessor.
-	// If unknown, returns NotFound.
 	GetPredecessor(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*Node, error)
 	// Returns this node's successor list.
 	GetSuccessorList(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*SuccessorList, error)
@@ -44,6 +46,14 @@ type DHTClient interface {
 	Notify(ctx context.Context, in *Node, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Ping to check liveness of the node (debug).
 	Ping(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Store a resource (Put). If the key already exists, overwrite it.
+	Store(ctx context.Context, in *StoreRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Retrieve a resource (Get).
+	// Returns NotFound if the key does not exist.
+	Retrieve(ctx context.Context, in *RetrieveRequest, opts ...grpc.CallOption) (*RetrieveResponse, error)
+	// Remove a resource (Delete).
+	// Returns NotFound if the key does not exist.
+	Remove(ctx context.Context, in *RemoveRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type dHTClient struct {
@@ -104,6 +114,36 @@ func (c *dHTClient) Ping(ctx context.Context, in *emptypb.Empty, opts ...grpc.Ca
 	return out, nil
 }
 
+func (c *dHTClient) Store(ctx context.Context, in *StoreRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, DHT_Store_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *dHTClient) Retrieve(ctx context.Context, in *RetrieveRequest, opts ...grpc.CallOption) (*RetrieveResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RetrieveResponse)
+	err := c.cc.Invoke(ctx, DHT_Retrieve_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *dHTClient) Remove(ctx context.Context, in *RemoveRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, DHT_Remove_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DHTServer is the server API for DHT service.
 // All implementations must embed UnimplementedDHTServer
 // for forward compatibility.
@@ -112,7 +152,6 @@ type DHTServer interface {
 	// Returns the successor responsible for target_id.
 	FindSuccessor(context.Context, *FindSuccessorRequest) (*FindSuccessorResponse, error)
 	// Returns this node's predecessor.
-	// If unknown, returns NotFound.
 	GetPredecessor(context.Context, *emptypb.Empty) (*Node, error)
 	// Returns this node's successor list.
 	GetSuccessorList(context.Context, *emptypb.Empty) (*SuccessorList, error)
@@ -121,6 +160,14 @@ type DHTServer interface {
 	Notify(context.Context, *Node) (*emptypb.Empty, error)
 	// Ping to check liveness of the node (debug).
 	Ping(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
+	// Store a resource (Put). If the key already exists, overwrite it.
+	Store(context.Context, *StoreRequest) (*emptypb.Empty, error)
+	// Retrieve a resource (Get).
+	// Returns NotFound if the key does not exist.
+	Retrieve(context.Context, *RetrieveRequest) (*RetrieveResponse, error)
+	// Remove a resource (Delete).
+	// Returns NotFound if the key does not exist.
+	Remove(context.Context, *RemoveRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedDHTServer()
 }
 
@@ -145,6 +192,15 @@ func (UnimplementedDHTServer) Notify(context.Context, *Node) (*emptypb.Empty, er
 }
 func (UnimplementedDHTServer) Ping(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Ping not implemented")
+}
+func (UnimplementedDHTServer) Store(context.Context, *StoreRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Store not implemented")
+}
+func (UnimplementedDHTServer) Retrieve(context.Context, *RetrieveRequest) (*RetrieveResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Retrieve not implemented")
+}
+func (UnimplementedDHTServer) Remove(context.Context, *RemoveRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Remove not implemented")
 }
 func (UnimplementedDHTServer) mustEmbedUnimplementedDHTServer() {}
 func (UnimplementedDHTServer) testEmbeddedByValue()             {}
@@ -257,6 +313,60 @@ func _DHT_Ping_Handler(srv interface{}, ctx context.Context, dec func(interface{
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DHT_Store_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StoreRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DHTServer).Store(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DHT_Store_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DHTServer).Store(ctx, req.(*StoreRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DHT_Retrieve_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RetrieveRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DHTServer).Retrieve(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DHT_Retrieve_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DHTServer).Retrieve(ctx, req.(*RetrieveRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DHT_Remove_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DHTServer).Remove(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DHT_Remove_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DHTServer).Remove(ctx, req.(*RemoveRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // DHT_ServiceDesc is the grpc.ServiceDesc for DHT service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -283,6 +393,18 @@ var DHT_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Ping",
 			Handler:    _DHT_Ping_Handler,
+		},
+		{
+			MethodName: "Store",
+			Handler:    _DHT_Store_Handler,
+		},
+		{
+			MethodName: "Retrieve",
+			Handler:    _DHT_Retrieve_Handler,
+		},
+		{
+			MethodName: "Remove",
+			Handler:    _DHT_Remove_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

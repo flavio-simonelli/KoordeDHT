@@ -191,3 +191,22 @@ func (n *Node) Notify(p *domain.Node) {
 		}
 	}
 }
+
+func (n *Node) IdFromKey(key string) (domain.ID, error) {
+	return n.rt.Space().FromHexString(key)
+}
+
+func (n *Node) Put(resource domain.Resource) error {
+	// TODO: implementare
+	return nil
+}
+
+func (n *Node) Get(key string) (domain.Resource, error) {
+	// TODO: implementare
+	return domain.Resource{}, nil
+}
+
+func (n *Node) Delete(key string) error {
+	// TODO: implementare
+	return nil
+}
