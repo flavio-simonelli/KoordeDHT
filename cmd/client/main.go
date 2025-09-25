@@ -36,9 +36,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to connect to node at %s: %v", *addr, err)
 	}
-	defer func(conn *grpc.ClientConn) {
-		_ = conn.Close()
-	}(conn)
+	defer conn.Close()
 
 	client := clientv1.NewClientAPIClient(conn)
 
@@ -56,11 +54,15 @@ func main() {
 		key := flag.Arg(1)
 		value := flag.Arg(2)
 		req := &clientv1.PutRequest{Key: key, Value: value}
+
+		start := time.Now()
 		_, err := client.Put(ctx, req)
+		elapsed := time.Since(start)
+
 		if err != nil {
 			log.Fatalf("Put failed: %v", err)
 		}
-		fmt.Printf("Put succeeded (key=%s, value=%s)\n", key, value)
+		fmt.Printf("Put succeeded (key=%s, value=%s) | latency=%s\n", key, value, elapsed)
 
 	case "get":
 		if flag.NArg() < 2 {
@@ -69,15 +71,19 @@ func main() {
 		}
 		key := flag.Arg(1)
 		req := &clientv1.GetRequest{Key: key}
+
+		start := time.Now()
 		resp, err := client.Get(ctx, req)
+		elapsed := time.Since(start)
+
 		if err != nil {
 			if s, ok := status.FromError(err); ok && s.Code().String() == "NotFound" {
-				fmt.Printf("Key not found: %s\n", key)
+				fmt.Printf("Key not found: %s | latency=%s\n", key, elapsed)
 				os.Exit(1)
 			}
 			log.Fatalf("Get failed: %v", err)
 		}
-		fmt.Printf("Get succeeded: key=%s, value=%s\n", key, resp.Value)
+		fmt.Printf("Get succeeded (key=%s, value=%s) | latency=%s\n", key, resp.Value, elapsed)
 
 	case "delete":
 		if flag.NArg() < 2 {
@@ -86,15 +92,19 @@ func main() {
 		}
 		key := flag.Arg(1)
 		req := &clientv1.DeleteRequest{Key: key}
+
+		start := time.Now()
 		_, err := client.Delete(ctx, req)
+		elapsed := time.Since(start)
+
 		if err != nil {
 			if s, ok := status.FromError(err); ok && s.Code().String() == "NotFound" {
-				fmt.Printf("Key not found: %s\n", key)
+				fmt.Printf("Key not found: %s | latency=%s\n", key, elapsed)
 				os.Exit(1)
 			}
 			log.Fatalf("Delete failed: %v", err)
 		}
-		fmt.Printf("Delete succeeded: key=%s\n", key)
+		fmt.Printf("Delete succeeded (key=%s) | latency=%s\n", key, elapsed)
 
 	default:
 		fmt.Println("Unknown command:", cmd)
