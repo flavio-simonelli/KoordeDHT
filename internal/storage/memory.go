@@ -2,11 +2,8 @@ package storage
 
 import (
 	"KoordeDHT/internal/domain"
-	"errors"
 	"sync"
 )
-
-var ErrNotFound = errors.New("key not found")
 
 // Storage is an in-memory key-value store that implements the Storage
 // interface. It is concurrency-safe and intended for local node storage.
@@ -41,7 +38,7 @@ func (s *Storage) Get(id domain.ID) (domain.Resource, error) {
 	defer s.mu.RUnlock()
 	res, ok := s.data[id.String()]
 	if !ok {
-		return domain.Resource{}, ErrNotFound
+		return domain.Resource{}, domain.ErrResourceNotFound
 	}
 	return res, nil
 }
@@ -52,7 +49,7 @@ func (s *Storage) Delete(id domain.ID) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, ok := s.data[id.String()]; !ok {
-		return ErrNotFound
+		return domain.ErrResourceNotFound
 	}
 	delete(s.data, id.String())
 	return nil
