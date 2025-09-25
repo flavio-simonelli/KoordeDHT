@@ -4,9 +4,14 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"math/bits"
 	"strings"
+)
+
+var (
+	ErrInvalidID = errors.New("invalid id")
 )
 
 // -------------------------------
@@ -105,24 +110,23 @@ func (sp Space) NewIdFromString(s string) ID {
 // IsValidID checks whether the given byte slice is a valid ID
 // in the current identifier space (0 <= id < 2^Bits).
 //
-// Rules:
-//  1. The length must be exactly sp.ByteLen.
-//  2. If Bits is not a multiple of 8, the unused high-order bits
-//     in the first byte must be zero.
-func (sp Space) IsValidID(id []byte) bool {
+// Returns:
+//   - nil if the ID is valid
+//   - ErrInvalidID if the length is wrong
+func (sp Space) IsValidID(id []byte) error {
 	// must have correct length
 	if len(id) != sp.ByteLen {
-		return false
+		return ErrInvalidID
 	}
 	// mask unused high-order bits
 	extraBits := sp.ByteLen*8 - sp.Bits
 	if extraBits > 0 {
 		mask := byte(0xFF << (8 - extraBits))
 		if id[0]&mask != 0 {
-			return false
+			return ErrInvalidID
 		}
 	}
-	return true
+	return nil
 }
 
 // Hex returns the identifier as a lowercase hexadecimal string.
