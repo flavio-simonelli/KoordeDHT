@@ -2,7 +2,11 @@ package storage
 
 import (
 	"KoordeDHT/internal/domain"
+	"fmt"
+	"os"
+	"sort"
 	"sync"
+	"text/tabwriter"
 )
 
 // Storage is an in-memory key-value store that implements the Storage
@@ -81,4 +85,42 @@ func (s *Storage) All() ([]domain.Resource, error) {
 		result = append(result, res)
 	}
 	return result, nil
+}
+
+// DebugPrint prints the contents of the storage as a formatted table
+// to stdout, with a clear header and separators to distinguish it from
+// other debug dumps.
+func (s *Storage) DebugPrint() {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	// Print a distinct header
+	fmt.Println("=== Storage Debug Dump ===")
+	if len(s.data) == 0 {
+		fmt.Println("Storage is empty.")
+		return
+	}
+
+	// Setup tabwriter for aligned columns
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+
+	// Table header
+	fmt.Fprintln(w, "ID (hex)\tValue")
+
+	// Collect and sort keys for deterministic order
+	keys := make([]string, 0, len(s.data))
+	for k := range s.data {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	// Print each resource
+	for _, k := range keys {
+		res := s.data[k]
+		fmt.Fprintf(w, "%s\t%s\n", res.Key.String(), res.Value)
+	}
+
+	// Flush writer
+	_ = w.Flush()
+	fmt.Println("==========================")
 }
