@@ -26,9 +26,15 @@ func (n *Node) StartStabilizers(ctx context.Context, interval time.Duration) {
 				n.fixDeBruijn()        // maintain de Bruijn pointer
 				n.printRoutingTable()
 				n.printClientPoolStats()
+				n.printStorageStats()
 			}
 		}
 	}()
+}
+
+// printStorageStats logs the current state of the local storage.
+func (n *Node) printStorageStats() {
+	n.s.DebugPrint()
 }
 
 // printClientPoolStats logs the current state of the client pool.
