@@ -12,6 +12,7 @@ import (
 	"KoordeDHT/internal/server"
 	"KoordeDHT/internal/storage"
 	"context"
+	"flag"
 	"log"
 	"os"
 	"os/signal"
@@ -22,13 +23,16 @@ import (
 	"google.golang.org/grpc"
 )
 
-var configPath = "config/node/config.yaml"
+var defaultConfigPath = "config/node/config.yaml"
 
 func main() {
+	// Parse command-line flags
+	configPath := flag.String("config", defaultConfigPath, "path to configuration file")
+	flag.Parse()
 	// Load configuration
-	cfg, err := config.LoadConfig(configPath)
+	cfg, err := config.LoadConfig(*configPath)
 	if err != nil {
-		log.Fatalf("failed to load configuration from %q: %v", configPath, err)
+		log.Fatalf("failed to load configuration from %q: %v", *configPath, err)
 	}
 	if err := cfg.ValidateConfig(); err != nil {
 		log.Fatalf("invalid configuration: %v", err)
