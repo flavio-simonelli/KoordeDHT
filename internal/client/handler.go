@@ -50,6 +50,8 @@ func (p *Pool) FindSuccessorStart(target domain.ID, serverAddr string) (*domain.
 	return p.FindSuccessorStartWithContext(ctx, target, serverAddr)
 }
 
+//TODO: gestire il caso in cui si contatta se stessi
+
 // FindSuccessorStartWithContext performs the initial FindSuccessor RPC call on the given server.
 // It starts a lookup for the provided target ID by sending a request in "Initial" mode.
 // The method retrieves a client connection from the pool, builds the request, executes
@@ -61,6 +63,13 @@ func (p *Pool) FindSuccessorStart(target domain.ID, serverAddr string) (*domain.
 //   - *domain.Node: the successor node returned by the remote server
 //   - error: ErrClientNotInPool, ErrTimeout, or a wrapped RPC error
 func (p *Pool) FindSuccessorStartWithContext(ctx context.Context, target domain.ID, serverAddr string) (*domain.Node, error) {
+	// check for self-address
+	/*
+		if serverAddr == p.selfAddr {
+			// if contacting self return error
+			return nil, fmt.Errorf("FindSuccessorStart: cannot contact self (%s)", p.selfAddr)
+		}
+	*/
 	// Check for canceled/expired context
 	if err := checkContext(ctx); err != nil {
 		return nil, err
@@ -102,6 +111,14 @@ func (p *Pool) FindSuccessorStartWithContext(ctx context.Context, target domain.
 //   - *domain.Node: the successor node returned by the remote server
 //   - error: ErrClientNotInPool, ErrTimeout, or a wrapped RPC error
 func (p *Pool) FindSuccessorStepWithContext(ctx context.Context, target, currentI, kshift domain.ID, serverAddr string) (*domain.Node, error) {
+	// check for self-address
+	/*
+		if serverAddr == p.selfAddr {
+			// if contacting self return error
+			return nil, fmt.Errorf("FindSuccessorStep: cannot contact self (%s)", p.selfAddr)
+		}
+
+	*/
 	// Check for canceled/expired context
 	if err := checkContext(ctx); err != nil {
 		return nil, err
@@ -154,7 +171,14 @@ func (p *Pool) FindSuccessorStep(target, currentI, kshift domain.ID, serverAddr 
 //     ErrNoPredecessor if the remote node has no predecessor,
 //     or a wrapped RPC error otherwise.
 func (p *Pool) GetPredecessor(serverAddr string) (*domain.Node, error) {
-	// TODO: considera che se sei te stesso allora non fai la chiamata
+	// check for self-address
+	/*
+		if serverAddr == p.selfAddr {
+			// if contacting self return error
+			return nil, fmt.Errorf("GetPredecessor: cannot contact self (%s)", p.selfAddr)
+		}
+
+	*/
 	// Retrieve the client from the pool
 	client, err := p.Get(serverAddr)
 	if err != nil {
@@ -196,6 +220,13 @@ func (p *Pool) GetPredecessor(serverAddr string) (*domain.Node, error) {
 //     ErrTimeout if the RPC timed out,
 //     or a wrapped RPC error otherwise.
 func (p *Pool) GetSuccessorList(serverAddr string) ([]*domain.Node, error) {
+	// check for self-address
+	/*
+		if serverAddr == p.selfAddr {
+			// if contacting self return error
+			return nil, fmt.Errorf("GetSuccessorList: cannot contact self (%s)", p.selfAddr)
+		}
+	*/
 	// Retrieve the client from the pool
 	client, err := p.Get(serverAddr)
 	if err != nil {
@@ -233,6 +264,13 @@ func (p *Pool) GetSuccessorList(serverAddr string) ([]*domain.Node, error) {
 //   - ErrTimeout if the RPC timed out
 //   - a wrapped RPC error otherwise
 func (p *Pool) Notify(self *domain.Node, serverAddr string) error {
+	// check for self-address
+	/*
+		if serverAddr == p.selfAddr {
+			// if contacting self return error
+			return fmt.Errorf("Notify: cannot contact self (%s)", p.selfAddr)
+		}
+	*/
 	// Retrieve the client from the pool
 	client, err := p.Get(serverAddr)
 	if err != nil {
