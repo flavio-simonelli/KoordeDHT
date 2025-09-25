@@ -1,6 +1,7 @@
 package main
 
 import (
+	"KoordeDHT/internal/bootstrap"
 	"KoordeDHT/internal/client"
 	"KoordeDHT/internal/config"
 	"KoordeDHT/internal/domain"
@@ -110,8 +111,23 @@ func main() {
 	lgr.Info("gRPC server started successfully", logger.F("addr", addr))
 
 	// Join an existing DHT or create a new one
-	if len(cfg.DHT.BootstrapPeers) != 0 {
-		peer := cfg.DHT.BootstrapPeers[0] // TODO: use multiple peers
+	peers, err := bootstrap.ResolveBootstrap(cfg.DHT.Bootstrap)
+	if err != nil {
+		lgr.Error("failed to resolve bootstrap peers", logger.F("err", err))
+		// cleanup before exit
+		n.Stop()
+		s.Stop()
+		os.Exit(1)
+	}
+	if len(peers) != 0 {
+		peer, err := bootstrap.PickRandom(peers)
+		if err != nil {
+			lgr.Error("failed to pick a bootstrap peer", logger.F("err", err))
+			// cleanup before exit
+			n.Stop()
+			s.Stop()
+			os.Exit(1)
+		}
 		lgr.Debug("joining DHT", logger.F("peer", peer))
 
 		if err := n.Join(peer); err != nil {
