@@ -192,21 +192,39 @@ func (n *Node) Notify(p *domain.Node) {
 	}
 }
 
-func (n *Node) IdFromKey(key string) (domain.ID, error) {
-	return n.rt.Space().FromHexString(key)
+func (n *Node) CheckIdValidity(id domain.ID) error {
+	return n.rt.Space().IsValidID(id)
 }
 
-func (n *Node) Put(resource domain.Resource) error {
+// operazione di store di una risorsa nella DHT chiamata da un client
+func (n *Node) Put(key string, value string) error {
 	// TODO: implementare
 	return nil
 }
 
+// operazione di get di una risorsa nella DHT chiamata da un client
 func (n *Node) Get(key string) (domain.Resource, error) {
 	// TODO: implementare
 	return domain.Resource{}, nil
 }
 
+// operazione di delete di una risorsa nella DHT chiamata da un client
 func (n *Node) Delete(key string) error {
 	// TODO: implementare
 	return nil
+}
+
+// StoreLocal memorizza la risorsa nel nodo locale utilizzando lo storage interno. (chiamata da operazioni node -> node)
+func (n *Node) StoreLocal(resource domain.Resource) error {
+	return n.s.Put(resource)
+}
+
+// RetrieveLocal ottiene la risorsa con la chiave specificata dal nodo locale utilizzando lo storage interno. (chiamata da operazioni node -> node)
+func (n *Node) RetrieveLocal(id domain.ID) (domain.Resource, error) {
+	return n.s.Get(id)
+}
+
+// RemoveLocal rimuove la risorsa con la chiave specificata dal nodo locale utilizzando lo storage interno. (chiamata da operazioni node -> node)
+func (n *Node) RemoveLocal(id domain.ID) error {
+	return n.s.Delete(id)
 }

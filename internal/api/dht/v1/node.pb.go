@@ -341,7 +341,7 @@ func (x *SuccessorList) GetSuccessors() []*Node {
 	return nil
 }
 
-// Store a resource (Put).
+// StoreLocal a resource (Put).
 type StoreRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Key           []byte                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
@@ -394,7 +394,7 @@ func (x *StoreRequest) GetValue() string {
 	return ""
 }
 
-// Retrieve a resource (Get).
+// RetrieveLocal a resource (Get).
 type RetrieveRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Key           []byte                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
@@ -483,7 +483,7 @@ func (x *RetrieveResponse) GetValue() string {
 	return ""
 }
 
-// Remove a resource (Delete).
+// RemoveLocal a resource (Delete).
 type RemoveRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Key           []byte                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
@@ -606,17 +606,17 @@ var file_dht_v1_node_proto_depIdxs = []int32{
 	10, // 6: dht.v1.DHT.GetSuccessorList:input_type -> google.protobuf.Empty
 	0,  // 7: dht.v1.DHT.Notify:input_type -> dht.v1.Node
 	10, // 8: dht.v1.DHT.Ping:input_type -> google.protobuf.Empty
-	6,  // 9: dht.v1.DHT.Store:input_type -> dht.v1.StoreRequest
-	7,  // 10: dht.v1.DHT.Retrieve:input_type -> dht.v1.RetrieveRequest
-	9,  // 11: dht.v1.DHT.Remove:input_type -> dht.v1.RemoveRequest
+	6,  // 9: dht.v1.DHT.StoreLocal:input_type -> dht.v1.StoreRequest
+	7,  // 10: dht.v1.DHT.RetrieveLocal:input_type -> dht.v1.RetrieveRequest
+	9,  // 11: dht.v1.DHT.RemoveLocal:input_type -> dht.v1.RemoveRequest
 	4,  // 12: dht.v1.DHT.FindSuccessor:output_type -> dht.v1.FindSuccessorResponse
 	0,  // 13: dht.v1.DHT.GetPredecessor:output_type -> dht.v1.Node
 	5,  // 14: dht.v1.DHT.GetSuccessorList:output_type -> dht.v1.SuccessorList
 	10, // 15: dht.v1.DHT.Notify:output_type -> google.protobuf.Empty
 	10, // 16: dht.v1.DHT.Ping:output_type -> google.protobuf.Empty
-	10, // 17: dht.v1.DHT.Store:output_type -> google.protobuf.Empty
-	8,  // 18: dht.v1.DHT.Retrieve:output_type -> dht.v1.RetrieveResponse
-	10, // 19: dht.v1.DHT.Remove:output_type -> google.protobuf.Empty
+	10, // 17: dht.v1.DHT.StoreLocal:output_type -> google.protobuf.Empty
+	8,  // 18: dht.v1.DHT.RetrieveLocal:output_type -> dht.v1.RetrieveResponse
+	10, // 19: dht.v1.DHT.RemoveLocal:output_type -> google.protobuf.Empty
 	12, // [12:20] is the sub-list for method output_type
 	4,  // [4:12] is the sub-list for method input_type
 	4,  // [4:4] is the sub-list for extension type_name

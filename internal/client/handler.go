@@ -74,7 +74,7 @@ func (p *Pool) FindSuccessorStartWithContext(ctx context.Context, target domain.
 	if err := checkContext(ctx); err != nil {
 		return nil, err
 	}
-	// Retrieve the client from the pool
+	// RetrieveLocal the client from the pool
 	client, err := p.Get(serverAddr)
 	if err != nil {
 		p.lgr.Warn("FindSuccessorStart: unable to get client from pool",
@@ -123,7 +123,7 @@ func (p *Pool) FindSuccessorStepWithContext(ctx context.Context, target, current
 	if err := checkContext(ctx); err != nil {
 		return nil, err
 	}
-	// Retrieve the client from the pool
+	// RetrieveLocal the client from the pool
 	client, err := p.Get(serverAddr)
 	if err != nil {
 		p.lgr.Warn("FindSuccessorStep: unable to get client from pool",
@@ -179,7 +179,7 @@ func (p *Pool) GetPredecessor(serverAddr string) (*domain.Node, error) {
 		}
 
 	*/
-	// Retrieve the client from the pool
+	// RetrieveLocal the client from the pool
 	client, err := p.Get(serverAddr)
 	if err != nil {
 		p.lgr.Warn("GetPredecessor: unable to get client from pool",
@@ -227,7 +227,7 @@ func (p *Pool) GetSuccessorList(serverAddr string) ([]*domain.Node, error) {
 			return nil, fmt.Errorf("GetSuccessorList: cannot contact self (%s)", p.selfAddr)
 		}
 	*/
-	// Retrieve the client from the pool
+	// RetrieveLocal the client from the pool
 	client, err := p.Get(serverAddr)
 	if err != nil {
 		p.lgr.Warn("GetSuccessorList: unable to get client from pool",
@@ -271,7 +271,7 @@ func (p *Pool) Notify(self *domain.Node, serverAddr string) error {
 			return fmt.Errorf("Notify: cannot contact self (%s)", p.selfAddr)
 		}
 	*/
-	// Retrieve the client from the pool
+	// RetrieveLocal the client from the pool
 	client, err := p.Get(serverAddr)
 	if err != nil {
 		p.lgr.Warn("Notify: unable to get client from pool",
@@ -303,7 +303,7 @@ func (p *Pool) Notify(self *domain.Node, serverAddr string) error {
 //   - ErrTimeout if the RPC timed out
 //   - a wrapped RPC error otherwise
 func (p *Pool) Ping(serverAddr string) error {
-	// Retrieve the client from the pool
+	// RetrieveLocal the client from the pool
 	client, err := p.Get(serverAddr)
 	if err != nil {
 		p.lgr.Warn("Ping: unable to get client from pool",
@@ -320,6 +320,107 @@ func (p *Pool) Ping(serverAddr string) error {
 			return ErrTimeout
 		}
 		return fmt.Errorf("client: Ping RPC to %s failed: %w", serverAddr, err)
+	}
+	return nil
+}
+
+// StoreRemote sends a StoreValue RPC to the given remote node to store
+func (p *Pool) StoreRemote(res domain.Resource, serverAddr string) error {
+	// RetrieveLocal the client from the pool
+	client, err := p.Get(serverAddr)
+	if err != nil {
+		p.lgr.Warn("Store: unable to get client from pool",
+			logger.F("addr", serverAddr), logger.F("err", err))
+		return fmt.Errorf("%w: %s", ErrClientNotInPool, serverAddr)
+	}
+	// Context with timeout for the RPC
+	ctx, cancel := context.WithTimeout(context.Background(), p.timeout)
+	defer cancel()
+	// Build the request from the domain.Resource
+	req := &pb.StoreRequest{
+		Key:   res.Key,
+		Value: res.Value,
+	}
+	// Perform the RPC
+	_, err = client.Store(ctx, req)
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return ErrTimeout
+		}
+		return fmt.Errorf("client: Store RPC to %s failed: %w", serverAddr, err)
+	}
+	return nil
+}
+
+// RetrieveRemote sends a RetrieveValue RPC to the given remote node to fetch
+// a resource by its key. It returns the resource if found.
+//
+// Returns:
+//   - *domain.Resource: the resource retrieved from the remote node
+//   - error: ErrClientNotInPool if the client is not in the pool,
+//     ErrTimeout if the RPC timed out,
+//     or a wrapped RPC error otherwise.
+func (p *Pool) RetrieveRemote(key domain.ID, serverAddr string) (*domain.Resource, error) {
+	// RetrieveLocal the client from the pool
+	client, err := p.Get(serverAddr)
+	if err != nil {
+		p.lgr.Warn("Retrieve: unable to get client from pool",
+			logger.F("addr", serverAddr), logger.F("err", err))
+		return nil, fmt.Errorf("%w: %s", ErrClientNotInPool, serverAddr)
+	}
+	// Context with timeout for the RPC
+	ctx, cancel := context.WithTimeout(context.Background(), p.timeout)
+	defer cancel()
+	// Build the request with the key
+	req := &pb.RetrieveRequest{
+		Key: key,
+	}
+	// Perform the RPC
+	resp, err := client.Retrieve(ctx, req)
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return nil, ErrTimeout
+		}
+		return nil, fmt.Errorf("client: Retrieve RPC to %s failed: %w", serverAddr, err)
+	}
+	// Build the domain.Resource from the response
+	res := &domain.Resource{
+		Key:   key,
+		Value: resp.Value,
+	}
+	return res, nil
+}
+
+// RemoveRemote sends a RemoveValue RPC to the given remote node to delete
+// a resource by its key.
+//
+// Returns:
+//   - nil on success
+//   - ErrClientNotInPool if the client is not in the pool
+//   - ErrTimeout if the RPC timed out
+//   - a wrapped RPC error otherwise
+func (p *Pool) RemoveRemote(key domain.ID, serverAddr string) error {
+	// RetrieveLocal the client from the pool
+	client, err := p.Get(serverAddr)
+	if err != nil {
+		p.lgr.Warn("Remove: unable to get client from pool",
+			logger.F("addr", serverAddr), logger.F("err", err))
+		return fmt.Errorf("%w: %s", ErrClientNotInPool, serverAddr)
+	}
+	// Context with timeout for the RPC
+	ctx, cancel := context.WithTimeout(context.Background(), p.timeout)
+	defer cancel()
+	// Build the request with the key
+	req := &pb.RemoveRequest{
+		Key: key,
+	}
+	// Perform the RPC
+	_, err = client.Remove(ctx, req)
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return ErrTimeout
+		}
+		return fmt.Errorf("client: Remove RPC to %s failed: %w", serverAddr, err)
 	}
 	return nil
 }

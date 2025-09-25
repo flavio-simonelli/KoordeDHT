@@ -25,9 +25,9 @@ const (
 	DHT_GetSuccessorList_FullMethodName = "/dht.v1.DHT/GetSuccessorList"
 	DHT_Notify_FullMethodName           = "/dht.v1.DHT/Notify"
 	DHT_Ping_FullMethodName             = "/dht.v1.DHT/Ping"
-	DHT_Store_FullMethodName            = "/dht.v1.DHT/Store"
-	DHT_Retrieve_FullMethodName         = "/dht.v1.DHT/Retrieve"
-	DHT_Remove_FullMethodName           = "/dht.v1.DHT/Remove"
+	DHT_Store_FullMethodName            = "/dht.v1.DHT/StoreLocal"
+	DHT_Retrieve_FullMethodName         = "/dht.v1.DHT/RetrieveLocal"
+	DHT_Remove_FullMethodName           = "/dht.v1.DHT/RemoveLocal"
 )
 
 // DHTClient is the client API for DHT service.
@@ -194,13 +194,13 @@ func (UnimplementedDHTServer) Ping(context.Context, *emptypb.Empty) (*emptypb.Em
 	return nil, status.Errorf(codes.Unimplemented, "method Ping not implemented")
 }
 func (UnimplementedDHTServer) Store(context.Context, *StoreRequest) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Store not implemented")
+	return nil, status.Errorf(codes.Unimplemented, "method StoreLocal not implemented")
 }
 func (UnimplementedDHTServer) Retrieve(context.Context, *RetrieveRequest) (*RetrieveResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Retrieve not implemented")
+	return nil, status.Errorf(codes.Unimplemented, "method RetrieveLocal not implemented")
 }
 func (UnimplementedDHTServer) Remove(context.Context, *RemoveRequest) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Remove not implemented")
+	return nil, status.Errorf(codes.Unimplemented, "method RemoveLocal not implemented")
 }
 func (UnimplementedDHTServer) mustEmbedUnimplementedDHTServer() {}
 func (UnimplementedDHTServer) testEmbeddedByValue()             {}
@@ -395,15 +395,15 @@ var DHT_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _DHT_Ping_Handler,
 		},
 		{
-			MethodName: "Store",
+			MethodName: "StoreLocal",
 			Handler:    _DHT_Store_Handler,
 		},
 		{
-			MethodName: "Retrieve",
+			MethodName: "RetrieveLocal",
 			Handler:    _DHT_Retrieve_Handler,
 		},
 		{
-			MethodName: "Remove",
+			MethodName: "RemoveLocal",
 			Handler:    _DHT_Remove_Handler,
 		},
 	},

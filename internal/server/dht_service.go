@@ -90,7 +90,7 @@ func (s *dhtService) GetPredecessor(ctx context.Context, _ *emptypb.Empty) (*dht
 	if err := checkContext(ctx); err != nil {
 		return nil, err
 	}
-	// Retrieve predecessor from node
+	// RetrieveLocal predecessor from node
 	pred := s.node.Predecessor()
 	if pred == nil {
 		return nil, status.Error(codes.NotFound, "no predecessor set")
@@ -110,7 +110,7 @@ func (s *dhtService) GetSuccessorList(ctx context.Context, _ *emptypb.Empty) (*d
 	if err := checkContext(ctx); err != nil {
 		return nil, err
 	}
-	// Retrieve successor list from node
+	// RetrieveLocal successor list from node
 	succList := s.node.SuccessorList()
 	if succList == nil {
 		return &dhtv1.SuccessorList{Successors: []*dhtv1.Node{}}, nil
@@ -162,5 +162,73 @@ func (s *dhtService) Ping(ctx context.Context, _ *emptypb.Empty) (*emptypb.Empty
 		return nil, err
 	}
 	// Always succeed if node is alive
+	return &emptypb.Empty{}, nil
+}
+
+// Store saves or updates a resource in the local node's storage.
+func (s *dhtService) Store(ctx context.Context, req *dhtv1.StoreRequest) (*emptypb.Empty, error) {
+	if req == nil || len(req.Key) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "missing key")
+	}
+	if len(req.Value) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "missing value")
+	}
+	// Validate key
+	id := domain.ID(req.Key)
+	if err := s.node.CheckIdValidity(id); err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid key")
+	}
+	// create domain resource
+	res := domain.Resource{
+		Key:   id,
+		Value: req.Value,
+	}
+	// call store operation
+	err := s.node.StoreLocal(res)
+	if err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, nil
+}
+
+// Retrieve fetches a resource from the local node's storage by its key.
+func (s *dhtService) Retrieve(ctx context.Context, req *dhtv1.RetrieveRequest) (*dhtv1.RetrieveResponse, error) {
+	if req == nil || len(req.Key) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "missing key")
+	}
+	// Validate key
+	id := domain.ID(req.Key)
+	if err := s.node.CheckIdValidity(id); err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid key")
+	}
+	// call retrieve operation
+	res, err := s.node.RetrieveLocal(id)
+	if err != nil {
+		if errors.Is(err, domain.ErrResourceNotFound) {
+			return nil, status.Error(codes.NotFound, "key not found")
+		}
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	return &dhtv1.RetrieveResponse{Value: res.Value}, nil
+}
+
+// Remove delete a resource from the local node's storage by its key.
+func (s *dhtService) Remove(ctx context.Context, req *dhtv1.RemoveRequest) (*emptypb.Empty, error) {
+	if req == nil || len(req.Key) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "missing key")
+	}
+	// Validate key
+	id := domain.ID(req.Key)
+	if err := s.node.CheckIdValidity(id); err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid key")
+	}
+	// call delete operation
+	err := s.node.RemoveLocal(id)
+	if err != nil {
+		if errors.Is(err, domain.ErrResourceNotFound) {
+			return nil, status.Error(codes.NotFound, "key not found")
+		}
+		return nil, status.Error(codes.Internal, err.Error())
+	}
 	return &emptypb.Empty{}, nil
 }
