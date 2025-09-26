@@ -12,6 +12,7 @@ type Field struct {
 type Logger interface {
 	Named(name string) Logger
 	With(fields ...Field) Logger
+	WithNode(n domain.Node) Logger
 	Debug(msg string, fields ...Field)
 	Info(msg string, fields ...Field)
 	Warn(msg string, fields ...Field)
@@ -49,6 +50,7 @@ type NopLogger struct{}
 
 func (l *NopLogger) Named(name string) Logger          { return l }
 func (l *NopLogger) With(fields ...Field) Logger       { return l }
+func (l *NopLogger) WithNode(n domain.Node) Logger     { return l }
 func (l *NopLogger) Debug(msg string, fields ...Field) {}
 func (l *NopLogger) Info(msg string, fields ...Field)  {}
 func (l *NopLogger) Warn(msg string, fields ...Field)  {}
