@@ -4,7 +4,6 @@ import (
 	"KoordeDHT/internal/domain"
 	"KoordeDHT/internal/logger"
 	"context"
-	"fmt"
 	"time"
 )
 
@@ -34,16 +33,16 @@ func (n *Node) StartStabilizers(ctx context.Context, interval time.Duration) {
 
 // printStorageStats logs the current state of the local storage.
 func (n *Node) printStorageStats() {
-	n.s.DebugPrint()
+	n.s.DebugLog()
 }
 
 // printClientPoolStats logs the current state of the client pool.
 func (n *Node) printClientPoolStats() {
-	n.cp.DebugDump()
+	n.cp.DebugLog()
 }
 
 func (n *Node) printRoutingTable() {
-	fmt.Println(n.rt.DebugString())
+	n.rt.DebugLog()
 }
 
 // stabilizeSuccessor checks whether our successor is still valid
@@ -59,7 +58,7 @@ func (n *Node) stabilizeSuccessor() {
 	pred, err := n.cp.GetPredecessor(succ.Addr)
 	if err != nil {
 		n.lgr.Warn("stabilize: could not contact successor",
-			logger.FNode("succ", *succ),
+			logger.FNode("succ", succ),
 			logger.F("err", err))
 		// Promote next available successor from the list
 		promoted := false
@@ -69,14 +68,14 @@ func (n *Node) stabilizeSuccessor() {
 				continue
 			}
 			n.lgr.Info("stabilize: promoting new successor",
-				logger.FNode("old", *succ),
-				logger.FNode("new", *candidate))
+				logger.FNode("old", succ),
+				logger.FNode("new", candidate))
 
 			n.rt.PromoteCandidate(i)
 
 			if err := n.cp.Release(succ.Addr); err != nil {
 				n.lgr.Warn("stabilize: failed to release old successor",
-					logger.FNode("old", *succ), logger.F("err", err))
+					logger.FNode("old", succ), logger.F("err", err))
 			}
 
 			succ = candidate
@@ -89,7 +88,7 @@ func (n *Node) stabilizeSuccessor() {
 			if pred := n.rt.GetPredecessor(); pred != nil {
 				if err := n.cp.Release(pred.Addr); err != nil {
 					n.lgr.Warn("stabilize: failed to release predecessor",
-						logger.FNode("pred", *pred), logger.F("err", err))
+						logger.FNode("pred", pred), logger.F("err", err))
 				}
 			}
 			// Release successor list
@@ -97,7 +96,7 @@ func (n *Node) stabilizeSuccessor() {
 				if nd != nil {
 					if err := n.cp.Release(nd.Addr); err != nil {
 						n.lgr.Warn("stabilize: failed to release successor",
-							logger.FNode("succ", *nd), logger.F("err", err))
+							logger.FNode("succ", nd), logger.F("err", err))
 					}
 				}
 			}
@@ -106,7 +105,7 @@ func (n *Node) stabilizeSuccessor() {
 				if nd != nil {
 					if err := n.cp.Release(nd.Addr); err != nil {
 						n.lgr.Warn("stabilize: failed to release deBruijn entry",
-							logger.FNode("node", *nd), logger.F("err", err))
+							logger.FNode("node", nd), logger.F("err", err))
 					}
 				}
 			}
@@ -117,26 +116,26 @@ func (n *Node) stabilizeSuccessor() {
 	// If successor’s predecessor is closer, promote it
 	if pred != nil && pred.ID.Between(self.ID, succ.ID) && !pred.ID.Equal(self.ID) {
 		n.lgr.Info("stabilize: successor updated",
-			logger.FNode("old_successor", *succ),
-			logger.FNode("new_successor", *pred))
+			logger.FNode("old_successor", succ),
+			logger.FNode("new_successor", pred))
 		// AddRef new successor
 		if err := n.cp.AddRef(pred.Addr); err != nil {
 			n.lgr.Warn("stabilize: failed to add new successor to pool",
-				logger.FNode("new", *pred), logger.F("err", err))
+				logger.FNode("new", pred), logger.F("err", err))
 		}
 		// Update routing table
 		n.rt.SetSuccessor(0, pred)
 		// Release old successor
 		if err := n.cp.Release(succ.Addr); err != nil {
 			n.lgr.Warn("stabilize: failed to release old successor",
-				logger.FNode("old", *succ), logger.F("err", err))
+				logger.FNode("old", succ), logger.F("err", err))
 		}
 		succ = pred
 	}
 	// Notify successor that we might be its predecessor
 	if err := n.cp.Notify(self, succ.Addr); err != nil {
 		n.lgr.Warn("stabilize: notify failed",
-			logger.FNode("succ", *succ), logger.F("err", err))
+			logger.FNode("succ", succ), logger.F("err", err))
 	}
 }
 
@@ -154,7 +153,7 @@ func (n *Node) fixSuccessorList() {
 	remoteList, err := n.cp.GetSuccessorList(succ.Addr)
 	if err != nil {
 		n.lgr.Warn("fixSuccessorList: could not fetch successor list",
-			logger.FNode("succ", *succ),
+			logger.FNode("succ", succ),
 			logger.F("err", err))
 		return
 	}
@@ -188,7 +187,7 @@ func (n *Node) fixSuccessorList() {
 		if _, ok := oldSet[addr]; !ok {
 			if err := n.cp.AddRef(addr); err != nil {
 				n.lgr.Warn("fixSuccessorList: addref failed",
-					logger.FNode("node", *nd), logger.F("err", err))
+					logger.FNode("node", nd), logger.F("err", err))
 			}
 		}
 	}
@@ -201,7 +200,7 @@ func (n *Node) fixSuccessorList() {
 		if _, ok := newSet[addr]; !ok {
 			if err := n.cp.Release(addr); err != nil {
 				n.lgr.Warn("fixSuccessorList: release failed",
-					logger.FNode("node", *nd), logger.F("err", err))
+					logger.FNode("node", nd), logger.F("err", err))
 			}
 		}
 	}
@@ -220,12 +219,12 @@ func (n *Node) checkPredecessor() {
 	// Try a lightweight ping
 	if err := n.cp.Ping(pred.Addr); err != nil {
 		n.lgr.Warn("checkPredecessor: predecessor unresponsive, clearing",
-			logger.FNode("pred", *pred),
+			logger.FNode("pred", pred),
 			logger.F("err", err))
 		// Release from client pool
 		if err := n.cp.Release(pred.Addr); err != nil {
 			n.lgr.Warn("checkPredecessor: failed to release predecessor from pool",
-				logger.FNode("pred", *pred),
+				logger.FNode("pred", pred),
 				logger.F("err", err))
 		}
 		// Clear predecessor
@@ -253,7 +252,7 @@ func (n *Node) fixDeBruijn() {
 	anchor, err := n.cp.GetPredecessor(succ.Addr)
 	if err != nil || anchor == nil {
 		n.lgr.Warn("fixDeBruijn: could not get anchor predecessor",
-			logger.FNode("succ", *succ),
+			logger.FNode("succ", succ),
 			logger.F("err", err))
 		return
 	}
@@ -271,7 +270,7 @@ func (n *Node) fixDeBruijn() {
 	list, err := n.cp.GetSuccessorList(anchor.Addr)
 	if err != nil {
 		n.lgr.Warn("fixDeBruijn: could not fetch successor list from anchor",
-			logger.FNode("anchor", *anchor), logger.F("err", err))
+			logger.FNode("anchor", anchor), logger.F("err", err))
 		return
 	}
 	for i := 1; i < n.rt.Space().GraphGrade; i++ {
@@ -290,7 +289,7 @@ func (n *Node) fixDeBruijn() {
 		if _, ok := oldSet[addr]; !ok {
 			if err := n.cp.AddRef(addr); err != nil {
 				n.lgr.Warn("fixDeBruijn: failed to addref node",
-					logger.FNode("node", *cand), logger.F("err", err))
+					logger.FNode("node", cand), logger.F("err", err))
 			}
 		}
 	}
@@ -301,7 +300,7 @@ func (n *Node) fixDeBruijn() {
 		if _, ok := newSet[addr]; !ok {
 			if err := n.cp.Release(addr); err != nil {
 				n.lgr.Warn("fixDeBruijn: failed to release node",
-					logger.FNode("old", *old), logger.F("err", err))
+					logger.FNode("old", old), logger.F("err", err))
 			}
 		}
 	}

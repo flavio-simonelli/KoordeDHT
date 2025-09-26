@@ -45,14 +45,14 @@ func (n *Node) Join(bootstrapAddr string) error {
 	if succ == nil {
 		return fmt.Errorf("join: bootstrap %s returned nil successor", bootstrapAddr)
 	}
-	n.lgr.Info("join: candidate successor found", logger.FNode("successor", *succ))
+	n.lgr.Info("join: candidate successor found", logger.FNode("successor", succ))
 	// 2. Ask successor for its predecessor
 	pred, err := n.cp.GetPredecessor(succ.Addr)
 	if err != nil {
 		return fmt.Errorf("join: failed to get predecessor of successor %s: %w", succ.Addr, err)
 	}
 	if pred != nil {
-		n.lgr.Info("join: successor has predecessor", logger.FNode("predecessor", *pred))
+		n.lgr.Info("join: successor has predecessor", logger.FNode("predecessor", pred))
 	}
 	// 3. Notify successor that we may be its predecessor
 	if err := n.cp.Notify(self, succ.Addr); err != nil {
@@ -68,11 +68,11 @@ func (n *Node) Join(bootstrapAddr string) error {
 	n.fixSuccessorList()
 
 	// 6. Initialize de Bruijn pointers
-	//n.fixDeBruijn()
+	n.fixDeBruijn()
 
 	n.lgr.Info("join: completed successfully",
-		logger.FNode("self", *self),
-		logger.FNode("successor", *succ))
+		logger.FNode("self", self),
+		logger.FNode("successor", succ))
 	return nil
 }
 

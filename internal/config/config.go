@@ -1,6 +1,7 @@
 package config
 
 import (
+	"KoordeDHT/internal/logger"
 	"fmt"
 	"net"
 	"os"
@@ -109,4 +110,36 @@ func (cfg *NodeConfig) ValidateConfig() error {
 	}
 
 	return nil
+}
+
+// LogConfig stampa la configurazione caricata a livello DEBUG
+func (cfg *NodeConfig) LogConfig(lgr logger.Logger) {
+	lgr.Debug("Loaded configuration",
+		logger.F("logger.level", cfg.Logger.Level),
+		logger.F("logger.encoding", cfg.Logger.Encoding),
+		logger.F("logger.mode", cfg.Logger.Mode),
+		logger.F("logger.file.path", cfg.Logger.File.Path),
+		logger.F("logger.file.maxSize", cfg.Logger.File.MaxSize),
+		logger.F("logger.file.maxBackups", cfg.Logger.File.MaxBackups),
+		logger.F("logger.file.maxAge", cfg.Logger.File.MaxAge),
+		logger.F("logger.file.compress", cfg.Logger.File.Compress),
+
+		logger.F("dht.idBits", cfg.DHT.IDBits),
+		logger.F("dht.mode", cfg.DHT.Mode),
+		logger.F("dht.debruijn.degree", cfg.DHT.DeBruijn.Degree),
+		logger.F("dht.debruijn.backupSize", cfg.DHT.DeBruijn.BackupSize),
+		logger.F("dht.debruijn.fixInterval", cfg.DHT.DeBruijn.FixInterval.String()),
+		logger.F("dht.fault.successorListSize", cfg.DHT.FaultTolerance.SuccessorListSize),
+		logger.F("dht.fault.stabilizationInterval", cfg.DHT.FaultTolerance.StabilizationInterval.String()),
+		logger.F("dht.fault.failureTimeout", cfg.DHT.FaultTolerance.FailureTimeout.String()),
+
+		logger.F("dht.bootstrap.mode", cfg.DHT.Bootstrap.Mode),
+		logger.F("dht.bootstrap.dnsName", cfg.DHT.Bootstrap.DNSName),
+		logger.F("dht.bootstrap.srv", cfg.DHT.Bootstrap.SRV),
+		logger.F("dht.bootstrap.port", cfg.DHT.Bootstrap.Port),
+		logger.F("dht.bootstrap.peers", cfg.DHT.Bootstrap.Peers),
+
+		logger.F("server.host", cfg.Server.Host),
+		logger.F("server.port", cfg.Server.Port),
+	)
 }

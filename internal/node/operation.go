@@ -3,6 +3,7 @@ package node
 import (
 	"KoordeDHT/internal/domain"
 	"KoordeDHT/internal/logger"
+	"KoordeDHT/internal/trace"
 	"context"
 	"errors"
 	"fmt"
@@ -16,6 +17,12 @@ import (
 // in questo caso la funzione deve iniziare la ricerca del successore partendo dal nodo corrente
 // e seguendo la logica del protocollo Koorde
 func (n *Node) FindSuccessorInit(ctx context.Context, target domain.ID) (*domain.Node, error) {
+	// check for canceled/expired context
+	if err := checkContext(ctx); err != nil {
+		return nil, err
+	}
+	traceID := trace.GetTraceID(ctx)
+	n.lgr.Info("FindSuccessorInit: starting lookup", logger.F("target", target), logger.F("traceID", traceID), logger.FNode("self", n.rt.Self()))
 	// check if the target id is between the current node and its successor
 	self := n.rt.Self()
 	succ := n.rt.FirstSuccessor()
@@ -92,6 +99,8 @@ func (n *Node) FindSuccessorInit(ctx context.Context, target domain.ID) (*domain
 // in questo caso la funzione deve continuare la ricerca del successore partendo dal nodo corrente
 // e seguendo la logica del protocollo Koorde
 func (n *Node) FindSuccessorStep(ctx context.Context, target, currentI, kshift domain.ID) (*domain.Node, error) {
+	traceID := trace.GetTraceID(ctx)
+	n.lgr.Info("FindSuccessorInit: starting lookup", logger.F("target", target), logger.F("traceID", traceID), logger.FNode("self", n.rt.Self()))
 	// check if the target id is between the current node and its successor
 	self := n.rt.Self()
 	succ := n.rt.FirstSuccessor()
@@ -177,7 +186,7 @@ func (n *Node) Notify(p *domain.Node) {
 	}
 	pred := n.rt.GetPredecessor()
 	if pred == nil || p.ID.Between(pred.ID, n.rt.Self().ID) {
-		n.lgr.Info("Notify: updating predecessor", logger.FNode("new", *p))
+		n.lgr.Info("Notify: updating predecessor", logger.FNode("new", p))
 		// addRef new predecessor
 		if err := n.cp.AddRef(p.Addr); err != nil {
 			n.lgr.Warn("Notify: failed to add new predecessor to pool",
@@ -235,7 +244,7 @@ func (n *Node) Put(ctx context.Context, key string, value string) error {
 		return fmt.Errorf("Put: failed to store resource at successor %s: %w", succ.Addr, err)
 	}
 	// Log success
-	n.lgr.Info("Put: resource stored at successor", logger.F("key", key), logger.FNode("successor", *succ))
+	n.lgr.Info("Put: resource stored at successor", logger.F("key", key), logger.FNode("successor", succ))
 	return nil
 }
 

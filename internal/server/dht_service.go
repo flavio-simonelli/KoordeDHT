@@ -1,12 +1,11 @@
 package server
 
 import (
+	dhtv1 "KoordeDHT/internal/api/dht/v1"
 	"KoordeDHT/internal/domain"
+	"KoordeDHT/internal/node"
 	"context"
 	"errors"
-
-	dhtv1 "KoordeDHT/internal/api/dht/v1"
-	"KoordeDHT/internal/node"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

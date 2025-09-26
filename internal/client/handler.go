@@ -33,6 +33,8 @@ func checkContext(ctx context.Context) error {
 	}
 }
 
+//TODO: da eliminare perchè non deve esistere
+
 // FindSuccessorStart performs the initial FindSuccessor RPC call on the given server.
 // It starts a lookup for the provided target ID by sending a request in "Initial" mode.
 // The method retrieves a client connection from the pool, builds the request, executes
@@ -49,8 +51,6 @@ func (p *Pool) FindSuccessorStart(target domain.ID, serverAddr string) (*domain.
 	defer cancel()
 	return p.FindSuccessorStartWithContext(ctx, target, serverAddr)
 }
-
-//TODO: gestire il caso in cui si contatta se stessi
 
 // FindSuccessorStartWithContext performs the initial FindSuccessor RPC call on the given server.
 // It starts a lookup for the provided target ID by sending a request in "Initial" mode.
@@ -77,8 +77,6 @@ func (p *Pool) FindSuccessorStartWithContext(ctx context.Context, target domain.
 	// RetrieveLocal the client from the pool
 	client, err := p.Get(serverAddr)
 	if err != nil {
-		p.lgr.Warn("FindSuccessorStart: unable to get client from pool",
-			logger.F("addr", serverAddr), logger.F("err", err))
 		return nil, fmt.Errorf("%w: %s", ErrClientNotInPool, serverAddr)
 	}
 	// Build the request in "Initial" mode (first hop of the lookup)
@@ -126,8 +124,6 @@ func (p *Pool) FindSuccessorStepWithContext(ctx context.Context, target, current
 	// RetrieveLocal the client from the pool
 	client, err := p.Get(serverAddr)
 	if err != nil {
-		p.lgr.Warn("FindSuccessorStep: unable to get client from pool",
-			logger.F("addr", serverAddr), logger.F("err", err))
 		return nil, fmt.Errorf("%w: %s", ErrClientNotInPool, serverAddr)
 	}
 	// Build the request in "Step" mode (subsequent hop of the lookup)
@@ -152,6 +148,7 @@ func (p *Pool) FindSuccessorStepWithContext(ctx context.Context, target, current
 	return domain.NodeFromProto(resp.Node), nil
 }
 
+// TODO: da eliminare perchè non deve esistere
 // FindSuccessorStep performs a FindSuccessor RPC in "Step" mode, creating
 // a new context with the default timeout configured in the pool.
 // This is used at the first hop when starting a lookup locally.
@@ -182,15 +179,11 @@ func (p *Pool) GetPredecessor(serverAddr string) (*domain.Node, error) {
 	// RetrieveLocal the client from the pool
 	client, err := p.Get(serverAddr)
 	if err != nil {
-		p.lgr.Warn("GetPredecessor: unable to get client from pool",
-			logger.F("addr", serverAddr), logger.F("err", err))
 		return nil, fmt.Errorf("%w: %s", ErrClientNotInPool, serverAddr)
 	}
-
 	// Context with timeout for the RPC
 	ctx, cancel := context.WithTimeout(context.Background(), p.timeout)
 	defer cancel()
-
 	// Perform the RPC
 	resp, err := client.GetPredecessor(ctx, &emptypb.Empty{})
 	if err != nil {
@@ -206,7 +199,6 @@ func (p *Pool) GetPredecessor(serverAddr string) (*domain.Node, error) {
 		// Other RPC errors
 		return nil, fmt.Errorf("client: GetPredecessor RPC to %s failed: %w", serverAddr, err)
 	}
-
 	// Convert proto.Node = domain.Node
 	return domain.NodeFromProto(resp), nil
 }
@@ -230,8 +222,6 @@ func (p *Pool) GetSuccessorList(serverAddr string) ([]*domain.Node, error) {
 	// RetrieveLocal the client from the pool
 	client, err := p.Get(serverAddr)
 	if err != nil {
-		p.lgr.Warn("GetSuccessorList: unable to get client from pool",
-			logger.F("addr", serverAddr), logger.F("err", err))
 		return nil, fmt.Errorf("%w: %s", ErrClientNotInPool, serverAddr)
 	}
 	// Context with timeout for the RPC
@@ -274,8 +264,6 @@ func (p *Pool) Notify(self *domain.Node, serverAddr string) error {
 	// RetrieveLocal the client from the pool
 	client, err := p.Get(serverAddr)
 	if err != nil {
-		p.lgr.Warn("Notify: unable to get client from pool",
-			logger.F("addr", serverAddr), logger.F("err", err))
 		return fmt.Errorf("%w: %s", ErrClientNotInPool, serverAddr)
 	}
 	// Context with timeout for the RPC
@@ -306,8 +294,6 @@ func (p *Pool) Ping(serverAddr string) error {
 	// RetrieveLocal the client from the pool
 	client, err := p.Get(serverAddr)
 	if err != nil {
-		p.lgr.Warn("Ping: unable to get client from pool",
-			logger.F("addr", serverAddr), logger.F("err", err))
 		return fmt.Errorf("%w: %s", ErrClientNotInPool, serverAddr)
 	}
 	// Context with timeout for the RPC
@@ -329,8 +315,6 @@ func (p *Pool) StoreRemoteWithContext(ctx context.Context, res domain.Resource, 
 	// RetrieveLocal the client from the pool
 	client, err := p.Get(serverAddr)
 	if err != nil {
-		p.lgr.Warn("Store: unable to get client from pool",
-			logger.F("addr", serverAddr), logger.F("err", err))
 		return fmt.Errorf("%w: %s", ErrClientNotInPool, serverAddr)
 	}
 	// Build the request from the domain.Resource
@@ -361,8 +345,6 @@ func (p *Pool) RetrieveRemoteWithContext(ctx context.Context, key domain.ID, ser
 	// RetrieveLocal the client from the pool
 	client, err := p.Get(serverAddr)
 	if err != nil {
-		p.lgr.Warn("Retrieve: unable to get client from pool",
-			logger.F("addr", serverAddr), logger.F("err", err))
 		return nil, fmt.Errorf("%w: %s", ErrClientNotInPool, serverAddr)
 	}
 	// Context with timeout for the RPC

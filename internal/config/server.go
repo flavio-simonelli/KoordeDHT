@@ -74,7 +74,7 @@ func (cfg *NodeConfig) Listen() (net.Listener, error) {
 		}
 		host = ip.String()
 	} else {
-		// Se l'utente ha specificato un IP → validiamo rispetto alla mode
+		// Se l'utente ha specificato un IP = validiamo rispetto alla mode
 		ip := net.ParseIP(host)
 		if ip == nil {
 			return nil, fmt.Errorf("invalid IP address: %s", host)
