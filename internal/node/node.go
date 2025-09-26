@@ -50,7 +50,9 @@ func (n *Node) Join(bootstrapAddr string) error {
 	}
 	n.lgr.Info("join: candidate successor found", logger.FNode("successor", succ))
 	// 2. Ask successor for its predecessor
-	pred, err := n.cp.GetPredecessor(succ.Addr)
+	ctx, cancel = ctxutil.NewContext(ctxutil.WithTimeout(n.cp.Timeout()))
+	defer cancel()
+	pred, err := n.cp.GetPredecessor(ctx, succ.Addr)
 	if err != nil {
 		return fmt.Errorf("join: failed to get predecessor of successor %s: %w", succ.Addr, err)
 	}
@@ -58,7 +60,9 @@ func (n *Node) Join(bootstrapAddr string) error {
 		n.lgr.Info("join: successor has predecessor", logger.FNode("predecessor", pred))
 	}
 	// 3. Notify successor that we may be its predecessor
-	if err := n.cp.Notify(self, succ.Addr); err != nil {
+	ctx, cancel = ctxutil.NewContext(ctxutil.WithTimeout(n.cp.Timeout()))
+	defer cancel()
+	if err := n.cp.Notify(ctx, self, succ.Addr); err != nil {
 		return fmt.Errorf("join: failed to notify successor %s: %w", succ.Addr, err)
 	}
 	// 4. Update local routing table (release old, set new)

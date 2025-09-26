@@ -56,7 +56,9 @@ func (n *Node) stabilizeSuccessor() {
 		return
 	}
 	// Ask successor for its predecessor
-	pred, err := n.cp.GetPredecessor(succ.Addr)
+	ctx, cancel := ctxutil.NewContext(ctxutil.WithTimeout(n.cp.Timeout()))
+	defer cancel()
+	pred, err := n.cp.GetPredecessor(ctx, succ.Addr)
 	if err != nil {
 		n.lgr.Warn("stabilize: could not contact successor",
 			logger.FNode("succ", succ),
@@ -134,7 +136,9 @@ func (n *Node) stabilizeSuccessor() {
 		succ = pred
 	}
 	// Notify successor that we might be its predecessor
-	if err := n.cp.Notify(self, succ.Addr); err != nil {
+	ctx, cancel = ctxutil.NewContext(ctxutil.WithTimeout(n.cp.Timeout()))
+	defer cancel()
+	if err := n.cp.Notify(ctx, self, succ.Addr); err != nil {
 		n.lgr.Warn("stabilize: notify failed",
 			logger.FNode("succ", succ), logger.F("err", err))
 	}
@@ -151,7 +155,9 @@ func (n *Node) fixSuccessorList() {
 		return
 	}
 	// Ask successor for its successor list
-	remoteList, err := n.cp.GetSuccessorList(succ.Addr)
+	ctx, cancel := ctxutil.NewContext(ctxutil.WithTimeout(n.cp.Timeout()))
+	defer cancel()
+	remoteList, err := n.cp.GetSuccessorList(ctx, succ.Addr)
 	if err != nil {
 		n.lgr.Warn("fixSuccessorList: could not fetch successor list",
 			logger.FNode("succ", succ),
@@ -252,7 +258,9 @@ func (n *Node) fixDeBruijn() {
 		return
 	}
 	// Get predecessor of that successor (anchor)
-	anchor, err := n.cp.GetPredecessor(succ.Addr)
+	ctx, cancel := ctxutil.NewContext(ctxutil.WithTimeout(n.cp.Timeout()))
+	defer cancel()
+	anchor, err := n.cp.GetPredecessor(ctx, succ.Addr)
 	if err != nil || anchor == nil {
 		n.lgr.Warn("fixDeBruijn: could not get anchor predecessor",
 			logger.FNode("succ", succ),
@@ -270,7 +278,9 @@ func (n *Node) fixDeBruijn() {
 	// Costruisci nuova finestra (newNodes + newSet)
 	newNodes := make([]*domain.Node, n.rt.Space().GraphGrade)
 	newNodes[0] = anchor
-	list, err := n.cp.GetSuccessorList(anchor.Addr)
+	ctx, cancel = ctxutil.NewContext(ctxutil.WithTimeout(n.cp.Timeout()))
+	defer cancel()
+	list, err := n.cp.GetSuccessorList(ctx, anchor.Addr)
 	if err != nil {
 		n.lgr.Warn("fixDeBruijn: could not fetch successor list from anchor",
 			logger.FNode("anchor", anchor), logger.F("err", err))
