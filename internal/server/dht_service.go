@@ -2,6 +2,7 @@ package server
 
 import (
 	dhtv1 "KoordeDHT/internal/api/dht/v1"
+	"KoordeDHT/internal/ctxutil"
 	"KoordeDHT/internal/domain"
 	"KoordeDHT/internal/node"
 	"context"
@@ -34,7 +35,7 @@ func NewDHTService(n *node.Node) dhtv1.DHTServer {
 // inside the node logic.
 func (s *dhtService) FindSuccessor(ctx context.Context, req *dhtv1.FindSuccessorRequest) (*dhtv1.FindSuccessorResponse, error) {
 	// Check for canceled/expired context
-	if err := checkContext(ctx); err != nil {
+	if err := ctxutil.CheckContext(ctx); err != nil {
 		return nil, err
 	}
 	// Validate request
@@ -72,7 +73,7 @@ func (s *dhtService) FindSuccessor(ctx context.Context, req *dhtv1.FindSuccessor
 //   - Otherwise, the current predecessor is returned as a protobuf Node.
 func (s *dhtService) GetPredecessor(ctx context.Context, _ *emptypb.Empty) (*dhtv1.Node, error) {
 	// Check for canceled/expired context
-	if err := checkContext(ctx); err != nil {
+	if err := ctxutil.CheckContext(ctx); err != nil {
 		return nil, err
 	}
 	// RetrieveLocal predecessor from node
@@ -92,7 +93,7 @@ func (s *dhtService) GetPredecessor(ctx context.Context, _ *emptypb.Empty) (*dht
 //   - Otherwise, the current successor list is returned as a protobuf message.
 func (s *dhtService) GetSuccessorList(ctx context.Context, _ *emptypb.Empty) (*dhtv1.SuccessorList, error) {
 	// Check for canceled/expired context
-	if err := checkContext(ctx); err != nil {
+	if err := ctxutil.CheckContext(ctx); err != nil {
 		return nil, err
 	}
 	// RetrieveLocal successor list from node
@@ -120,7 +121,7 @@ func (s *dhtService) GetSuccessorList(ctx context.Context, _ *emptypb.Empty) (*d
 //   - Otherwise, the node logic is invoked to update the predecessor if appropriate.
 func (s *dhtService) Notify(ctx context.Context, req *dhtv1.Node) (*emptypb.Empty, error) {
 	// Check for canceled/expired context
-	if err := checkContext(ctx); err != nil {
+	if err := ctxutil.CheckContext(ctx); err != nil {
 		return nil, err
 	}
 	// Validate request
@@ -143,7 +144,7 @@ func (s *dhtService) Notify(ctx context.Context, req *dhtv1.Node) (*emptypb.Empt
 //   - Otherwise, the method always returns an empty response to indicate liveness.
 func (s *dhtService) Ping(ctx context.Context, _ *emptypb.Empty) (*emptypb.Empty, error) {
 	// Check for canceled/expired context
-	if err := checkContext(ctx); err != nil {
+	if err := ctxutil.CheckContext(ctx); err != nil {
 		return nil, err
 	}
 	// Always succeed if node is alive
