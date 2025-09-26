@@ -1,6 +1,7 @@
 package zap
 
 import (
+	"KoordeDHT/internal/domain"
 	"KoordeDHT/internal/logger"
 
 	"go.uber.org/zap"
@@ -22,6 +23,15 @@ func (z ZapAdapter) With(fields ...logger.Field) logger.Logger {
 
 func (z ZapAdapter) Named(name string) logger.Logger {
 	return ZapAdapter{L: z.L.Named(name)}
+}
+
+func (z ZapAdapter) WithNode(n domain.Node) logger.Logger {
+	return ZapAdapter{L: z.L.With(
+		zap.Any("self", map[string]any{
+			"id":   n.ID.String(),
+			"addr": n.Addr,
+		}),
+	)}
 }
 
 func (z ZapAdapter) Debug(msg string, fields ...logger.Field) {
