@@ -19,7 +19,6 @@ import (
 	"syscall"
 	"time"
 
-	"go.uber.org/zap"
 	"google.golang.org/grpc"
 )
 
@@ -34,27 +33,30 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to load configuration from %q: %v", *configPath, err)
 	}
+	// Validate configuration
 	if err := cfg.ValidateConfig(); err != nil {
 		log.Fatalf("invalid configuration: %v", err)
 	}
-
 	// Initialize logger
 	zapLog, err := zapfactory.New(cfg.Logger)
 	if err != nil {
 		log.Fatalf("failed to initialize logger: %v", err)
 	}
 	defer func() { _ = zapLog.Sync() }() // flush logger buffers before exit
-	lgr := zapfactory.NewZapAdapter(zapLog)
-	lgr.Info("configuration loaded and validated successfully", logger.F("path", configPath))
+	var lgr logger.Logger
+	lgr = zapfactory.NewZapAdapter(zapLog) // adapt zap.Logger to logger.Interface
 
-	// Initialize listener for incoming connections (to determine server address and port)
+	cfg.LogConfig(lgr) // log loaded configuration at DEBUG level
+
+	// Initialize listener (to determine server address and port)
 	lis, err := cfg.Listen()
 	if err != nil {
-		zapLog.Fatal("failed to bind listener", zap.Error(err))
+		lgr.Error("Fatal: failed to initialize listener", logger.F("err", err))
+		os.Exit(1)
 	}
 	defer func() { _ = lis.Close() }() // close listener on shutdown
 	addr := lis.Addr().String()
-	lgr.Info("listener initialized successfully", logger.F("addr", addr))
+	lgr.Debug("create listener", logger.F("addr", addr))
 
 	// Initialize the identifier space
 	space, err := domain.NewSpace(cfg.DHT.IDBits, cfg.DHT.DeBruijn.Degree)
@@ -62,14 +64,17 @@ func main() {
 		lgr.Error("failed to initialize identifier space", logger.F("id_bits", cfg.DHT.IDBits), logger.F("degree", cfg.DHT.DeBruijn.Degree), logger.F("err", err))
 		os.Exit(1)
 	}
+	lgr.Debug("identifier space initialized", logger.F("id_bits", space.Bits), logger.F("degree", space.GraphGrade), logger.F("sizeByte", space.ByteLen))
 
 	// Initialize the local node
 	id := space.NewIdFromString(addr) // derive ID from address
-	lgr.Info("node identifier assigned", logger.F("id", id.String()))
 	domainNode := domain.Node{
 		ID:   id,
 		Addr: addr,
 	}
+	lgr.Debug("generated node ID", logger.F("id", id.String()))
+	lgr = lgr.Named("node").WithNode(domainNode)
+	lgr.Info("New Node initializing")
 
 	// Initialize the routing table
 	rt := routingtable.New(
@@ -78,24 +83,31 @@ func main() {
 		cfg.DHT.FaultTolerance.SuccessorListSize,
 		routingtable.WithLogger(lgr.Named("routingtable")),
 	)
+	lgr.Debug("initialize routing table")
 
 	// Initialize the client pool
 	cp := client.New(
+		id,
 		addr,
 		cfg.DHT.FaultTolerance.FailureTimeout,
 		client.WithLogger(lgr.Named("clientpool")),
 	)
+	lgr.Debug("initialize client pool")
 
 	// Initialize the storage
-	store := storage.NewMemoryStorage()
+	store := storage.NewMemoryStorage(
+		lgr.Named("storage"),
+	)
+	lgr.Debug("initialize in-memory storage")
 
 	// Initialize the node
 	n := node.New(
 		rt,
 		cp,
 		store,
-		node.WithLogger(lgr.Named("node")),
+		node.WithLogger(lgr),
 	)
+	lgr.Debug("initialize new struct node")
 
 	// Initialize the gRPC server
 	s, err := server.New(
@@ -108,11 +120,12 @@ func main() {
 		lgr.Error("failed to initialize gRPC server", logger.F("err", err))
 		os.Exit(1)
 	}
+	lgr.Debug("initialized gRPC server")
 
 	// Run server in background
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- s.Start() }()
-	lgr.Info("gRPC server started successfully", logger.F("addr", addr))
+	lgr.Debug("server started")
 
 	// Join an existing DHT or create a new one
 	peers, err := bootstrap.ResolveBootstrap(cfg.DHT.Bootstrap)
@@ -123,8 +136,10 @@ func main() {
 		s.Stop()
 		os.Exit(1)
 	}
+	lgr.Debug("resolved bootstrap peers", logger.F("peers", peers))
 	if len(peers) != 0 {
 		peer, err := bootstrap.PickRandom(peers)
+		lgr.Debug("picked random peers used in like bootstrap", logger.F("peers", peer))
 		if err != nil {
 			lgr.Error("failed to pick a bootstrap peer", logger.F("err", err))
 			// cleanup before exit
@@ -141,11 +156,10 @@ func main() {
 			s.Stop()
 			os.Exit(1)
 		}
-
-		lgr.Info("successfully joined DHT", logger.F("peer", peer))
+		lgr.Debug("joined DHT")
 	} else {
 		n.CreateNewDHT()
-		lgr.Info("new DHT created successfully")
+		lgr.Debug("new DHT created")
 	}
 
 	// Setup signal handler for graceful shutdown
@@ -154,7 +168,7 @@ func main() {
 
 	// Start periodic stabilization workers (run until ctx is canceled)
 	n.StartStabilizers(ctx, cfg.DHT.FaultTolerance.StabilizationInterval)
-	lgr.Info("Stabilization workers started")
+	lgr.Debug("Stabilization workers started")
 
 	select {
 	case <-ctx.Done():
