@@ -2,6 +2,7 @@ package node
 
 import (
 	"KoordeDHT/internal/client"
+	"KoordeDHT/internal/ctxutil"
 	"KoordeDHT/internal/logger"
 	"KoordeDHT/internal/routingtable"
 	"KoordeDHT/internal/storage"
@@ -38,7 +39,9 @@ func (n *Node) Join(bootstrapAddr string) error {
 	if bootstrapAddr == self.Addr {
 		return fmt.Errorf("join: bootstrap address cannot be self address %s", bootstrapAddr)
 	}
-	succ, err := n.cp.FindSuccessorStart(self.ID, bootstrapAddr)
+	ctx, cancel := ctxutil.NewContext(ctxutil.WithTrace(self.ID), ctxutil.WithTimeout(n.cp.Timeout()), ctxutil.WithHops())
+	defer cancel()
+	succ, err := n.cp.FindSuccessorStart(ctx, self.ID, bootstrapAddr)
 	if err != nil {
 		return fmt.Errorf("join: failed to find successor via bootstrap %s: %w", bootstrapAddr, err)
 	}
