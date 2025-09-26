@@ -1,6 +1,7 @@
 package node
 
 import (
+	"KoordeDHT/internal/ctxutil"
 	"KoordeDHT/internal/domain"
 	"KoordeDHT/internal/logger"
 	"context"
@@ -217,7 +218,9 @@ func (n *Node) checkPredecessor() {
 		return
 	}
 	// Try a lightweight ping
-	if err := n.cp.Ping(pred.Addr); err != nil {
+	ctx, cancel := ctxutil.NewContext(ctxutil.WithTimeout(n.cp.Timeout()))
+	defer cancel()
+	if err := n.cp.Ping(ctx, pred.Addr); err != nil {
 		n.lgr.Warn("checkPredecessor: predecessor unresponsive, clearing",
 			logger.FNode("pred", pred),
 			logger.F("err", err))

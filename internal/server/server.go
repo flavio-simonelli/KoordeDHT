@@ -5,14 +5,10 @@ import (
 	dhtv1 "KoordeDHT/internal/api/dht/v1"
 	"KoordeDHT/internal/logger"
 	"KoordeDHT/internal/node"
-	"context"
-	"errors"
 	"fmt"
 	"net"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 // Server wraps a gRPC server hosting both the client and DHT services.
@@ -59,18 +55,4 @@ func (s *Server) Stop() {
 // waiting for in-flight RPCs to complete.
 func (s *Server) GracefulStop() {
 	s.grpcServer.GracefulStop()
-}
-
-// checkContext checks whether the provided context has been canceled
-// or has exceeded its deadline. If so, it returns the corresponding
-// gRPC status error. Otherwise, it returns nil.
-func checkContext(ctx context.Context) error {
-	switch err := ctx.Err(); {
-	case errors.Is(err, context.Canceled):
-		return status.Error(codes.Canceled, "request was canceled by client")
-	case errors.Is(err, context.DeadlineExceeded):
-		return status.Error(codes.DeadlineExceeded, "request deadline exceeded")
-	default:
-		return nil
-	}
 }

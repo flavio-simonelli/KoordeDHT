@@ -1,6 +1,7 @@
 package node
 
 import (
+	"KoordeDHT/internal/ctxutil"
 	"KoordeDHT/internal/domain"
 	"KoordeDHT/internal/logger"
 	"KoordeDHT/internal/trace"
@@ -18,7 +19,7 @@ import (
 // e seguendo la logica del protocollo Koorde
 func (n *Node) FindSuccessorInit(ctx context.Context, target domain.ID) (*domain.Node, error) {
 	// check for canceled/expired context
-	if err := checkContext(ctx); err != nil {
+	if err := ctxutil.CheckContext(ctx); err != nil {
 		return nil, err
 	}
 	traceID := trace.GetTraceID(ctx)
@@ -38,7 +39,7 @@ func (n *Node) FindSuccessorInit(ctx context.Context, target domain.ID) (*domain
 	if debruijn == nil || len(debruijn) == 0 {
 		n.lgr.Warn("FindSuccessorInit: de Bruijn list non inizializzata")
 		// fallback to successor
-		return n.cp.FindSuccessorStartWithContext(ctx, target, succ.Addr)
+		return n.cp.FindSuccessorStart(ctx, target, succ.Addr)
 	}
 	digit, kshift := n.rt.Space().NextDigitBaseK(target)
 	currentI := n.rt.Space().MulKMod(self.ID)
@@ -70,7 +71,7 @@ func (n *Node) FindSuccessorInit(ctx context.Context, target domain.ID) (*domain
 		if d == nil {
 			continue
 		}
-		res, err := n.cp.FindSuccessorStepWithContext(ctx, target, currentI, kshift, d.Addr)
+		res, err := n.cp.FindSuccessorStep(ctx, target, currentI, kshift, d.Addr)
 		if err == nil && res != nil {
 			return res, nil
 		}
@@ -85,7 +86,7 @@ func (n *Node) FindSuccessorInit(ctx context.Context, target domain.ID) (*domain
 			logger.F("tryIdx", i), logger.F("addr", d.Addr), logger.F("err", err))
 	}
 	// if all the nodes in the de Bruijn list not response, fallback to successor
-	res, err := n.cp.FindSuccessorStartWithContext(ctx, target, succ.Addr)
+	res, err := n.cp.FindSuccessorStart(ctx, target, succ.Addr)
 	if err == nil && res != nil {
 		return res, nil
 	}
@@ -118,7 +119,7 @@ func (n *Node) FindSuccessorStep(ctx context.Context, target, currentI, kshift d
 		if debruijn == nil || len(debruijn) == 0 {
 			n.lgr.Warn("FindSuccessorInit: de Bruijn list non inizializzata")
 			// fallback to successor
-			return n.cp.FindSuccessorStartWithContext(ctx, target, succ.Addr)
+			return n.cp.FindSuccessorStart(ctx, target, succ.Addr)
 		}
 		nextdigit, nextkshift := n.rt.Space().NextDigitBaseK(kshift)
 		nextI := n.rt.Space().MulKMod(currentI)
@@ -150,7 +151,7 @@ func (n *Node) FindSuccessorStep(ctx context.Context, target, currentI, kshift d
 			if d == nil {
 				continue
 			}
-			res, err := n.cp.FindSuccessorStepWithContext(ctx, target, nextI, nextkshift, d.Addr)
+			res, err := n.cp.FindSuccessorStep(ctx, target, nextI, nextkshift, d.Addr)
 			if err == nil && res != nil {
 				return res, nil
 			}
@@ -165,10 +166,10 @@ func (n *Node) FindSuccessorStep(ctx context.Context, target, currentI, kshift d
 				logger.F("tryIdx", i), logger.F("addr", d.Addr), logger.F("err", err))
 		}
 		// if all the nodes in the de Bruijn list not response, fallback to successor
-		return n.cp.FindSuccessorStartWithContext(ctx, target, succ.Addr)
+		return n.cp.FindSuccessorStart(ctx, target, succ.Addr)
 	} else {
 		// next hop is successor
-		return n.cp.FindSuccessorStepWithContext(ctx, target, currentI, kshift, succ.Addr)
+		return n.cp.FindSuccessorStep(ctx, target, currentI, kshift, succ.Addr)
 	}
 }
 
@@ -217,7 +218,7 @@ func (n *Node) CheckIdValidity(id domain.ID) error {
 // apply also to the routing and storage steps.
 func (n *Node) Put(ctx context.Context, key string, value string) error {
 	// Check if the context has already been canceled or expired
-	if err := checkContext(ctx); err != nil {
+	if err := ctxutil.CheckContext(ctx); err != nil {
 		return err
 	}
 	// Translate the client key into a DHT identifier
@@ -225,10 +226,10 @@ func (n *Node) Put(ctx context.Context, key string, value string) error {
 	// Find the successor node responsible for this ID
 	succ, err := n.FindSuccessorInit(ctx, id)
 	if err != nil {
-		return fmt.Errorf("Put: failed to find successor for key %s: %w", key, err)
+		return fmt.Errorf("put: failed to find successor for key %s: %w", key, err)
 	}
 	if succ == nil {
-		return fmt.Errorf("Put: no successor found for key %s", key)
+		return fmt.Errorf("put: no successor found for key %s", key)
 	}
 	// Build the resource object
 	res := domain.Resource{
@@ -241,7 +242,7 @@ func (n *Node) Put(ctx context.Context, key string, value string) error {
 	}
 	// Otherwise, forward the resource to the successor
 	if err := n.cp.StoreRemoteWithContext(ctx, res, succ.Addr); err != nil {
-		return fmt.Errorf("Put: failed to store resource at successor %s: %w", succ.Addr, err)
+		return fmt.Errorf("put: failed to store resource at successor %s: %w", succ.Addr, err)
 	}
 	// Log success
 	n.lgr.Info("Put: resource stored at successor", logger.F("key", key), logger.FNode("successor", succ))
@@ -258,16 +259,16 @@ func (n *Node) Put(ctx context.Context, key string, value string) error {
 //   - status.Error(codes.NotFound, ...) if the resource does not exist
 //   - error in case of routing or RPC issues
 func (n *Node) Get(ctx context.Context, key string) (*domain.Resource, error) {
-	if err := checkContext(ctx); err != nil {
+	if err := ctxutil.CheckContext(ctx); err != nil {
 		return nil, err
 	}
 	id := n.rt.Space().NewIdFromString(key)
 	succ, err := n.FindSuccessorInit(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("Get: failed to find successor for key %s: %w", key, err)
+		return nil, fmt.Errorf("get: failed to find successor for key %s: %w", key, err)
 	}
 	if succ == nil {
-		return nil, fmt.Errorf("Get: no successor found for key %s", key)
+		return nil, fmt.Errorf("get: no successor found for key %s", key)
 	}
 	// If this node is the successor, retrieve locally
 	if succ.ID.Equal(n.rt.Self().ID) {
@@ -283,7 +284,7 @@ func (n *Node) Get(ctx context.Context, key string) (*domain.Resource, error) {
 	// Otherwise, forward the request to the successor
 	res, err := n.cp.RetrieveRemoteWithContext(ctx, id, succ.Addr)
 	if err != nil {
-		return nil, fmt.Errorf("Get: failed to retrieve resource from successor %s: %w", succ.Addr, err)
+		return nil, fmt.Errorf("get: failed to retrieve resource from successor %s: %w", succ.Addr, err)
 	}
 	return res, nil
 }
@@ -295,16 +296,16 @@ func (n *Node) Get(ctx context.Context, key string) (*domain.Resource, error) {
 //
 // Returns NotFound if the resource does not exist.
 func (n *Node) Delete(ctx context.Context, key string) error {
-	if err := checkContext(ctx); err != nil {
+	if err := ctxutil.CheckContext(ctx); err != nil {
 		return err
 	}
 	id := n.rt.Space().NewIdFromString(key)
 	succ, err := n.FindSuccessorInit(ctx, id)
 	if err != nil {
-		return fmt.Errorf("Delete: failed to find successor for key %s: %w", key, err)
+		return fmt.Errorf("delete: failed to find successor for key %s: %w", key, err)
 	}
 	if succ == nil {
-		return fmt.Errorf("Delete: no successor found for key %s", key)
+		return fmt.Errorf("delete: no successor found for key %s", key)
 	}
 	// If this node is the successor, delete locally
 	if succ.ID.Equal(n.rt.Self().ID) {
@@ -318,7 +319,7 @@ func (n *Node) Delete(ctx context.Context, key string) error {
 	}
 	// Otherwise, forward the request to the successor
 	if err := n.cp.RemoveRemoteWithContext(ctx, id, succ.Addr); err != nil {
-		return fmt.Errorf("Delete: failed to remove resource at successor %s: %w", succ.Addr, err)
+		return fmt.Errorf("delete: failed to remove resource at successor %s: %w", succ.Addr, err)
 	}
 	return nil
 }
@@ -336,18 +337,4 @@ func (n *Node) RetrieveLocal(id domain.ID) (domain.Resource, error) {
 // RemoveLocal rimuove la risorsa con la chiave specificata dal nodo locale utilizzando lo storage interno. (chiamata da operazioni node -> node)
 func (n *Node) RemoveLocal(id domain.ID) error {
 	return n.s.Delete(id)
-}
-
-// checkContext checks whether the provided context has been canceled
-// or has exceeded its deadline. If so, it returns the corresponding
-// gRPC status error. Otherwise, it returns nil.
-func checkContext(ctx context.Context) error {
-	switch err := ctx.Err(); {
-	case errors.Is(err, context.Canceled):
-		return status.Error(codes.Canceled, "request was canceled by client")
-	case errors.Is(err, context.DeadlineExceeded):
-		return status.Error(codes.DeadlineExceeded, "request deadline exceeded")
-	default:
-		return nil
-	}
 }
