@@ -30,9 +30,8 @@ func New(rout *routingtable.RoutingTable, clientpool *client.Pool, storage *stor
 	return n
 }
 
-// Join connects this node to an existing Koorde ring using the given bootstrap peer.
-// It sets predecessor/successor pointers, initializes the successor list,
-// and refreshes de Bruijn links.
+// Join connects this node to an existing Koorde DHT using the given bootstrap peer.
+// It sets predecessor/successor pointers, initializes the successor list, and sets de Bruijn links.
 func (n *Node) Join(bootstrapAddr string) error {
 	self := n.rt.Self()
 	// 1. Ask bootstrap to find our successor

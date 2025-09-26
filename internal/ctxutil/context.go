@@ -23,7 +23,7 @@ type ContextOption func(*ctxConfig)
 type ctxConfig struct {
 	withTrace bool
 	withHops  bool
-	nodeID    string
+	nodeID    domain.ID
 	timeout   time.Duration
 }
 
@@ -32,7 +32,7 @@ type ctxConfig struct {
 func WithTrace(nodeID domain.ID) ContextOption {
 	return func(cfg *ctxConfig) {
 		cfg.withTrace = true
-		cfg.nodeID = nodeID.String()
+		cfg.nodeID = nodeID
 	}
 }
 
@@ -90,6 +90,16 @@ func TraceIDFromContext(ctx context.Context) string {
 	return trace.GetTraceID(ctx)
 }
 
+// EnsureTraceID checks if the context already has a non-empty traceID.
+// If not, it attaches a new one derived from the provided nodeID.
+// Returns the updated context (may be the same as input).
+func EnsureTraceID(ctx context.Context, nodeID domain.ID) context.Context {
+	if id := trace.GetTraceID(ctx); id == "" {
+		ctx, _ = trace.AttachTraceID(ctx, nodeID)
+	}
+	return ctx
+}
+
 // HopsFromContext returns the current hop counter from the context.
 // If not present, it returns -1 to indicate "not set".
 func HopsFromContext(ctx context.Context) int {
@@ -102,9 +112,14 @@ func HopsFromContext(ctx context.Context) int {
 
 // IncHops increments the hop counter in the context if present.
 // If no hop counter is set, the original context is returned unchanged.
+// Special case: if the hop counter is -1, it remains -1.
 func IncHops(ctx context.Context) context.Context {
 	val := ctx.Value(hopsKey{})
 	if hops, ok := val.(int); ok {
+		if hops == -1 {
+			// -1 significa "non conteggiare", non incrementare
+			return ctx
+		}
 		return context.WithValue(ctx, hopsKey{}, hops+1)
 	}
 	return ctx

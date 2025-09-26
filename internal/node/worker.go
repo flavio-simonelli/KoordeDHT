@@ -52,7 +52,7 @@ func (n *Node) stabilizeSuccessor() {
 	self := n.rt.Self()
 	succ := n.rt.FirstSuccessor()
 	if succ == nil {
-		n.lgr.Warn("IMPOSSIBLE -> stabilize: successor nil")
+		n.lgr.Error("IMPOSSIBLE -> stabilize: successor nil")
 		return
 	}
 	// Ask successor for its predecessor
@@ -70,7 +70,7 @@ func (n *Node) stabilizeSuccessor() {
 			if candidate == nil {
 				continue
 			}
-			n.lgr.Info("stabilize: promoting new successor",
+			n.lgr.Debug("stabilize: promoting new successor",
 				logger.FNode("old", succ),
 				logger.FNode("new", candidate))
 
@@ -118,7 +118,7 @@ func (n *Node) stabilizeSuccessor() {
 	}
 	// If successor’s predecessor is closer, promote it
 	if pred != nil && pred.ID.Between(self.ID, succ.ID) && !pred.ID.Equal(self.ID) {
-		n.lgr.Info("stabilize: successor updated",
+		n.lgr.Debug("stabilize: successor updated",
 			logger.FNode("old_successor", succ),
 			logger.FNode("new_successor", pred))
 		// AddRef new successor
@@ -151,7 +151,7 @@ func (n *Node) stabilizeSuccessor() {
 func (n *Node) fixSuccessorList() {
 	succ := n.rt.FirstSuccessor()
 	if succ == nil {
-		n.lgr.Warn("fixSuccessorList: no successor set")
+		n.lgr.Error("fixSuccessorList: no successor set")
 		return
 	}
 	// Ask successor for its successor list
@@ -211,9 +211,6 @@ func (n *Node) fixSuccessorList() {
 			}
 		}
 	}
-
-	n.lgr.Debug("fixSuccessorList: updated",
-		logger.F("count", len(newList)))
 }
 
 // checkPredecessor verifies whether our predecessor is still alive.
@@ -248,9 +245,11 @@ func (n *Node) fixDeBruijn() {
 	self := n.rt.Self()
 	// Compute target = (k * self.ID) mod 2^b
 	target := n.rt.Space().MulKMod(self.ID)
-	n.lgr.Info("fixDeBruijn: checking target", logger.F("target", target.String()))
+	n.lgr.Debug("fixDeBruijn: checking target", logger.F("target", target.String()))
 	// Lookup successor of target
-	succ, err := n.FindSuccessorInit(context.Background(), target)
+	ctx, cancel := ctxutil.NewContext(ctxutil.WithTrace(self.ID), ctxutil.WithTimeout(n.cp.Timeout()), ctxutil.WithHops())
+	defer cancel()
+	succ, err := n.FindSuccessorInit(ctx, target)
 	if err != nil || succ == nil {
 		n.lgr.Warn("fixDeBruijn: could not find successor",
 			logger.F("target", target.String()),
@@ -258,7 +257,7 @@ func (n *Node) fixDeBruijn() {
 		return
 	}
 	// Get predecessor of that successor (anchor)
-	ctx, cancel := ctxutil.NewContext(ctxutil.WithTimeout(n.cp.Timeout()))
+	ctx, cancel = ctxutil.NewContext(ctxutil.WithTimeout(n.cp.Timeout()))
 	defer cancel()
 	anchor, err := n.cp.GetPredecessor(ctx, succ.Addr)
 	if err != nil || anchor == nil {

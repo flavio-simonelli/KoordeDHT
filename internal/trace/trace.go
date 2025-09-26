@@ -6,9 +6,12 @@ import (
 	"math/rand"
 	"time"
 
+	"KoordeDHT/internal/domain"
+
 	"github.com/oklog/ulid/v2"
-	"google.golang.org/grpc/metadata"
 )
+
+type traceKey struct{}
 
 // GenerateTraceID crea un traceID globale univoco nel formato:
 //
@@ -16,34 +19,24 @@ import (
 func GenerateTraceID(nodeID string) string {
 	t := time.Now().UTC()
 	entropy := ulid.Monotonic(rand.New(rand.NewSource(t.UnixNano())), 0)
-	return fmt.Sprintf("%s-%s", nodeID, ulid.MustNew(ulid.Timestamp(t), entropy).String())
+	id := ulid.MustNew(ulid.Timestamp(t), entropy)
+	return fmt.Sprintf("%s-%s", nodeID, id.String())
 }
 
-// AttachTraceID prende il traceID dal contesto o ne genera uno nuovo
-func AttachTraceID(ctx context.Context, nodeID string) (context.Context, string) {
-	md, ok := metadata.FromOutgoingContext(ctx)
-	if !ok {
-		md = metadata.New(nil)
-	}
-	// Se esiste già lo riutilizza
-	if vals := md.Get("trace-id"); len(vals) > 0 {
-		return ctx, vals[0]
-	}
-	// Altrimenti generane uno nuovo
-	traceID := GenerateTraceID(nodeID)
-	newCtx := metadata.NewOutgoingContext(ctx, metadata.Pairs("trace-id", traceID))
-	return newCtx, traceID
+// AttachTraceID genera e inserisce un traceID nel contesto
+// a partire dal nodeID fornito. Restituisce il nuovo contesto e il traceID.
+func AttachTraceID(ctx context.Context, nodeID domain.ID) (context.Context, string) {
+	traceID := GenerateTraceID(nodeID.String())
+	return context.WithValue(ctx, traceKey{}, traceID), traceID
 }
 
-// getTraceID estrae il trace-id dai metadata, oppure "" se assente
+// GetTraceID recupera il traceID dal contesto.
+// Se non è presente ritorna "".
 func GetTraceID(ctx context.Context) string {
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		return ""
+	if v := ctx.Value(traceKey{}); v != nil {
+		if id, ok := v.(string); ok && id != "" {
+			return id
+		}
 	}
-	vals := md.Get("trace-id")
-	if len(vals) == 0 {
-		return ""
-	}
-	return vals[0]
+	return ""
 }

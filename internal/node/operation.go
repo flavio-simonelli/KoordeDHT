@@ -13,6 +13,25 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// findNextHop restituisce l'indice del nodo predecessore più vicino a currentI
+// nella lista fornita (che rappresenta una sequenza ordinata di nodi).
+// - Usa la funzione ID.Between per il confronto
+// - Se trova nil nella lista lo salta e logga un warning
+// - Se non trova alcun intervallo valido ritorna l'ultimo indice valido
+func (n *Node) findNextHop(list []*domain.Node, currentI domain.ID) int {
+	for i := range list {
+		curr, next := list[i], list[(i+1)%len(list)]
+		if curr == nil || next == nil {
+			n.lgr.Error("findNextHop: nil node in list", logger.F("index", i))
+			continue
+		}
+		if currentI.Between(curr.ID, next.ID) {
+			return i
+		}
+	}
+	return -1
+}
+
 // FindSuccessorInit questa funzione è quella che viene chiamata dal server se riceve una richiesta di FindSuccessor in modalità INIT
 // ovvero senza currentI e kshift
 // in questo caso la funzione deve iniziare la ricerca del successore partendo dal nodo corrente
@@ -22,77 +41,67 @@ func (n *Node) FindSuccessorInit(ctx context.Context, target domain.ID) (*domain
 	if err := ctxutil.CheckContext(ctx); err != nil {
 		return nil, err
 	}
-	traceID := trace.GetTraceID(ctx)
-	n.lgr.Info("FindSuccessorInit: starting lookup", logger.F("target", target), logger.F("traceID", traceID), logger.FNode("self", n.rt.Self()))
-	// check if the target id is between the current node and its successor
+	// add trace id if missing in the context
 	self := n.rt.Self()
+	ctx = ctxutil.EnsureTraceID(ctx, self.ID)
+	traceId := trace.GetTraceID(ctx)
+	// check if the target is in (self, successor]
 	succ := n.rt.FirstSuccessor()
 	if succ == nil {
-		n.lgr.Warn("FindSuccessorInit: successor non inizializzato")
-		return nil, errors.New("successor not initialized")
-	}
-	if target.Between(self.ID, succ.ID) {
+		n.lgr.Error("routing table not initialized: successor is nil")
+		return nil, status.Error(codes.Internal, "node not initialized (routing table not initialized)")
+	} else if target.Between(self.ID, succ.ID) {
+		n.lgr.Info("EndLookup: target in (self, successor], returning successor",
+			logger.F("target", target), logger.FNode("successor", succ),
+			logger.F("traceID", traceId), logger.F("hops", ctxutil.HopsFromContext(ctx)))
 		return succ, nil
 	}
-	// otherwise first hop of de Bruijn graph routing
-	debruijn := n.rt.DeBruijnList()
-	if debruijn == nil || len(debruijn) == 0 {
-		n.lgr.Warn("FindSuccessorInit: de Bruijn list non inizializzata")
-		// fallback to successor
-		return n.cp.FindSuccessorStart(ctx, target, succ.Addr)
-	}
-	digit, kshift := n.rt.Space().NextDigitBaseK(target)
-	currentI := n.rt.Space().MulKMod(self.ID)
-	currentI = n.rt.Space().AddMod(currentI, n.rt.Space().FromUint64(digit))
-	// find the closest preceding node to currentI
-	var startIdx = -1
-	for i := 0; i < len(debruijn)-2; i++ {
-		cand, nxt := debruijn[i], debruijn[i+1]
-		if cand == nil || nxt == nil {
-			continue
-		}
-		if currentI.Between(cand.ID, nxt.ID) {
-			startIdx = i
-			break
-		}
-	}
-	// se non trovato, prendi l’ultimo nodo valido
-	if startIdx == -1 {
-		for i := len(debruijn) - 1; i >= 0; i-- {
-			if debruijn[i] != nil {
-				startIdx = i
-				break
+	// start de Bruijn routing
+	Bruijn := n.rt.DeBruijnList()
+	if Bruijn != nil && len(Bruijn) > 0 {
+		// calculate I and kshift
+		digit, kshift := n.rt.Space().NextDigitBaseK(target)
+		currentI := n.rt.Space().MulKMod(self.ID)
+		currentI = n.rt.Space().AddMod(currentI, n.rt.Space().FromUint64(digit))
+		// find the closest preceding node to currentI
+		index := n.findNextHop(Bruijn, currentI)
+		for i := index; i >= 0; i-- {
+			d := Bruijn[i]
+			if d == nil {
+				continue
+			}
+			n.lgr.Info("FindSuccessorStep: forwarding to de Bruijn node",
+				logger.F("target", target), logger.FNode("nextHop", d),
+				logger.F("traceID", traceId), logger.F("hops", ctxutil.HopsFromContext(ctx)))
+			var res *domain.Node
+			var err error
+			if d.ID.Equal(self.ID) {
+				res, err = n.FindSuccessorStep(ctx, target, currentI, kshift)
+			} else {
+				ctx = ctxutil.IncHops(ctx)
+				res, err = n.cp.FindSuccessorStep(ctx, target, currentI, kshift, d.Addr)
+			}
+			if err == nil && res != nil {
+				return res, nil
+			} else {
+				// se il contesto è già scaduto/cancellato = stop immediato
+				if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) || ctx.Err() != nil {
+					n.lgr.Error("FindSuccessorInit: lookup interrotto per timeout/cancel",
+						logger.F("tryIdx", i), logger.F("addr", d.Addr), logger.F("err", err))
+					return nil, ctx.Err()
+				}
+				// altrimenti logghiamo il problema e proviamo il precedente
+				n.lgr.Warn("FindSuccessorInit: de Bruijn nodo errore",
+					logger.F("tryIdx", i), logger.F("addr", d.Addr), logger.F("err", err))
 			}
 		}
 	}
-	// se abbiamo trovato qualcosa, proviamo a partire da lì e usiamo come fallback il precedente
-	for i := startIdx; i >= 0; i-- {
-		d := debruijn[i]
-		if d == nil {
-			continue
-		}
-		res, err := n.cp.FindSuccessorStep(ctx, target, currentI, kshift, d.Addr)
-		if err == nil && res != nil {
-			return res, nil
-		}
-		// se il contesto è già scaduto/cancellato = stop immediato
-		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) || ctx.Err() != nil {
-			n.lgr.Error("FindSuccessorInit: lookup interrotto per timeout/cancel",
-				logger.F("tryIdx", i), logger.F("addr", d.Addr), logger.F("err", err))
-			return nil, ctx.Err()
-		}
-		// altrimenti logghiamo il problema e proviamo il precedente
-		n.lgr.Warn("FindSuccessorInit: de Bruijn nodo non risponde",
-			logger.F("tryIdx", i), logger.F("addr", d.Addr), logger.F("err", err))
-	}
 	// if all the nodes in the de Bruijn list not response, fallback to successor
-	res, err := n.cp.FindSuccessorStart(ctx, target, succ.Addr)
-	if err == nil && res != nil {
-		return res, nil
-	}
-	n.lgr.Error("FindSuccessorInit: nessun nodo risponde, errore finale",
-		logger.F("target", target), logger.F("succ", succ.Addr))
-	return nil, fmt.Errorf("no de Bruijn or successor responded for target %s", target)
+	n.lgr.Warn("FindSuccessorInit: no de Bruijn responded or present, falling back to successor",
+		logger.F("target", target), logger.FNode("successor", succ),
+		logger.F("traceID", traceId), logger.F("hops", ctxutil.HopsFromContext(ctx)))
+	ctx = ctxutil.IncHops(ctx)
+	return n.cp.FindSuccessorStart(ctx, target, succ.Addr)
 }
 
 // FindSuccessorStep questa funzione è quella che viene chiamata dal server se riceve una richiesta di FindSuccessor in modalità STEP
@@ -100,94 +109,110 @@ func (n *Node) FindSuccessorInit(ctx context.Context, target domain.ID) (*domain
 // in questo caso la funzione deve continuare la ricerca del successore partendo dal nodo corrente
 // e seguendo la logica del protocollo Koorde
 func (n *Node) FindSuccessorStep(ctx context.Context, target, currentI, kshift domain.ID) (*domain.Node, error) {
-	traceID := trace.GetTraceID(ctx)
-	n.lgr.Info("FindSuccessorInit: starting lookup", logger.F("target", target), logger.F("traceID", traceID), logger.FNode("self", n.rt.Self()))
-	// check if the target id is between the current node and its successor
+	// check for canceled/expired context
+	if err := ctxutil.CheckContext(ctx); err != nil {
+		return nil, err
+	}
 	self := n.rt.Self()
+	traceId := trace.GetTraceID(ctx)
+	// check if the target is in (self, successor]
 	succ := n.rt.FirstSuccessor()
 	if succ == nil {
-		n.lgr.Warn("FindSuccessorInit: successor non inizializzato")
-		return nil, errors.New("successor not initialized")
-	}
-	if target.Between(self.ID, succ.ID) {
+		n.lgr.Error("routing table not initialized: successor is nil")
+		return nil, status.Error(codes.Internal, "node not initialized (routing table not initialized)")
+	} else if target.Between(self.ID, succ.ID) {
+		n.lgr.Info("EndLookup: target in (self, successor], returning successor",
+			logger.F("target", target), logger.FNode("successor", succ),
+			logger.F("traceID", traceId), logger.F("hops", ctxutil.HopsFromContext(ctx)))
 		return succ, nil
 	}
-	// otherwise continue hop of de Bruijn graph routing
+	// start de Bruijn routing
+	// check if currentI is in (self, successor]
 	if currentI.Between(self.ID, succ.ID) {
 		// extract the de Bruijn link
-		debruijn := n.rt.DeBruijnList()
-		if debruijn == nil || len(debruijn) == 0 {
-			n.lgr.Warn("FindSuccessorInit: de Bruijn list non inizializzata")
-			// fallback to successor
-			return n.cp.FindSuccessorStart(ctx, target, succ.Addr)
-		}
-		nextdigit, nextkshift := n.rt.Space().NextDigitBaseK(kshift)
-		nextI := n.rt.Space().MulKMod(currentI)
-		nextI = n.rt.Space().AddMod(nextI, n.rt.Space().FromUint64(nextdigit))
-		// find the closest preceding node to currentI
-		var startIdx = -1
-		for i := 0; i < len(debruijn)-2; i++ {
-			cand, nxt := debruijn[i], debruijn[i+1]
-			if cand == nil || nxt == nil {
-				continue
-			}
-			if nextI.Between(cand.ID, nxt.ID) {
-				startIdx = i
-				break
-			}
-		}
-		// se non trovato, prendi l’ultimo nodo valido
-		if startIdx == -1 {
-			for i := len(debruijn) - 1; i >= 0; i-- {
-				if debruijn[i] != nil {
-					startIdx = i
-					break
+		Bruijn := n.rt.DeBruijnList()
+		if Bruijn != nil && len(Bruijn) > 0 {
+			nextDigit, nextKshift := n.rt.Space().NextDigitBaseK(kshift)
+			nextI := n.rt.Space().MulKMod(currentI)
+			nextI = n.rt.Space().AddMod(nextI, n.rt.Space().FromUint64(nextDigit))
+			// find the closest preceding node to currentI
+			index := n.findNextHop(Bruijn, nextI)
+			for i := index; i >= 0; i-- {
+				d := Bruijn[i]
+				if d == nil {
+					continue
+				}
+				n.lgr.Info("FindSuccessorStep: forwarding to de Bruijn node",
+					logger.F("target", target), logger.FNode("nextHop", d),
+					logger.F("traceID", traceId), logger.F("hops", ctxutil.HopsFromContext(ctx)))
+				var res *domain.Node
+				var err error
+				if d.ID.Equal(self.ID) {
+					res, err = n.FindSuccessorStep(ctx, target, nextI, nextKshift)
+				} else {
+					ctx = ctxutil.IncHops(ctx)
+					res, err = n.cp.FindSuccessorStep(ctx, target, nextI, nextKshift, d.Addr)
+				}
+				if err == nil && res != nil {
+					return res, nil
+				} else {
+					// se il contesto è già scaduto/cancellato = stop immediato
+					if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) || ctx.Err() != nil {
+						n.lgr.Error("FindSuccessorStep: lookup interrotto per timeout/cancel",
+							logger.F("tryIdx", i), logger.F("addr", d.Addr), logger.F("err", err))
+						return nil, ctx.Err()
+					}
+					// altrimenti logghiamo il problema e proviamo il precedente
+					n.lgr.Warn("FindSuccessorStep: de Bruijn nodo errore",
+						logger.F("tryIdx", i), logger.F("addr", d.Addr), logger.F("err", err))
 				}
 			}
 		}
-		// se abbiamo trovato qualcosa, proviamo a partire da lì e usiamo come fallback il precedente
-		for i := startIdx; i >= 0; i-- {
-			d := debruijn[i]
-			if d == nil {
-				continue
-			}
-			res, err := n.cp.FindSuccessorStep(ctx, target, nextI, nextkshift, d.Addr)
-			if err == nil && res != nil {
-				return res, nil
-			}
-			// se il contesto è già scaduto/cancellato = stop immediato
-			if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) || ctx.Err() != nil {
-				n.lgr.Error("FindSuccessorStep: lookup interrotto per timeout/cancel",
-					logger.F("tryIdx", i), logger.F("addr", d.Addr), logger.F("err", err))
-				return nil, ctx.Err()
-			}
-			// altrimenti logghiamo il problema e proviamo il precedente
-			n.lgr.Warn("FindSuccessorStep: de Bruijn nodo non risponde",
-				logger.F("tryIdx", i), logger.F("addr", d.Addr), logger.F("err", err))
-		}
 		// if all the nodes in the de Bruijn list not response, fallback to successor
+		n.lgr.Warn("FindSuccessorStep: no de Bruijn responded or present, falling back to successor",
+			logger.F("target", target), logger.FNode("nextHop", succ),
+			logger.F("traceID", traceId), logger.F("hops", ctxutil.HopsFromContext(ctx)))
+		ctx = ctxutil.IncHops(ctx)
 		return n.cp.FindSuccessorStart(ctx, target, succ.Addr)
-	} else {
-		// next hop is successor
-		return n.cp.FindSuccessorStep(ctx, target, currentI, kshift, succ.Addr)
 	}
+	// next hop is successor
+	n.lgr.Info("FindSuccessorStep: forwarding to successor",
+		logger.F("target", target), logger.FNode("nextHop", succ),
+		logger.F("traceID", traceId), logger.F("hops", ctxutil.HopsFromContext(ctx)))
+	ctx = ctxutil.IncHops(ctx)
+	return n.cp.FindSuccessorStep(ctx, target, currentI, kshift, succ.Addr)
 }
 
+// Predecessor returns the predecessor of this node as currently
+// stored in the routing table.
 func (n *Node) Predecessor() *domain.Node {
-	return n.rt.GetPredecessor()
+	pred := n.rt.GetPredecessor()
+	n.lgr.Debug("Predecessor: returning current predecessor",
+		logger.FNode("predecessor", pred))
+	return pred
 }
 
+// SuccessorList returns the current successor list of this node from the routing table.
 func (n *Node) SuccessorList() []*domain.Node {
-	return n.rt.SuccessorList()
+	list := n.rt.SuccessorList()
+	n.lgr.Debug("SuccessorList: returning current list",
+		logger.F("count", len(list)))
+	return list
 }
 
+// Notify informs this node about a potential predecessor.
+// If the notifying node p lies between the current predecessor
+// and self, the predecessor is updated.
 func (n *Node) Notify(p *domain.Node) {
+	// check if the notifier is nil or self
 	if p == nil || p.ID.Equal(n.rt.Self().ID) {
+		n.lgr.Debug("Notify: notify called with nil or self node, ignored", logger.FNode("node", p))
 		return
 	}
+	// get current predecessor
 	pred := n.rt.GetPredecessor()
+	// if no predecessor or p is between pred and self (or pred == self), update
 	if pred == nil || p.ID.Between(pred.ID, n.rt.Self().ID) {
-		n.lgr.Info("Notify: updating predecessor", logger.FNode("new", p))
 		// addRef new predecessor
 		if err := n.cp.AddRef(p.Addr); err != nil {
 			n.lgr.Warn("Notify: failed to add new predecessor to pool",
@@ -202,9 +227,13 @@ func (n *Node) Notify(p *domain.Node) {
 					logger.F("node", pred), logger.F("err", err))
 			}
 		}
+		// log update
+		n.lgr.Info("Notify: predecessor updated", logger.FNode("newPredecessor", p), logger.FNode("oldPredecessor", pred))
 	}
 }
 
+// CheckIdValidity verifies that the given ID is valid in this node's
+// identifier space. Returns an error if invalid.
 func (n *Node) CheckIdValidity(id domain.ID) error {
 	return n.rt.Space().IsValidID(id)
 }
@@ -263,7 +292,7 @@ func (n *Node) Get(ctx context.Context, key string) (*domain.Resource, error) {
 		return nil, err
 	}
 	id := n.rt.Space().NewIdFromString(key)
-	succ, err := n.FindSuccessorInit(ctx, id)
+	succ, err := n.FindSuccessorInit(ctx, id) // is used the context from client
 	if err != nil {
 		return nil, fmt.Errorf("get: failed to find successor for key %s: %w", key, err)
 	}
