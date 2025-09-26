@@ -2,6 +2,7 @@ package server
 
 import (
 	clientv1 "KoordeDHT/internal/api/client/v1"
+	"KoordeDHT/internal/ctxutil"
 	"KoordeDHT/internal/domain"
 	"KoordeDHT/internal/node"
 	"context"
@@ -25,7 +26,7 @@ func NewClientService(n *node.Node) clientv1.ClientAPIServer {
 // Put handles the Put RPC call.
 func (s *clientService) Put(ctx context.Context, req *clientv1.PutRequest) (*emptypb.Empty, error) {
 	// Check for canceled/expired context
-	if err := checkContext(ctx); err != nil {
+	if err := ctxutil.CheckContext(ctx); err != nil {
 		return nil, err
 	}
 	if req == nil || len(req.Key) == 0 {
@@ -44,7 +45,7 @@ func (s *clientService) Put(ctx context.Context, req *clientv1.PutRequest) (*emp
 // Get retrieves a resource by key. Returns NotFound if the key does not exist.
 func (s *clientService) Get(ctx context.Context, req *clientv1.GetRequest) (*clientv1.GetResponse, error) {
 	// Check for canceled/expired context
-	if err := checkContext(ctx); err != nil {
+	if err := ctxutil.CheckContext(ctx); err != nil {
 		return nil, err
 	}
 	if req == nil || len(req.Key) == 0 {
@@ -63,7 +64,7 @@ func (s *clientService) Get(ctx context.Context, req *clientv1.GetRequest) (*cli
 // Delete removes a resource by key. Returns NotFound if the key does not exist.
 func (s *clientService) Delete(ctx context.Context, req *clientv1.DeleteRequest) (*emptypb.Empty, error) {
 	// Check for canceled/expired context
-	if err := checkContext(ctx); err != nil {
+	if err := ctxutil.CheckContext(ctx); err != nil {
 		return nil, err
 	}
 	if req == nil || len(req.Key) == 0 {
