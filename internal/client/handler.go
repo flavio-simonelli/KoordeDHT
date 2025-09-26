@@ -347,9 +347,6 @@ func (p *Pool) RetrieveRemoteWithContext(ctx context.Context, key domain.ID, ser
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", ErrClientNotInPool, serverAddr)
 	}
-	// Context with timeout for the RPC
-	ctx, cancel := context.WithTimeout(context.Background(), p.timeout)
-	defer cancel()
 	// Build the request with the key
 	req := &pb.RetrieveRequest{
 		Key: key,
@@ -386,9 +383,6 @@ func (p *Pool) RemoveRemoteWithContext(ctx context.Context, key domain.ID, serve
 			logger.F("addr", serverAddr), logger.F("err", err))
 		return fmt.Errorf("%w: %s", ErrClientNotInPool, serverAddr)
 	}
-	// Context with timeout for the RPC
-	ctx, cancel := context.WithTimeout(context.Background(), p.timeout)
-	defer cancel()
 	// Build the request with the key
 	req := &pb.RemoveRequest{
 		Key: key,
