@@ -125,7 +125,7 @@ func (p *Pool) FindSuccessorStep(ctx context.Context, target, currentI, kshift d
 //     ErrTimeout if the RPC timed out,
 //     ErrNoPredecessor if the remote node has no predecessor,
 //     or a wrapped RPC error otherwise.
-func (p *Pool) GetPredecessor(serverAddr string) (*domain.Node, error) {
+func (p *Pool) GetPredecessor(ctx context.Context, serverAddr string) (*domain.Node, error) {
 	// check for self-address
 	/*
 		if serverAddr == p.selfAddr {
@@ -139,9 +139,6 @@ func (p *Pool) GetPredecessor(serverAddr string) (*domain.Node, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", ErrClientNotInPool, serverAddr)
 	}
-	// Context with timeout for the RPC
-	ctx, cancel := context.WithTimeout(context.Background(), p.timeout)
-	defer cancel()
 	// Perform the RPC
 	resp, err := client.GetPredecessor(ctx, &emptypb.Empty{})
 	if err != nil {
@@ -169,7 +166,7 @@ func (p *Pool) GetPredecessor(serverAddr string) (*domain.Node, error) {
 //   - error: ErrClientNotInPool if the client is not in the pool,
 //     ErrTimeout if the RPC timed out,
 //     or a wrapped RPC error otherwise.
-func (p *Pool) GetSuccessorList(serverAddr string) ([]*domain.Node, error) {
+func (p *Pool) GetSuccessorList(ctx context.Context, serverAddr string) ([]*domain.Node, error) {
 	// check for self-address
 	/*
 		if serverAddr == p.selfAddr {
@@ -182,9 +179,6 @@ func (p *Pool) GetSuccessorList(serverAddr string) ([]*domain.Node, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", ErrClientNotInPool, serverAddr)
 	}
-	// Context with timeout for the RPC
-	ctx, cancel := context.WithTimeout(context.Background(), p.timeout)
-	defer cancel()
 	// Perform the RPC
 	resp, err := client.GetSuccessorList(ctx, &emptypb.Empty{})
 	if err != nil {
@@ -211,7 +205,7 @@ func (p *Pool) GetSuccessorList(serverAddr string) ([]*domain.Node, error) {
 //   - ErrClientNotInPool if the client is not in the pool
 //   - ErrTimeout if the RPC timed out
 //   - a wrapped RPC error otherwise
-func (p *Pool) Notify(self *domain.Node, serverAddr string) error {
+func (p *Pool) Notify(ctx context.Context, self *domain.Node, serverAddr string) error {
 	// check for self-address
 	/*
 		if serverAddr == p.selfAddr {
@@ -224,9 +218,6 @@ func (p *Pool) Notify(self *domain.Node, serverAddr string) error {
 	if err != nil {
 		return fmt.Errorf("%w: %s", ErrClientNotInPool, serverAddr)
 	}
-	// Context with timeout for the RPC
-	ctx, cancel := context.WithTimeout(context.Background(), p.timeout)
-	defer cancel()
 	// Build the request from the domain.Node
 	req := self.ToProto()
 	// Perform the RPC
