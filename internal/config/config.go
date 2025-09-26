@@ -19,6 +19,7 @@ type FileLoggerConfig struct {
 }
 
 type LoggerConfig struct {
+	Active   bool             `yaml:"active"`
 	Level    string           `yaml:"level"`
 	Encoding string           `yaml:"encoding"` // console | json
 	Mode     string           `yaml:"mode"`     // stdout | file
@@ -53,24 +54,25 @@ type DHTConfig struct {
 	Bootstrap      BootstrapConfig      `yaml:"bootstrap"`
 }
 
-type ServerConfig struct {
+type NodeConfig struct {
+	Id   string `yaml:"id"`
 	Host string `yaml:"host"`
 	Port int    `yaml:"port"`
 }
 
-type NodeConfig struct {
+type Config struct {
 	Logger LoggerConfig `yaml:"logger"`
 	DHT    DHTConfig    `yaml:"dht"`
-	Server ServerConfig `yaml:"server"`
+	Node   NodeConfig   `yaml:"node"`
 }
 
-func LoadConfig(path string) (*NodeConfig, error) {
+func LoadConfig(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
 
-	var cfg NodeConfig
+	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, err
 	}
@@ -78,7 +80,7 @@ func LoadConfig(path string) (*NodeConfig, error) {
 	return &cfg, nil
 }
 
-func (cfg *NodeConfig) ValidateConfig() error {
+func (cfg *Config) ValidateConfig() error {
 	// per ora valida solamente il bootstrap
 	b := cfg.DHT.Bootstrap
 
@@ -113,8 +115,9 @@ func (cfg *NodeConfig) ValidateConfig() error {
 }
 
 // LogConfig stampa la configurazione caricata a livello DEBUG
-func (cfg *NodeConfig) LogConfig(lgr logger.Logger) {
+func (cfg *Config) LogConfig(lgr logger.Logger) {
 	lgr.Debug("Loaded configuration",
+		logger.F("logger.active", cfg.Logger.Active),
 		logger.F("logger.level", cfg.Logger.Level),
 		logger.F("logger.encoding", cfg.Logger.Encoding),
 		logger.F("logger.mode", cfg.Logger.Mode),
@@ -139,7 +142,8 @@ func (cfg *NodeConfig) LogConfig(lgr logger.Logger) {
 		logger.F("dht.bootstrap.port", cfg.DHT.Bootstrap.Port),
 		logger.F("dht.bootstrap.peers", cfg.DHT.Bootstrap.Peers),
 
-		logger.F("server.host", cfg.Server.Host),
-		logger.F("server.port", cfg.Server.Port),
+		logger.F("node.id", cfg.Node.Id),
+		logger.F("node.host", cfg.Node.Host),
+		logger.F("node.port", cfg.Node.Port),
 	)
 }

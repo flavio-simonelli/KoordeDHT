@@ -1,5 +1,6 @@
 logger:
-  level: "debug"           # log level: debug, info, warn, error
+  active: true          # enable/disable logging (true | false)
+  level: "info"           # log level: debug, info, warn, error
   encoding: "console"      # log encoding: console | json
   mode: "stdout"           # output mode: stdout | file
 
@@ -31,6 +32,7 @@ dht:
     stabilizationInterval: 5s  # stabilization procedure interval
     failureTimeout: 3s     # max time before marking a node as failed
 
-server:
+node:
+    id: ""                 # hexadecimal node identifier (empty = random)
     host: ""               # server host (empty = all interfaces (in base a come è configurata dht mode))"
     port: 0               # server port (0 = random available port)
