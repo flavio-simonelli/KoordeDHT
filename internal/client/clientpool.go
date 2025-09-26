@@ -60,6 +60,11 @@ func New(selfId domain.ID, selfAddr string, timeout time.Duration, opt ...Option
 	return p
 }
 
+// Timeout returns the default timeout for RPC calls.
+func (p *Pool) Timeout() time.Duration {
+	return p.timeout
+}
+
 // AddRef ensures that a gRPC connection to the given node exists in the pool.
 // If the connection already exists, its reference count is incremented.
 // If not, a new connection is created and tracked with an initial reference count of 1.
