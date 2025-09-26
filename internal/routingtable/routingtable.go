@@ -4,8 +4,6 @@ import (
 	"KoordeDHT/internal/domain"
 	"KoordeDHT/internal/logger"
 	"fmt"
-	"strings"
-
 	"sync"
 )
 
@@ -89,6 +87,8 @@ func New(self *domain.Node, space domain.Space, succListSize int, opts ...Option
 	for _, opt := range opts {
 		opt(rt)
 	}
+	// Log the creation of the routing table.
+	rt.logger.Debug("routing table initialized")
 	return rt
 }
 
@@ -107,8 +107,8 @@ func (rt *RoutingTable) InitSingleNode() {
 	rt.successorList[0] = &routingEntry{node: rt.self}
 	rt.predecessor = &routingEntry{node: rt.self}
 	rt.deBruijn[0] = &routingEntry{node: rt.self}
-
-	rt.logger.Info("routing table initialized for single-node network")
+	// log the reinitialization
+	rt.logger.Debug("Routing table setted to single-node in dht configuration")
 }
 
 // Space return the space configuration of the koorde network.
@@ -121,6 +121,7 @@ func (rt *RoutingTable) Self() *domain.Node {
 	return rt.self
 }
 
+// SuccListSize returns the configured size of the successor list.
 func (rt *RoutingTable) SuccListSize() int {
 	return rt.succListSize
 }
@@ -132,12 +133,19 @@ func (rt *RoutingTable) SuccListSize() int {
 // to ensure thread-safe concurrent access.
 func (rt *RoutingTable) GetSuccessor(i int) *domain.Node {
 	if i < 0 || i >= len(rt.successorList) {
+		rt.logger.Warn(
+			"GetSuccessor: index out of range",
+			logger.F("requested", i),
+			logger.F("valid_range", fmt.Sprintf("[0..%d]", len(rt.successorList)-1)),
+		)
 		return nil
 	}
 	entry := rt.successorList[i]
 	entry.mu.RLock()
-	defer entry.mu.RUnlock()
-	return entry.node
+	node := entry.node
+	entry.mu.RUnlock()
+	rt.logger.Debug("GetSuccessor: returning successor", logger.F("index", i), logger.FNode("successor", node))
+	return node
 }
 
 // FirstSuccessor return the first successor in the successor list.
@@ -155,16 +163,17 @@ func (rt *RoutingTable) FirstSuccessor() *domain.Node {
 func (rt *RoutingTable) SetSuccessor(i int, node *domain.Node) {
 	if i < 0 || i >= len(rt.successorList) {
 		rt.logger.Warn(
-			"SetSuccessor index out of range",
-			logger.F("index", i),
-			logger.F("max", len(rt.successorList)-1),
+			"SetSuccessor: index out of range",
+			logger.F("requested", i),
+			logger.F("valid_range", fmt.Sprintf("[0..%d]", len(rt.successorList)-1)),
 		)
 		return
 	}
 	entry := rt.successorList[i]
 	entry.mu.Lock()
-	defer entry.mu.Unlock()
 	entry.node = node
+	entry.mu.Unlock()
+	rt.logger.Debug("SetSuccessor: updated successor", logger.F("index", i), logger.FNode("successor", node))
 }
 
 // SuccessorList returns a slice of all non-nil successors currently known
@@ -176,13 +185,35 @@ func (rt *RoutingTable) SetSuccessor(i int, node *domain.Node) {
 // may safely modify it without affecting the internal state.
 func (rt *RoutingTable) SuccessorList() []*domain.Node {
 	out := make([]*domain.Node, 0, len(rt.successorList))
+	snapshot := make([]*domain.Node, 0, len(rt.successorList))
+	// lock phase: take a snapshot of the successor list
 	for _, entry := range rt.successorList {
 		entry.mu.RLock()
-		if entry.node != nil {
-			out = append(out, entry.node)
-		}
+		node := entry.node
 		entry.mu.RUnlock()
+
+		snapshot = append(snapshot, node)
+		if node != nil {
+			out = append(out, node)
+		}
 	}
+	// debug logging phase: log the full snapshot including nils
+	nodesInfo := make([]map[string]any, 0, len(snapshot))
+	for i, n := range snapshot {
+		if n == nil {
+			nodesInfo = append(nodesInfo, map[string]any{
+				"index": i,
+				"node":  nil,
+			})
+		} else {
+			nodesInfo = append(nodesInfo, map[string]any{
+				"index": i,
+				"id":    n.ID.String(),
+				"addr":  n.Addr,
+			})
+		}
+	}
+	rt.logger.Debug("SuccessorList snapshot", logger.F("entries", nodesInfo))
 	return out
 }
 
@@ -200,10 +231,30 @@ func (rt *RoutingTable) SetSuccessorList(nodes []*domain.Node) {
 		)
 		return
 	}
-
 	for i, node := range nodes {
 		rt.SetSuccessor(i, node)
 	}
+	// log
+	entriesInfo := make([]map[string]any, 0, len(nodes))
+	for i, node := range nodes {
+		rt.SetSuccessor(i, node)
+
+		if node == nil {
+			entriesInfo = append(entriesInfo, map[string]any{
+				"index": i,
+				"node":  nil,
+			})
+		} else {
+			entriesInfo = append(entriesInfo, map[string]any{
+				"index": i,
+				"id":    node.ID.String(),
+				"addr":  node.Addr,
+			})
+		}
+	}
+	rt.logger.Debug("SetSuccessorList: successor list updated",
+		logger.F("entries", entriesInfo),
+	)
 }
 
 // PromoteCandidate restructures the successor list by promoting the
@@ -222,14 +273,23 @@ func (rt *RoutingTable) SetSuccessorList(nodes []*domain.Node) {
 //     If i <= 0 or out of range, the function does nothing.
 func (rt *RoutingTable) PromoteCandidate(i int) {
 	if i <= 0 || i >= rt.succListSize {
+		rt.logger.Warn(
+			"PromoteCandidate: invalid index",
+			logger.F("requested", i),
+			logger.F("valid_range", fmt.Sprintf("[1..%d]", rt.succListSize-1)),
+		)
+		return
+	}
+	candidate := rt.GetSuccessor(i)
+	if candidate == nil {
+		rt.logger.Warn(
+			"PromoteCandidate: candidate is nil",
+			logger.F("index", i),
+		)
 		return
 	}
 	// Build a new list: candidate + all successors after it
 	newList := make([]*domain.Node, 0, rt.succListSize)
-	candidate := rt.GetSuccessor(i)
-	if candidate == nil {
-		return
-	}
 	newList = append(newList, candidate)
 	for j := i + 1; j < rt.succListSize; j++ {
 		if succ := rt.GetSuccessor(j); succ != nil {
@@ -241,6 +301,12 @@ func (rt *RoutingTable) PromoteCandidate(i int) {
 		newList = append(newList, nil)
 	}
 	rt.SetSuccessorList(newList)
+	// Log the promotion
+	rt.logger.Debug(
+		"PromoteCandidate: successor promoted",
+		logger.F("from_index", i),
+		logger.FNode("candidate", candidate),
+	)
 }
 
 // GetPredecessor return the current predecessor node.
@@ -248,16 +314,25 @@ func (rt *RoutingTable) PromoteCandidate(i int) {
 // Access is synchronized with a read lock for thread safety.
 func (rt *RoutingTable) GetPredecessor() *domain.Node {
 	rt.predecessor.mu.RLock()
-	defer rt.predecessor.mu.RUnlock()
-	return rt.predecessor.node
+	node := rt.predecessor.node
+	rt.predecessor.mu.RUnlock()
+	rt.logger.Debug(
+		"GetPredecessor: predecessor retrieved",
+		logger.FNode("predecessor", node),
+	)
+	return node
 }
 
 // SetPredecessor updates the predecessor pointer to the specified node.
 // Access is synchronized with a write lock to ensure thread-safe updates.
 func (rt *RoutingTable) SetPredecessor(node *domain.Node) {
 	rt.predecessor.mu.Lock()
-	defer rt.predecessor.mu.Unlock()
 	rt.predecessor.node = node
+	rt.predecessor.mu.Unlock()
+	rt.logger.Debug(
+		"SetPredecessor: predecessor updated",
+		logger.FNode("predecessor", node),
+	)
 }
 
 // GetDeBruijn returns the node pointer stored in the de Bruijn entry
@@ -267,12 +342,23 @@ func (rt *RoutingTable) SetPredecessor(node *domain.Node) {
 // with a read lock to ensure thread-safe concurrent access.
 func (rt *RoutingTable) GetDeBruijn(digit int) *domain.Node {
 	if digit < 0 || digit >= len(rt.deBruijn) {
+		rt.logger.Warn(
+			"GetDeBruijn: digit out of range",
+			logger.F("requested", digit),
+			logger.F("valid_range", fmt.Sprintf("[0..%d]", len(rt.deBruijn)-1)),
+		)
 		return nil
 	}
 	entry := rt.deBruijn[digit]
 	entry.mu.RLock()
-	defer entry.mu.RUnlock()
-	return entry.node
+	node := entry.node
+	entry.mu.RUnlock()
+	rt.logger.Debug(
+		"GetDeBruijn: node retrieved",
+		logger.F("digit", digit),
+		logger.FNode("node", node),
+	)
+	return node
 }
 
 // SetDeBruijn updates the de Bruijn entry for the given digit with the specified node.
@@ -283,16 +369,21 @@ func (rt *RoutingTable) GetDeBruijn(digit int) *domain.Node {
 func (rt *RoutingTable) SetDeBruijn(digit int, node *domain.Node) {
 	if digit < 0 || digit >= len(rt.deBruijn) {
 		rt.logger.Warn(
-			"SetDeBruijn index out of range",
-			logger.F("index", digit),
-			logger.F("max", len(rt.deBruijn)-1),
+			"SetDeBruijn: index out of range",
+			logger.F("requested", digit),
+			logger.F("valid_range", fmt.Sprintf("[0..%d]", len(rt.deBruijn)-1)),
 		)
 		return
 	}
 	entry := rt.deBruijn[digit]
 	entry.mu.Lock()
-	defer entry.mu.Unlock()
 	entry.node = node
+	entry.mu.Unlock()
+	rt.logger.Debug(
+		"SetDeBruijn: entry updated",
+		logger.F("digit", digit),
+		logger.FNode("node", node),
+	)
 }
 
 // DeBruijnList returns a slice of all non-nil de Bruijn entries currently known
@@ -308,82 +399,145 @@ func (rt *RoutingTable) SetDeBruijn(digit int, node *domain.Node) {
 //	// If the de Bruijn window has [n1, nil, n2]
 //	// the returned slice will be [n1, n2].
 func (rt *RoutingTable) DeBruijnList() []*domain.Node {
-	var out []*domain.Node
+	out := make([]*domain.Node, 0, len(rt.deBruijn))
+	snapshot := make([]*domain.Node, 0, len(rt.deBruijn))
+	// snapshot phase: read all entries under lock
 	for _, entry := range rt.deBruijn {
 		entry.mu.RLock()
-		if entry.node != nil {
-			out = append(out, entry.node)
-		}
+		node := entry.node
 		entry.mu.RUnlock()
+
+		snapshot = append(snapshot, node)
+		if node != nil {
+			out = append(out, node)
+		}
 	}
+	// logging phase: log the full snapshot including nils
+	nodesInfo := make([]map[string]any, 0, len(snapshot))
+	for i, n := range snapshot {
+		if n == nil {
+			nodesInfo = append(nodesInfo, map[string]any{
+				"digit": i,
+				"node":  nil,
+			})
+		} else {
+			nodesInfo = append(nodesInfo, map[string]any{
+				"digit": i,
+				"id":    n.ID.String(),
+				"addr":  n.Addr,
+			})
+		}
+	}
+	rt.logger.Debug("DeBruijnList snapshot", logger.F("entries", nodesInfo))
 	return out
 }
 
-// SetDeBruijnList sovrascrive l'intera finestra de Bruijn con i nodi forniti.
-// La slice deve avere lunghezza pari al grado del grafo (GraphGrade).
-// Per ogni posizione:
-//   - se node è nil, l'entry viene svuotata;
-//   - se node è non-nil, viene scritto come nuovo puntatore.
+// SetDeBruijnList overwrites the entire de Bruijn window with the provided nodes.
+// The input slice must have a length equal to the routing table's GraphGrade.
 //
-// L'aggiornamento è thread-safe (ogni entry viene protetta dal suo lock).
+// For each position in the slice:
+//   - If the element is nil, the corresponding entry is cleared.
+//   - If the element is non-nil, it is written as the new pointer.
+//
+// Each entry is updated under its own lock, ensuring thread-safe writes.
+// After updating, the method emits a DEBUG-level log with the new state of
+// the de Bruijn list, including indices and nil entries, for debugging
+// and monitoring purposes.
+//
+// This method does not modify the size of the list; it only replaces its contents.
 func (rt *RoutingTable) SetDeBruijnList(nodes []*domain.Node) {
 	if len(nodes) != len(rt.deBruijn) {
-		// in caso di mismatch logghiamo un warning e aggiorniamo solo fino al minimo
-		rt.logger.Warn("SetDeBruijnList: length mismatch",
+		rt.logger.Warn(
+			"SetDeBruijnList: length mismatch",
 			logger.F("expected", len(rt.deBruijn)),
-			logger.F("got", len(nodes)))
+			logger.F("got", len(nodes)),
+		)
 		return
 	}
+	// update phase: write each entry under its lock
 	for i := 0; i < len(rt.deBruijn); i++ {
 		rt.deBruijn[i].mu.Lock()
 		rt.deBruijn[i].node = nodes[i]
 		rt.deBruijn[i].mu.Unlock()
 	}
+	// logging phase: log the new state including nils
+	entriesInfo := make([]map[string]any, 0, len(nodes))
+	for i, n := range nodes {
+		if n == nil {
+			entriesInfo = append(entriesInfo, map[string]any{
+				"digit": i,
+				"node":  nil,
+			})
+		} else {
+			entriesInfo = append(entriesInfo, map[string]any{
+				"digit": i,
+				"id":    n.ID.String(),
+				"addr":  n.Addr,
+			})
+		}
+	}
+	rt.logger.Debug("SetDeBruijnList: list updated",
+		logger.F("entries", entriesInfo),
+	)
 }
 
-// DebugString restituisce una rappresentazione leggibile dell’intera routing table.
+// DebugLog emits a structured DEBUG-level log entry containing a snapshot
+// of the entire routing table.
 //
-// Include:
-//   - Self node
-//   - Predecessore
-//   - Successor list (solo non-nil, con indici)
-//   - De Bruijn list (solo non-nil, con indici)
-func (rt *RoutingTable) DebugString() string {
-	var b strings.Builder
+// Unlike calling the public getters (GetSuccessor, GetPredecessor, GetDeBruijn),
+// this method accesses the internal entries directly under read locks, in order
+// to avoid triggering additional per-entry debug logs. As a result, DebugLog
+// produces a single compact log entry that reflects the current state without
+// side effects.
+//
+// The snapshot includes:
+//   - Self node (the node that owns this routing table)
+//   - Predecessor (nil if not set)
+//   - Successor list (all entries, including nils, with indices)
+//   - De Bruijn list (all entries, including nils, with digits)
+//
+// This method is intended for debugging and monitoring purposes.
+// It does not modify the routing table and can be safely invoked
+// concurrently with other operations.
+func (rt *RoutingTable) DebugLog() {
+	// self
+	self := rt.self
 
-	fmt.Fprintf(&b, "=== Routing Table Debug ===\n")
-	fmt.Fprintf(&b, "Self: %s (%s)\n", rt.self.ID.String(), rt.self.Addr)
+	// predecessor
+	rt.predecessor.mu.RLock()
+	pred := rt.predecessor.node
+	rt.predecessor.mu.RUnlock()
 
-	// Predecessore
-	pred := rt.GetPredecessor()
-	if pred != nil {
-		fmt.Fprintf(&b, "Predecessor: %s (%s)\n", pred.ID.String(), pred.Addr)
-	} else {
-		fmt.Fprintf(&b, "Predecessor: <nil>\n")
-	}
-
-	// Successor list
-	fmt.Fprintf(&b, "Successor List:\n")
-	for i := 0; i < rt.SuccListSize(); i++ {
-		succ := rt.GetSuccessor(i)
-		if succ != nil {
-			fmt.Fprintf(&b, "  [%d] %s (%s)\n", i, succ.ID.String(), succ.Addr)
+	// successors snapshot
+	successors := make([]map[string]any, 0, len(rt.successorList))
+	for i, entry := range rt.successorList {
+		entry.mu.RLock()
+		node := entry.node
+		entry.mu.RUnlock()
+		if node == nil {
+			successors = append(successors, map[string]any{"index": i, "node": nil})
 		} else {
-			fmt.Fprintf(&b, "  [%d] <nil>\n", i)
+			successors = append(successors, map[string]any{"index": i, "id": node.ID.String(), "addr": node.Addr})
 		}
 	}
 
-	// De Bruijn list
-	fmt.Fprintf(&b, "De Bruijn List:\n")
-	for i := 0; i < rt.space.GraphGrade; i++ {
-		node := rt.GetDeBruijn(i)
-		if node != nil {
-			fmt.Fprintf(&b, "  [%d] %s (%s)\n", i, node.ID.String(), node.Addr)
+	// de Bruijn snapshot
+	debruijn := make([]map[string]any, 0, len(rt.deBruijn))
+	for i, entry := range rt.deBruijn {
+		entry.mu.RLock()
+		node := entry.node
+		entry.mu.RUnlock()
+		if node == nil {
+			debruijn = append(debruijn, map[string]any{"digit": i, "node": nil})
 		} else {
-			fmt.Fprintf(&b, "  [%d] <nil>\n", i)
+			debruijn = append(debruijn, map[string]any{"digit": i, "id": node.ID.String(), "addr": node.Addr})
 		}
 	}
 
-	fmt.Fprintf(&b, "===========================\n")
-	return b.String()
+	rt.logger.Debug("RoutingTable snapshot",
+		logger.FNode("self", self),
+		logger.FNode("predecessor", pred),
+		logger.F("successors", successors),
+		logger.F("debruijn", debruijn),
+	)
 }

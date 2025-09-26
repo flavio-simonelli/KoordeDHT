@@ -22,8 +22,12 @@ type Logger interface {
 // F è un helper per creare un Field in modo conciso.
 func F(key string, val any) Field { return Field{Key: key, Val: val} }
 
-// FNode serializza un domain.Node in un campo strutturato leggibile.
-func FNode(key string, n domain.Node) Field {
+// FNode serializza un *domain.Node in un campo strutturato leggibile.
+// Se il puntatore è nil, produce direttamente un valore nil.
+func FNode(key string, n *domain.Node) Field {
+	if n == nil {
+		return Field{Key: key, Val: nil}
+	}
 	return Field{
 		Key: key,
 		Val: map[string]any{
