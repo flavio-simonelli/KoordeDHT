@@ -38,14 +38,18 @@ func main() {
 		log.Fatalf("invalid configuration: %v", err)
 	}
 	// Initialize logger
-	zapLog, err := zapfactory.New(cfg.Logger)
-	if err != nil {
-		log.Fatalf("failed to initialize logger: %v", err)
-	}
-	defer func() { _ = zapLog.Sync() }() // flush logger buffers before exit
 	var lgr logger.Logger
-	lgr = zapfactory.NewZapAdapter(zapLog) // adapt zap.Logger to logger.Interface
-
+	if cfg.Logger.Active {
+		zapLog, err := zapfactory.New(cfg.Logger)
+		if err != nil {
+			log.Fatalf("failed to initialize logger: %v", err)
+		}
+		defer func() { _ = zapLog.Sync() }()   // flush logger buffers before exit
+		lgr = zapfactory.NewZapAdapter(zapLog) // adapt zap.Logger to logger.Interface
+	} else {
+		lgr = &logger.NopLogger{} // no-op logger
+	}
+	// Log loaded configuration at DEBUG level
 	cfg.LogConfig(lgr) // log loaded configuration at DEBUG level
 
 	// Initialize listener (to determine server address and port)
@@ -67,7 +71,16 @@ func main() {
 	lgr.Debug("identifier space initialized", logger.F("id_bits", space.Bits), logger.F("degree", space.GraphGrade), logger.F("sizeByte", space.ByteLen))
 
 	// Initialize the local node
-	id := space.NewIdFromString(addr) // derive ID from address
+	var id domain.ID
+	if cfg.Node.Id == "" {
+		id = space.NewIdFromString(addr) // derive ID from address
+	} else {
+		id, err = space.FromHexString(cfg.Node.Id) // use configured ID
+		if err != nil {
+			lgr.Error("invalid node ID in configuration", logger.F("id", cfg.Node.Id), logger.F("err", err))
+			os.Exit(1)
+		}
+	}
 	domainNode := domain.Node{
 		ID:   id,
 		Addr: addr,

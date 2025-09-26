@@ -65,8 +65,8 @@ func isPrivateIP(ip net.IP) bool {
 }
 
 // Listen crea un net.Listener scegliendo host/porta corretti
-func (cfg *NodeConfig) Listen() (net.Listener, error) {
-	host := cfg.Server.Host
+func (cfg *Config) Listen() (net.Listener, error) {
+	host := cfg.Node.Host
 	if host == "" {
 		ip, err := pickIP(cfg.DHT.Mode)
 		if err != nil {
@@ -86,7 +86,7 @@ func (cfg *NodeConfig) Listen() (net.Listener, error) {
 			return nil, fmt.Errorf("host %s is private but mode=public", host)
 		}
 	}
-	addr := fmt.Sprintf("%s:%d", host, cfg.Server.Port)
+	addr := fmt.Sprintf("%s:%d", host, cfg.Node.Port)
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
 		return nil, err
