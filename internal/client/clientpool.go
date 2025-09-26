@@ -2,6 +2,7 @@ package client
 
 import (
 	dhtv1 "KoordeDHT/internal/api/dht/v1"
+	"KoordeDHT/internal/domain"
 	"KoordeDHT/internal/logger"
 	"fmt"
 	"strings"
@@ -33,6 +34,7 @@ type refConn struct {
 // It uses reference counting to avoid closing connections that are still in use
 // (a node can appear in multiple roles, e.g., successor and de Bruijn pointer).
 type Pool struct {
+	selfId   domain.ID
 	selfAddr string
 	lgr      logger.Logger
 	mu       sync.Mutex
@@ -42,8 +44,9 @@ type Pool struct {
 
 // New creates a new empty Pool. It accepts a list of functional options
 // to configure the pool (logger).
-func New(selfAddr string, timeout time.Duration, opt ...Option) *Pool {
+func New(selfId domain.ID, selfAddr string, timeout time.Duration, opt ...Option) *Pool {
 	p := &Pool{
+		selfId:   selfId,
 		selfAddr: selfAddr,
 		clients:  make(map[string]*refConn),
 		lgr:      &logger.NopLogger{}, // default: no logging
