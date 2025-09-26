@@ -101,7 +101,7 @@ func (s *dhtService) GetSuccessorList(ctx context.Context, _ *emptypb.Empty) (*d
 	if succList == nil {
 		return &dhtv1.SuccessorList{Successors: []*dhtv1.Node{}}, nil
 	}
-	// Convert domain.Node → proto.Node
+	// Convert domain.Node to proto.Node
 	protoList := make([]*dhtv1.Node, len(succList))
 	for i, n := range succList {
 		protoList[i] = n.ToProto()
@@ -153,6 +153,10 @@ func (s *dhtService) Ping(ctx context.Context, _ *emptypb.Empty) (*emptypb.Empty
 
 // Store saves or updates a resource in the local node's storage.
 func (s *dhtService) Store(ctx context.Context, req *dhtv1.StoreRequest) (*emptypb.Empty, error) {
+	// Check for canceled/expired context
+	if err := ctxutil.CheckContext(ctx); err != nil {
+		return nil, err
+	}
 	if req == nil || len(req.Key) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "missing key")
 	}
@@ -179,6 +183,10 @@ func (s *dhtService) Store(ctx context.Context, req *dhtv1.StoreRequest) (*empty
 
 // Retrieve fetches a resource from the local node's storage by its key.
 func (s *dhtService) Retrieve(ctx context.Context, req *dhtv1.RetrieveRequest) (*dhtv1.RetrieveResponse, error) {
+	// Check for canceled/expired context
+	if err := ctxutil.CheckContext(ctx); err != nil {
+		return nil, err
+	}
 	if req == nil || len(req.Key) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "missing key")
 	}
@@ -200,6 +208,10 @@ func (s *dhtService) Retrieve(ctx context.Context, req *dhtv1.RetrieveRequest) (
 
 // Remove delete a resource from the local node's storage by its key.
 func (s *dhtService) Remove(ctx context.Context, req *dhtv1.RemoveRequest) (*emptypb.Empty, error) {
+	// Check for canceled/expired context
+	if err := ctxutil.CheckContext(ctx); err != nil {
+		return nil, err
+	}
 	if req == nil || len(req.Key) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "missing key")
 	}
