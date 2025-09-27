@@ -7,6 +7,7 @@ var (
 )
 
 type Resource struct {
-	Key   ID
-	Value string
+	Key    ID
+	RawKey string
+	Value  string
 }
