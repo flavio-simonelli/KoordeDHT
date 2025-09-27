@@ -62,7 +62,7 @@ func (s *dhtService) FindSuccessor(ctx context.Context, req *dhtv1.FindSuccessor
 	if succ == nil {
 		return nil, status.Error(codes.NotFound, "successor not found")
 	}
-	return &dhtv1.FindSuccessorResponse{Node: succ.ToProto()}, nil
+	return &dhtv1.FindSuccessorResponse{Node: succ.ToProtoDHT()}, nil
 }
 
 // GetPredecessor handles a request to retrieve the current predecessor of this node.
@@ -81,7 +81,7 @@ func (s *dhtService) GetPredecessor(ctx context.Context, _ *emptypb.Empty) (*dht
 	if pred == nil {
 		return nil, status.Error(codes.NotFound, "no predecessor set")
 	}
-	return pred.ToProto(), nil
+	return pred.ToProtoDHT(), nil
 }
 
 // GetSuccessorList handles a request to retrieve the current successor list of this node.
@@ -104,7 +104,7 @@ func (s *dhtService) GetSuccessorList(ctx context.Context, _ *emptypb.Empty) (*d
 	// Convert domain.Node to proto.Node
 	protoList := make([]*dhtv1.Node, len(succList))
 	for i, n := range succList {
-		protoList[i] = n.ToProto()
+		protoList[i] = n.ToProtoDHT()
 	}
 	return &dhtv1.SuccessorList{
 		Successors: protoList,
@@ -129,7 +129,7 @@ func (s *dhtService) Notify(ctx context.Context, req *dhtv1.Node) (*emptypb.Empt
 		return nil, status.Error(codes.InvalidArgument, "invalid node")
 	}
 	// Convert proto.Node → domain.Node and update predecessor
-	n := domain.NodeFromProto(req)
+	n := domain.NodeFromProtoDHT(req)
 	s.node.Notify(n)
 	return &emptypb.Empty{}, nil
 }
