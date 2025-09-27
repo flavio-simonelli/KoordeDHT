@@ -341,11 +341,12 @@ func (x *SuccessorList) GetSuccessors() []*Node {
 	return nil
 }
 
-// StoreLocal a resource (Put).
+// Store a resource (Put).
 type StoreRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Key           []byte                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
-	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	RawKey        string                 `protobuf:"bytes,2,opt,name=raw_key,json=rawKey,proto3" json:"raw_key,omitempty"` // for debugging
+	Value         string                 `protobuf:"bytes,3,opt,name=value,proto3" json:"value,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -387,6 +388,13 @@ func (x *StoreRequest) GetKey() []byte {
 	return nil
 }
 
+func (x *StoreRequest) GetRawKey() string {
+	if x != nil {
+		return x.RawKey
+	}
+	return ""
+}
+
 func (x *StoreRequest) GetValue() string {
 	if x != nil {
 		return x.Value
@@ -394,7 +402,7 @@ func (x *StoreRequest) GetValue() string {
 	return ""
 }
 
-// RetrieveLocal a resource (Get).
+// Retrieve a resource (Get).
 type RetrieveRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Key           []byte                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
@@ -441,7 +449,8 @@ func (x *RetrieveRequest) GetKey() []byte {
 
 type RetrieveResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Value         string                 `protobuf:"bytes,1,opt,name=value,proto3" json:"value,omitempty"`
+	RawKey        string                 `protobuf:"bytes,1,opt,name=raw_key,json=rawKey,proto3" json:"raw_key,omitempty"` // for debugging
+	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -476,6 +485,13 @@ func (*RetrieveResponse) Descriptor() ([]byte, []int) {
 	return file_dht_v1_node_proto_rawDescGZIP(), []int{8}
 }
 
+func (x *RetrieveResponse) GetRawKey() string {
+	if x != nil {
+		return x.RawKey
+	}
+	return ""
+}
+
 func (x *RetrieveResponse) GetValue() string {
 	if x != nil {
 		return x.Value
@@ -483,7 +499,7 @@ func (x *RetrieveResponse) GetValue() string {
 	return ""
 }
 
-// RemoveLocal a resource (Delete).
+// Remove a resource (Delete).
 type RemoveRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Key           []byte                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
@@ -550,14 +566,16 @@ const file_dht_v1_node_proto_rawDesc = "" +
 	"\rSuccessorList\x12,\n" +
 	"\n" +
 	"successors\x18\x01 \x03(\v2\f.dht.v1.NodeR\n" +
-	"successors\"6\n" +
+	"successors\"O\n" +
 	"\fStoreRequest\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\fR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value\"#\n" +
+	"\x03key\x18\x01 \x01(\fR\x03key\x12\x17\n" +
+	"\araw_key\x18\x02 \x01(\tR\x06rawKey\x12\x14\n" +
+	"\x05value\x18\x03 \x01(\tR\x05value\"#\n" +
 	"\x0fRetrieveRequest\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\fR\x03key\"(\n" +
-	"\x10RetrieveResponse\x12\x14\n" +
-	"\x05value\x18\x01 \x01(\tR\x05value\"!\n" +
+	"\x03key\x18\x01 \x01(\fR\x03key\"A\n" +
+	"\x10RetrieveResponse\x12\x17\n" +
+	"\araw_key\x18\x01 \x01(\tR\x06rawKey\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value\"!\n" +
 	"\rRemoveRequest\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\fR\x03key2\xe5\x03\n" +
 	"\x03DHT\x12L\n" +
@@ -606,17 +624,17 @@ var file_dht_v1_node_proto_depIdxs = []int32{
 	10, // 6: dht.v1.DHT.GetSuccessorList:input_type -> google.protobuf.Empty
 	0,  // 7: dht.v1.DHT.Notify:input_type -> dht.v1.Node
 	10, // 8: dht.v1.DHT.Ping:input_type -> google.protobuf.Empty
-	6,  // 9: dht.v1.DHT.StoreLocal:input_type -> dht.v1.StoreRequest
-	7,  // 10: dht.v1.DHT.RetrieveLocal:input_type -> dht.v1.RetrieveRequest
-	9,  // 11: dht.v1.DHT.RemoveLocal:input_type -> dht.v1.RemoveRequest
+	6,  // 9: dht.v1.DHT.Store:input_type -> dht.v1.StoreRequest
+	7,  // 10: dht.v1.DHT.Retrieve:input_type -> dht.v1.RetrieveRequest
+	9,  // 11: dht.v1.DHT.Remove:input_type -> dht.v1.RemoveRequest
 	4,  // 12: dht.v1.DHT.FindSuccessor:output_type -> dht.v1.FindSuccessorResponse
 	0,  // 13: dht.v1.DHT.GetPredecessor:output_type -> dht.v1.Node
 	5,  // 14: dht.v1.DHT.GetSuccessorList:output_type -> dht.v1.SuccessorList
 	10, // 15: dht.v1.DHT.Notify:output_type -> google.protobuf.Empty
 	10, // 16: dht.v1.DHT.Ping:output_type -> google.protobuf.Empty
-	10, // 17: dht.v1.DHT.StoreLocal:output_type -> google.protobuf.Empty
-	8,  // 18: dht.v1.DHT.RetrieveLocal:output_type -> dht.v1.RetrieveResponse
-	10, // 19: dht.v1.DHT.RemoveLocal:output_type -> google.protobuf.Empty
+	10, // 17: dht.v1.DHT.Store:output_type -> google.protobuf.Empty
+	8,  // 18: dht.v1.DHT.Retrieve:output_type -> dht.v1.RetrieveResponse
+	10, // 19: dht.v1.DHT.Remove:output_type -> google.protobuf.Empty
 	12, // [12:20] is the sub-list for method output_type
 	4,  // [4:12] is the sub-list for method input_type
 	4,  // [4:4] is the sub-list for extension type_name

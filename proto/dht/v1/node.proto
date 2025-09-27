@@ -54,7 +54,8 @@ message SuccessorList {
 // Store a resource (Put).
 message StoreRequest {
   bytes key = 1;
-  string value = 2;
+  string raw_key = 2; // for debugging
+  string value = 3;
 }
 
 // Retrieve a resource (Get).
@@ -63,7 +64,8 @@ message RetrieveRequest {
 }
 
 message RetrieveResponse {
-  string value = 1;
+  string raw_key = 1; // for debugging
+  string value = 2;
 }
 
 // Remove a resource (Delete).
@@ -102,4 +104,8 @@ service DHT {
     // Remove a resource (Delete).
     // Returns NotFound if the key does not exist.
     rpc Remove(RemoveRequest) returns (google.protobuf.Empty);
+
+    // Gracefully leave the DHT, notifying the successor to take over this node's keys.
+    // Returns InvalidArgument if the node is not the successor of this node.
+    //rpc Leave(stream StoreRequest) returns (google.protobuf.Empty);
 }
