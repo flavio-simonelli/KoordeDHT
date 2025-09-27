@@ -1,6 +1,9 @@
 package domain
 
-import dhtv1 "KoordeDHT/internal/api/dht/v1"
+import (
+	clientv1 "KoordeDHT/internal/api/client/v1"
+	dhtv1 "KoordeDHT/internal/api/dht/v1"
+)
 
 // Node rappresenta un partecipante alla DHT
 type Node struct {
@@ -8,8 +11,8 @@ type Node struct {
 	Addr string // indirizzo di rete, es. "127.0.0.1:5000"
 }
 
-// ToProto converts a domain.Node into its protobuf representation.
-func (n *Node) ToProto() *dhtv1.Node {
+// ToProtoDHT converts a domain.Node into its protobuf representation.
+func (n *Node) ToProtoDHT() *dhtv1.Node {
 	if n == nil {
 		return nil
 	}
@@ -19,13 +22,24 @@ func (n *Node) ToProto() *dhtv1.Node {
 	}
 }
 
-// NodeFromProto converts a protobuf Node into a domain.Node.
-func NodeFromProto(p *dhtv1.Node) *Node {
+// NodeFromProtoDHT converts a protobuf Node into a domain.Node.
+func NodeFromProtoDHT(p *dhtv1.Node) *Node {
 	if p == nil {
 		return nil
 	}
 	return &Node{
 		ID:   p.Id,
 		Addr: p.Address,
+	}
+}
+
+// ToProtoClient converts a domain.Node into its protobuf representation.
+func (n *Node) ToProtoClient() *clientv1.NodeInfo {
+	if n == nil {
+		return nil
+	}
+	return &clientv1.NodeInfo{
+		Id:   n.ID.String(),
+		Addr: n.Addr,
 	}
 }
