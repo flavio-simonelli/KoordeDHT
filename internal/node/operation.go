@@ -183,6 +183,13 @@ func (n *Node) FindSuccessorStep(ctx context.Context, target, currentI, kshift d
 	return n.cp.FindSuccessorStep(ctx, target, currentI, kshift, succ.Addr)
 }
 
+// Self returns the node information of this node.
+func (n *Node) Self() *domain.Node {
+	self := n.rt.Self()
+	n.lgr.Debug("Self: returning self node", logger.FNode("self", self))
+	return self
+}
+
 // Predecessor returns the predecessor of this node as currently
 // stored in the routing table.
 func (n *Node) Predecessor() *domain.Node {
@@ -196,6 +203,14 @@ func (n *Node) Predecessor() *domain.Node {
 func (n *Node) SuccessorList() []*domain.Node {
 	list := n.rt.SuccessorList()
 	n.lgr.Debug("SuccessorList: returning current list",
+		logger.F("count", len(list)))
+	return list
+}
+
+// DeBruijnList returns the current de Bruijn list of this node from the routing table.
+func (n *Node) DeBruijnList() []*domain.Node {
+	list := n.rt.DeBruijnList()
+	n.lgr.Debug("DeBruijnList: returning current list",
 		logger.F("count", len(list)))
 	return list
 }
@@ -366,4 +381,24 @@ func (n *Node) RetrieveLocal(id domain.ID) (domain.Resource, error) {
 // RemoveLocal rimuove la risorsa con la chiave specificata dal nodo locale utilizzando lo storage interno. (chiamata da operazioni node -> node)
 func (n *Node) RemoveLocal(id domain.ID) error {
 	return n.s.Delete(id)
+}
+
+// GetAllResourceStored returns the internal storage used by this node.
+func (n *Node) GetAllResourceStored() []domain.Resource {
+	return n.s.All()
+}
+
+func (n *Node) LookUp(ctx context.Context, key string) (*domain.Node, error) {
+	if err := ctxutil.CheckContext(ctx); err != nil {
+		return nil, err
+	}
+	id := n.rt.Space().NewIdFromString(key)
+	succ, err := n.FindSuccessorInit(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("get: failed to find successor for key %s: %w", key, err)
+	}
+	if succ == nil {
+		return nil, fmt.Errorf("get: no successor found for key %s", key)
+	}
+	return succ, nil
 }

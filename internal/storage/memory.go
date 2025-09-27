@@ -105,7 +105,7 @@ func (s *Storage) Between(from, to domain.ID) ([]domain.Resource, error) {
 
 // All returns a snapshot of all resources currently stored.
 // The slice is a copy and modifications to it do not affect the storage.
-func (s *Storage) All() ([]domain.Resource, error) {
+func (s *Storage) All() []domain.Resource {
 	s.mu.RLock()
 	result := make([]domain.Resource, 0, len(s.data))
 	for _, res := range s.data {
@@ -121,7 +121,7 @@ func (s *Storage) All() ([]domain.Resource, error) {
 		logger.F("count", len(result)),
 		logger.F("keys", keys),
 	)
-	return result, nil
+	return result
 }
 
 // DebugLog emits a structured DEBUG-level log with the contents of the storage.

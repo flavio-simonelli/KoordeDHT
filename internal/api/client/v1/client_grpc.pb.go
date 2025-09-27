@@ -20,9 +20,12 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ClientAPI_Put_FullMethodName    = "/client.v1.ClientAPI/Put"
-	ClientAPI_Get_FullMethodName    = "/client.v1.ClientAPI/Get"
-	ClientAPI_Delete_FullMethodName = "/client.v1.ClientAPI/Delete"
+	ClientAPI_Put_FullMethodName             = "/client.v1.ClientAPI/Put"
+	ClientAPI_Get_FullMethodName             = "/client.v1.ClientAPI/Get"
+	ClientAPI_Delete_FullMethodName          = "/client.v1.ClientAPI/Delete"
+	ClientAPI_GetStore_FullMethodName        = "/client.v1.ClientAPI/GetStore"
+	ClientAPI_GetRoutingTable_FullMethodName = "/client.v1.ClientAPI/GetRoutingTable"
+	ClientAPI_Lookup_FullMethodName          = "/client.v1.ClientAPI/Lookup"
 )
 
 // ClientAPIClient is the client API for ClientAPI service.
@@ -33,6 +36,10 @@ type ClientAPIClient interface {
 	Put(ctx context.Context, in *PutRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	Get(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*GetResponse, error)
 	Delete(ctx context.Context, in *DeleteRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Demonstrative
+	GetStore(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GetStoreResponse], error)
+	GetRoutingTable(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetRoutingTableResponse, error)
+	Lookup(ctx context.Context, in *LookupRequest, opts ...grpc.CallOption) (*LookupResponse, error)
 }
 
 type clientAPIClient struct {
@@ -73,6 +80,45 @@ func (c *clientAPIClient) Delete(ctx context.Context, in *DeleteRequest, opts ..
 	return out, nil
 }
 
+func (c *clientAPIClient) GetStore(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GetStoreResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &ClientAPI_ServiceDesc.Streams[0], ClientAPI_GetStore_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[emptypb.Empty, GetStoreResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type ClientAPI_GetStoreClient = grpc.ServerStreamingClient[GetStoreResponse]
+
+func (c *clientAPIClient) GetRoutingTable(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetRoutingTableResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetRoutingTableResponse)
+	err := c.cc.Invoke(ctx, ClientAPI_GetRoutingTable_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *clientAPIClient) Lookup(ctx context.Context, in *LookupRequest, opts ...grpc.CallOption) (*LookupResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(LookupResponse)
+	err := c.cc.Invoke(ctx, ClientAPI_Lookup_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ClientAPIServer is the server API for ClientAPI service.
 // All implementations must embed UnimplementedClientAPIServer
 // for forward compatibility.
@@ -81,6 +127,10 @@ type ClientAPIServer interface {
 	Put(context.Context, *PutRequest) (*emptypb.Empty, error)
 	Get(context.Context, *GetRequest) (*GetResponse, error)
 	Delete(context.Context, *DeleteRequest) (*emptypb.Empty, error)
+	// Demonstrative
+	GetStore(*emptypb.Empty, grpc.ServerStreamingServer[GetStoreResponse]) error
+	GetRoutingTable(context.Context, *emptypb.Empty) (*GetRoutingTableResponse, error)
+	Lookup(context.Context, *LookupRequest) (*LookupResponse, error)
 	mustEmbedUnimplementedClientAPIServer()
 }
 
@@ -99,6 +149,15 @@ func (UnimplementedClientAPIServer) Get(context.Context, *GetRequest) (*GetRespo
 }
 func (UnimplementedClientAPIServer) Delete(context.Context, *DeleteRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Delete not implemented")
+}
+func (UnimplementedClientAPIServer) GetStore(*emptypb.Empty, grpc.ServerStreamingServer[GetStoreResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method GetStore not implemented")
+}
+func (UnimplementedClientAPIServer) GetRoutingTable(context.Context, *emptypb.Empty) (*GetRoutingTableResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetRoutingTable not implemented")
+}
+func (UnimplementedClientAPIServer) Lookup(context.Context, *LookupRequest) (*LookupResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Lookup not implemented")
 }
 func (UnimplementedClientAPIServer) mustEmbedUnimplementedClientAPIServer() {}
 func (UnimplementedClientAPIServer) testEmbeddedByValue()                   {}
@@ -175,6 +234,53 @@ func _ClientAPI_Delete_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ClientAPI_GetStore_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(emptypb.Empty)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(ClientAPIServer).GetStore(m, &grpc.GenericServerStream[emptypb.Empty, GetStoreResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type ClientAPI_GetStoreServer = grpc.ServerStreamingServer[GetStoreResponse]
+
+func _ClientAPI_GetRoutingTable_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ClientAPIServer).GetRoutingTable(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ClientAPI_GetRoutingTable_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ClientAPIServer).GetRoutingTable(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ClientAPI_Lookup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(LookupRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ClientAPIServer).Lookup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ClientAPI_Lookup_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ClientAPIServer).Lookup(ctx, req.(*LookupRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ClientAPI_ServiceDesc is the grpc.ServiceDesc for ClientAPI service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -194,7 +300,21 @@ var ClientAPI_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "Delete",
 			Handler:    _ClientAPI_Delete_Handler,
 		},
+		{
+			MethodName: "GetRoutingTable",
+			Handler:    _ClientAPI_GetRoutingTable_Handler,
+		},
+		{
+			MethodName: "Lookup",
+			Handler:    _ClientAPI_Lookup_Handler,
+		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "GetStore",
+			Handler:       _ClientAPI_GetStore_Handler,
+			ServerStreams: true,
+		},
+	},
 	Metadata: "client/v1/client.proto",
 }

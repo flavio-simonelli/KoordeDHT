@@ -25,17 +25,68 @@ const (
 // ---------------------------------------------------------------
 // Key-Value API per i client
 // ---------------------------------------------------------------
+type Resource struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`     // Resource key (application-key)
+	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"` // Resource value
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Resource) Reset() {
+	*x = Resource{}
+	mi := &file_client_v1_client_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Resource) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Resource) ProtoMessage() {}
+
+func (x *Resource) ProtoReflect() protoreflect.Message {
+	mi := &file_client_v1_client_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Resource.ProtoReflect.Descriptor instead.
+func (*Resource) Descriptor() ([]byte, []int) {
+	return file_client_v1_client_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *Resource) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *Resource) GetValue() string {
+	if x != nil {
+		return x.Value
+	}
+	return ""
+}
+
 type PutRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
-	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	Resource      *Resource              `protobuf:"bytes,1,opt,name=resource,proto3" json:"resource,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *PutRequest) Reset() {
 	*x = PutRequest{}
-	mi := &file_client_v1_client_proto_msgTypes[0]
+	mi := &file_client_v1_client_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -47,7 +98,7 @@ func (x *PutRequest) String() string {
 func (*PutRequest) ProtoMessage() {}
 
 func (x *PutRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_client_v1_client_proto_msgTypes[0]
+	mi := &file_client_v1_client_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -60,21 +111,14 @@ func (x *PutRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PutRequest.ProtoReflect.Descriptor instead.
 func (*PutRequest) Descriptor() ([]byte, []int) {
-	return file_client_v1_client_proto_rawDescGZIP(), []int{0}
+	return file_client_v1_client_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *PutRequest) GetKey() string {
+func (x *PutRequest) GetResource() *Resource {
 	if x != nil {
-		return x.Key
+		return x.Resource
 	}
-	return ""
-}
-
-func (x *PutRequest) GetValue() string {
-	if x != nil {
-		return x.Value
-	}
-	return ""
+	return nil
 }
 
 type GetRequest struct {
@@ -86,7 +130,7 @@ type GetRequest struct {
 
 func (x *GetRequest) Reset() {
 	*x = GetRequest{}
-	mi := &file_client_v1_client_proto_msgTypes[1]
+	mi := &file_client_v1_client_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -98,7 +142,7 @@ func (x *GetRequest) String() string {
 func (*GetRequest) ProtoMessage() {}
 
 func (x *GetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_client_v1_client_proto_msgTypes[1]
+	mi := &file_client_v1_client_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -111,7 +155,7 @@ func (x *GetRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRequest.ProtoReflect.Descriptor instead.
 func (*GetRequest) Descriptor() ([]byte, []int) {
-	return file_client_v1_client_proto_rawDescGZIP(), []int{1}
+	return file_client_v1_client_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *GetRequest) GetKey() string {
@@ -130,7 +174,7 @@ type GetResponse struct {
 
 func (x *GetResponse) Reset() {
 	*x = GetResponse{}
-	mi := &file_client_v1_client_proto_msgTypes[2]
+	mi := &file_client_v1_client_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -142,7 +186,7 @@ func (x *GetResponse) String() string {
 func (*GetResponse) ProtoMessage() {}
 
 func (x *GetResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_client_v1_client_proto_msgTypes[2]
+	mi := &file_client_v1_client_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -155,7 +199,7 @@ func (x *GetResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetResponse.ProtoReflect.Descriptor instead.
 func (*GetResponse) Descriptor() ([]byte, []int) {
-	return file_client_v1_client_proto_rawDescGZIP(), []int{2}
+	return file_client_v1_client_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *GetResponse) GetValue() string {
@@ -174,7 +218,7 @@ type DeleteRequest struct {
 
 func (x *DeleteRequest) Reset() {
 	*x = DeleteRequest{}
-	mi := &file_client_v1_client_proto_msgTypes[3]
+	mi := &file_client_v1_client_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -186,7 +230,7 @@ func (x *DeleteRequest) String() string {
 func (*DeleteRequest) ProtoMessage() {}
 
 func (x *DeleteRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_client_v1_client_proto_msgTypes[3]
+	mi := &file_client_v1_client_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -199,7 +243,7 @@ func (x *DeleteRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteRequest.ProtoReflect.Descriptor instead.
 func (*DeleteRequest) Descriptor() ([]byte, []int) {
-	return file_client_v1_client_proto_rawDescGZIP(), []int{3}
+	return file_client_v1_client_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *DeleteRequest) GetKey() string {
@@ -209,26 +253,299 @@ func (x *DeleteRequest) GetKey() string {
 	return ""
 }
 
+type NodeInfo struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`     // Unique identifier of the node in the ring (hex string)
+	Addr          string                 `protobuf:"bytes,2,opt,name=addr,proto3" json:"addr,omitempty"` // Address of the node (host:port)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NodeInfo) Reset() {
+	*x = NodeInfo{}
+	mi := &file_client_v1_client_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NodeInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NodeInfo) ProtoMessage() {}
+
+func (x *NodeInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_client_v1_client_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NodeInfo.ProtoReflect.Descriptor instead.
+func (*NodeInfo) Descriptor() ([]byte, []int) {
+	return file_client_v1_client_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *NodeInfo) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *NodeInfo) GetAddr() string {
+	if x != nil {
+		return x.Addr
+	}
+	return ""
+}
+
+type GetStoreResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Item          *Resource              `protobuf:"bytes,1,opt,name=item,proto3" json:"item,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetStoreResponse) Reset() {
+	*x = GetStoreResponse{}
+	mi := &file_client_v1_client_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetStoreResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetStoreResponse) ProtoMessage() {}
+
+func (x *GetStoreResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_client_v1_client_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetStoreResponse.ProtoReflect.Descriptor instead.
+func (*GetStoreResponse) Descriptor() ([]byte, []int) {
+	return file_client_v1_client_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *GetStoreResponse) GetItem() *Resource {
+	if x != nil {
+		return x.Item
+	}
+	return nil
+}
+
+type GetRoutingTableResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Self          *NodeInfo              `protobuf:"bytes,1,opt,name=self,proto3" json:"self,omitempty"`
+	Predecessor   *NodeInfo              `protobuf:"bytes,2,opt,name=predecessor,proto3" json:"predecessor,omitempty"`
+	Successors    []*NodeInfo            `protobuf:"bytes,3,rep,name=successors,proto3" json:"successors,omitempty"`
+	DeBruijnList  []*NodeInfo            `protobuf:"bytes,4,rep,name=de_bruijn_list,json=deBruijnList,proto3" json:"de_bruijn_list,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetRoutingTableResponse) Reset() {
+	*x = GetRoutingTableResponse{}
+	mi := &file_client_v1_client_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetRoutingTableResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetRoutingTableResponse) ProtoMessage() {}
+
+func (x *GetRoutingTableResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_client_v1_client_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetRoutingTableResponse.ProtoReflect.Descriptor instead.
+func (*GetRoutingTableResponse) Descriptor() ([]byte, []int) {
+	return file_client_v1_client_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *GetRoutingTableResponse) GetSelf() *NodeInfo {
+	if x != nil {
+		return x.Self
+	}
+	return nil
+}
+
+func (x *GetRoutingTableResponse) GetPredecessor() *NodeInfo {
+	if x != nil {
+		return x.Predecessor
+	}
+	return nil
+}
+
+func (x *GetRoutingTableResponse) GetSuccessors() []*NodeInfo {
+	if x != nil {
+		return x.Successors
+	}
+	return nil
+}
+
+func (x *GetRoutingTableResponse) GetDeBruijnList() []*NodeInfo {
+	if x != nil {
+		return x.DeBruijnList
+	}
+	return nil
+}
+
+type LookupRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"` // Identifier to look up
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LookupRequest) Reset() {
+	*x = LookupRequest{}
+	mi := &file_client_v1_client_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LookupRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LookupRequest) ProtoMessage() {}
+
+func (x *LookupRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_client_v1_client_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LookupRequest.ProtoReflect.Descriptor instead.
+func (*LookupRequest) Descriptor() ([]byte, []int) {
+	return file_client_v1_client_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *LookupRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type LookupResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Successor     *NodeInfo              `protobuf:"bytes,1,opt,name=successor,proto3" json:"successor,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LookupResponse) Reset() {
+	*x = LookupResponse{}
+	mi := &file_client_v1_client_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LookupResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LookupResponse) ProtoMessage() {}
+
+func (x *LookupResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_client_v1_client_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LookupResponse.ProtoReflect.Descriptor instead.
+func (*LookupResponse) Descriptor() ([]byte, []int) {
+	return file_client_v1_client_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *LookupResponse) GetSuccessor() *NodeInfo {
+	if x != nil {
+		return x.Successor
+	}
+	return nil
+}
+
 var File_client_v1_client_proto protoreflect.FileDescriptor
 
 const file_client_v1_client_proto_rawDesc = "" +
 	"\n" +
-	"\x16client/v1/client.proto\x12\tclient.v1\x1a\x1bgoogle/protobuf/empty.proto\"4\n" +
-	"\n" +
-	"PutRequest\x12\x10\n" +
+	"\x16client/v1/client.proto\x12\tclient.v1\x1a\x1bgoogle/protobuf/empty.proto\"2\n" +
+	"\bResource\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value\"\x1e\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value\"=\n" +
+	"\n" +
+	"PutRequest\x12/\n" +
+	"\bresource\x18\x01 \x01(\v2\x13.client.v1.ResourceR\bresource\"\x1e\n" +
 	"\n" +
 	"GetRequest\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\"#\n" +
 	"\vGetResponse\x12\x14\n" +
 	"\x05value\x18\x01 \x01(\tR\x05value\"!\n" +
 	"\rDeleteRequest\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key2\xb3\x01\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\".\n" +
+	"\bNodeInfo\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04addr\x18\x02 \x01(\tR\x04addr\";\n" +
+	"\x10GetStoreResponse\x12'\n" +
+	"\x04item\x18\x01 \x01(\v2\x13.client.v1.ResourceR\x04item\"\xe9\x01\n" +
+	"\x17GetRoutingTableResponse\x12'\n" +
+	"\x04self\x18\x01 \x01(\v2\x13.client.v1.NodeInfoR\x04self\x125\n" +
+	"\vpredecessor\x18\x02 \x01(\v2\x13.client.v1.NodeInfoR\vpredecessor\x123\n" +
+	"\n" +
+	"successors\x18\x03 \x03(\v2\x13.client.v1.NodeInfoR\n" +
+	"successors\x129\n" +
+	"\x0ede_bruijn_list\x18\x04 \x03(\v2\x13.client.v1.NodeInfoR\fdeBruijnList\"\x1f\n" +
+	"\rLookupRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"C\n" +
+	"\x0eLookupResponse\x121\n" +
+	"\tsuccessor\x18\x01 \x01(\v2\x13.client.v1.NodeInfoR\tsuccessor2\x84\x03\n" +
 	"\tClientAPI\x124\n" +
 	"\x03Put\x12\x15.client.v1.PutRequest\x1a\x16.google.protobuf.Empty\x124\n" +
 	"\x03Get\x12\x15.client.v1.GetRequest\x1a\x16.client.v1.GetResponse\x12:\n" +
-	"\x06Delete\x12\x18.client.v1.DeleteRequest\x1a\x16.google.protobuf.EmptyBFZDgithub.com/flaviosimonelli/KoordeDHT/internal/api/client/v1;clientv1b\x06proto3"
+	"\x06Delete\x12\x18.client.v1.DeleteRequest\x1a\x16.google.protobuf.Empty\x12A\n" +
+	"\bGetStore\x12\x16.google.protobuf.Empty\x1a\x1b.client.v1.GetStoreResponse0\x01\x12M\n" +
+	"\x0fGetRoutingTable\x12\x16.google.protobuf.Empty\x1a\".client.v1.GetRoutingTableResponse\x12=\n" +
+	"\x06Lookup\x12\x18.client.v1.LookupRequest\x1a\x19.client.v1.LookupResponseBFZDgithub.com/flaviosimonelli/KoordeDHT/internal/api/client/v1;clientv1b\x06proto3"
 
 var (
 	file_client_v1_client_proto_rawDescOnce sync.Once
@@ -242,26 +559,45 @@ func file_client_v1_client_proto_rawDescGZIP() []byte {
 	return file_client_v1_client_proto_rawDescData
 }
 
-var file_client_v1_client_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_client_v1_client_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_client_v1_client_proto_goTypes = []any{
-	(*PutRequest)(nil),    // 0: client.v1.PutRequest
-	(*GetRequest)(nil),    // 1: client.v1.GetRequest
-	(*GetResponse)(nil),   // 2: client.v1.GetResponse
-	(*DeleteRequest)(nil), // 3: client.v1.DeleteRequest
-	(*emptypb.Empty)(nil), // 4: google.protobuf.Empty
+	(*Resource)(nil),                // 0: client.v1.Resource
+	(*PutRequest)(nil),              // 1: client.v1.PutRequest
+	(*GetRequest)(nil),              // 2: client.v1.GetRequest
+	(*GetResponse)(nil),             // 3: client.v1.GetResponse
+	(*DeleteRequest)(nil),           // 4: client.v1.DeleteRequest
+	(*NodeInfo)(nil),                // 5: client.v1.NodeInfo
+	(*GetStoreResponse)(nil),        // 6: client.v1.GetStoreResponse
+	(*GetRoutingTableResponse)(nil), // 7: client.v1.GetRoutingTableResponse
+	(*LookupRequest)(nil),           // 8: client.v1.LookupRequest
+	(*LookupResponse)(nil),          // 9: client.v1.LookupResponse
+	(*emptypb.Empty)(nil),           // 10: google.protobuf.Empty
 }
 var file_client_v1_client_proto_depIdxs = []int32{
-	0, // 0: client.v1.ClientAPI.Put:input_type -> client.v1.PutRequest
-	1, // 1: client.v1.ClientAPI.Get:input_type -> client.v1.GetRequest
-	3, // 2: client.v1.ClientAPI.Delete:input_type -> client.v1.DeleteRequest
-	4, // 3: client.v1.ClientAPI.Put:output_type -> google.protobuf.Empty
-	2, // 4: client.v1.ClientAPI.Get:output_type -> client.v1.GetResponse
-	4, // 5: client.v1.ClientAPI.Delete:output_type -> google.protobuf.Empty
-	3, // [3:6] is the sub-list for method output_type
-	0, // [0:3] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	0,  // 0: client.v1.PutRequest.resource:type_name -> client.v1.Resource
+	0,  // 1: client.v1.GetStoreResponse.item:type_name -> client.v1.Resource
+	5,  // 2: client.v1.GetRoutingTableResponse.self:type_name -> client.v1.NodeInfo
+	5,  // 3: client.v1.GetRoutingTableResponse.predecessor:type_name -> client.v1.NodeInfo
+	5,  // 4: client.v1.GetRoutingTableResponse.successors:type_name -> client.v1.NodeInfo
+	5,  // 5: client.v1.GetRoutingTableResponse.de_bruijn_list:type_name -> client.v1.NodeInfo
+	5,  // 6: client.v1.LookupResponse.successor:type_name -> client.v1.NodeInfo
+	1,  // 7: client.v1.ClientAPI.Put:input_type -> client.v1.PutRequest
+	2,  // 8: client.v1.ClientAPI.Get:input_type -> client.v1.GetRequest
+	4,  // 9: client.v1.ClientAPI.Delete:input_type -> client.v1.DeleteRequest
+	10, // 10: client.v1.ClientAPI.GetStore:input_type -> google.protobuf.Empty
+	10, // 11: client.v1.ClientAPI.GetRoutingTable:input_type -> google.protobuf.Empty
+	8,  // 12: client.v1.ClientAPI.Lookup:input_type -> client.v1.LookupRequest
+	10, // 13: client.v1.ClientAPI.Put:output_type -> google.protobuf.Empty
+	3,  // 14: client.v1.ClientAPI.Get:output_type -> client.v1.GetResponse
+	10, // 15: client.v1.ClientAPI.Delete:output_type -> google.protobuf.Empty
+	6,  // 16: client.v1.ClientAPI.GetStore:output_type -> client.v1.GetStoreResponse
+	7,  // 17: client.v1.ClientAPI.GetRoutingTable:output_type -> client.v1.GetRoutingTableResponse
+	9,  // 18: client.v1.ClientAPI.Lookup:output_type -> client.v1.LookupResponse
+	13, // [13:19] is the sub-list for method output_type
+	7,  // [7:13] is the sub-list for method input_type
+	7,  // [7:7] is the sub-list for extension type_name
+	7,  // [7:7] is the sub-list for extension extendee
+	0,  // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_client_v1_client_proto_init() }
@@ -275,7 +611,7 @@ func file_client_v1_client_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_client_v1_client_proto_rawDesc), len(file_client_v1_client_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

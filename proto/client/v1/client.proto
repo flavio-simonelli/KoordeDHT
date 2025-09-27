@@ -9,9 +9,13 @@ import "google/protobuf/empty.proto";
 // ---------------------------------------------------------------
 // Key-Value API per i client
 // ---------------------------------------------------------------
+message Resource {
+  string key = 1;    // Resource key (application-key)
+  string value = 2;  // Resource value
+}
+
 message PutRequest {
-  string key = 1;
-  string value = 2;
+  Resource resource = 1;
 }
 
 message GetRequest {
@@ -26,6 +30,34 @@ message DeleteRequest {
   string key = 1;
 }
 
+message NodeInfo {
+  string id = 1;    // Unique identifier of the node in the ring (hex string)
+  string addr = 2;  // Address of the node (host:port)
+}
+
+message GetStoreResponse {
+  Resource item = 1;
+  string id = 2; // id of the resource in the dht
+}
+
+message GetRoutingTableResponse {
+  NodeInfo self = 1;
+  NodeInfo predecessor = 2;
+  repeated NodeInfo successors = 3;
+  repeated NodeInfo de_bruijn_list = 4;
+}
+
+message LookupRequest {
+  string id = 1; // Identifier to look up
+}
+
+message LookupResponse {
+  NodeInfo successor = 1;
+}
+
+
+
+
 // ---------------------------------------------------------------
 // API Client-facing
 // ---------------------------------------------------------------
@@ -35,4 +67,8 @@ service ClientAPI {
   rpc Put(PutRequest) returns (google.protobuf.Empty);
   rpc Get(GetRequest) returns (GetResponse); // status.Error(codes.NotFound, "key not found") se la chiave non esiste
   rpc Delete(DeleteRequest) returns (google.protobuf.Empty); // status.Error(codes.NotFound, "key not found") se la chiave non esiste
+  // Demonstrative
+  rpc GetStore(google.protobuf.Empty) returns (stream GetStoreResponse); // return all stored items in the node
+  rpc GetRoutingTable(google.protobuf.Empty) returns (GetRoutingTableResponse); // return predecessor, successors and de_bruijn_list of the node
+  rpc Lookup(LookupRequest) returns (LookupResponse); // lookup the successor of a given id (without resource key)
 }

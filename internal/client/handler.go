@@ -63,7 +63,7 @@ func (p *Pool) FindSuccessorStart(ctx context.Context, target domain.ID, serverA
 		return nil, fmt.Errorf("client: FindSuccessor RPC to %s failed: %w", serverAddr, err)
 	}
 	// Convert the protobuf Node into a domain.Node
-	return domain.NodeFromProto(resp.Node), nil
+	return domain.NodeFromProtoDHT(resp.Node), nil
 }
 
 // FindSuccessorStep performs a FindSuccessor RPC in "Step" mode.
@@ -113,7 +113,7 @@ func (p *Pool) FindSuccessorStep(ctx context.Context, target, currentI, kshift d
 		return nil, fmt.Errorf("client: FindSuccessorStep RPC to %s failed: %w", serverAddr, err)
 	}
 	// Convert the protobuf Node into a domain.Node
-	return domain.NodeFromProto(resp.Node), nil
+	return domain.NodeFromProtoDHT(resp.Node), nil
 }
 
 // GetPredecessor contacts the given remote node and asks for its predecessor.
@@ -155,7 +155,7 @@ func (p *Pool) GetPredecessor(ctx context.Context, serverAddr string) (*domain.N
 		return nil, fmt.Errorf("client: GetPredecessor RPC to %s failed: %w", serverAddr, err)
 	}
 	// Convert proto.Node = domain.Node
-	return domain.NodeFromProto(resp), nil
+	return domain.NodeFromProtoDHT(resp), nil
 }
 
 // GetSuccessorList contacts the given remote node and retrieves its successor list.
@@ -190,7 +190,7 @@ func (p *Pool) GetSuccessorList(ctx context.Context, serverAddr string) ([]*doma
 	// Convert proto.Node slice = domain.Node slice
 	nodes := make([]*domain.Node, len(resp.Successors))
 	for i, n := range resp.Successors {
-		nodes[i] = domain.NodeFromProto(n)
+		nodes[i] = domain.NodeFromProtoDHT(n)
 	}
 	return nodes, nil
 }
@@ -219,7 +219,7 @@ func (p *Pool) Notify(ctx context.Context, self *domain.Node, serverAddr string)
 		return fmt.Errorf("%w: %s", ErrClientNotInPool, serverAddr)
 	}
 	// Build the request from the domain.Node
-	req := self.ToProto()
+	req := self.ToProtoDHT()
 	// Perform the RPC
 	_, err = client.Notify(ctx, req)
 	if err != nil {
