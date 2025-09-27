@@ -11,6 +11,7 @@ import (
 	"KoordeDHT/internal/routingtable"
 	"KoordeDHT/internal/server"
 	"KoordeDHT/internal/storage"
+	"KoordeDHT/internal/telemetry"
 	"context"
 	"flag"
 	"log"
@@ -19,6 +20,7 @@ import (
 	"syscall"
 	"time"
 
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 )
 
@@ -51,6 +53,10 @@ func main() {
 	}
 	// Log loaded configuration at DEBUG level
 	cfg.LogConfig(lgr) // log loaded configuration at DEBUG level
+
+	// Initialize Telemetry (if enabled)
+	shutdown := telemetry.InitTracer(cfg.Telemetry, "KoordeDHT-Node")
+	defer shutdown(context.Background())
 
 	// Initialize listener (to determine server address and port)
 	lis, err := cfg.Listen()
@@ -123,10 +129,17 @@ func main() {
 	lgr.Debug("initialize new struct node")
 
 	// Initialize the gRPC server
+	grpcOpts := []grpc.ServerOption{}
+	if cfg.Telemetry.Tracing.Enabled {
+		grpcOpts = append(grpcOpts,
+			grpc.StatsHandler(otelgrpc.NewServerHandler()),
+		)
+		lgr.Debug("gRPC tracing enabled")
+	}
 	s, err := server.New(
 		lis,
 		n,
-		[]grpc.ServerOption{},
+		grpcOpts,
 		server.WithLogger(lgr.Named("server")),
 	)
 	if err != nil {

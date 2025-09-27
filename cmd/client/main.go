@@ -179,10 +179,5 @@ func main() {
 		}
 
 		fmt.Printf("Lookup result: %s (%s)\n", resp.Successor.Id, resp.Successor.Addr)
-
-	default:
-		fmt.Println("Unknown command:", cmd)
-		fmt.Println("Usage: koorde-client put|get|delete|getstore|getrt|lookup <args>")
-		os.Exit(1)
 	}
 }

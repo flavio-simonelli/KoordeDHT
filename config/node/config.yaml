@@ -16,11 +16,11 @@ dht:
   mode: "private"          # network mode: public | private
 
   bootstrap:
-    mode: "init"              # "dns" | "static" | "init"
+    mode: "static"              # "dns" | "static" | "init"
     dnsName: "bootstrap.koorde.local"
     srv: false                 # se true usa record SRV, altrimenti A/AAAA
     port: 35761                # usato solo se srv=false
-    peers: []                 # lista statica solo se mode=static (es. ["100.x.x.x:43243", "101.x.x.x:43243"])
+    peers: [""]                 # lista statica solo se mode=static (es. ["100.x.x.x:43243", "101.x.x.x:43243"])
 
   deBruijn:
     degree: 2              # de Bruijn graph degree (2 = minimal, log n = optimal, utilizzare obbligatoriamente potenze di 2 per lavorare direttamente con stringhe binarie)
@@ -36,3 +36,8 @@ node:
     id: ""                 # hexadecimal node identifier (empty = random)
     host: ""               # server host (empty = all interfaces (in base a come è configurata dht mode))"
     port: 0               # server port (0 = random available port)
+
+telemetry:
+  tracing:
+    enabled: true
+    exporter: jaeger   # oppure jaeger, otlp, ecc.

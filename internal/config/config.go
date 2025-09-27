@@ -10,6 +10,15 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+type TracingConfig struct {
+	Enabled  bool   `yaml:"enabled"`
+	Exporter string `yaml:"exporter"` // stdout | jaeger | otlp
+}
+
+type TelemetryConfig struct {
+	Tracing TracingConfig `yaml:"tracing"`
+}
+
 type FileLoggerConfig struct {
 	Path       string `yaml:"path"`
 	MaxSize    int    `yaml:"maxSize"`
@@ -61,9 +70,10 @@ type NodeConfig struct {
 }
 
 type Config struct {
-	Logger LoggerConfig `yaml:"logger"`
-	DHT    DHTConfig    `yaml:"dht"`
-	Node   NodeConfig   `yaml:"node"`
+	Logger    LoggerConfig    `yaml:"logger"`
+	DHT       DHTConfig       `yaml:"dht"`
+	Node      NodeConfig      `yaml:"node"`
+	Telemetry TelemetryConfig `yaml:"telemetry"`
 }
 
 func LoadConfig(path string) (*Config, error) {

@@ -4,7 +4,6 @@ import (
 	"KoordeDHT/internal/ctxutil"
 	"KoordeDHT/internal/domain"
 	"KoordeDHT/internal/logger"
-	"KoordeDHT/internal/trace"
 	"context"
 	"errors"
 	"fmt"
@@ -41,10 +40,7 @@ func (n *Node) FindSuccessorInit(ctx context.Context, target domain.ID) (*domain
 	if err := ctxutil.CheckContext(ctx); err != nil {
 		return nil, err
 	}
-	// add trace id if missing in the context
 	self := n.rt.Self()
-	ctx = ctxutil.EnsureTraceID(ctx, self.ID)
-	traceId := trace.GetTraceID(ctx)
 	// check if the target is in (self, successor]
 	succ := n.rt.FirstSuccessor()
 	if succ == nil {
@@ -52,8 +48,7 @@ func (n *Node) FindSuccessorInit(ctx context.Context, target domain.ID) (*domain
 		return nil, status.Error(codes.Internal, "node not initialized (routing table not initialized)")
 	} else if target.Between(self.ID, succ.ID) {
 		n.lgr.Info("EndLookup: target in (self, successor], returning successor",
-			logger.F("target", target), logger.FNode("successor", succ),
-			logger.F("traceID", traceId), logger.F("hops", ctxutil.HopsFromContext(ctx)))
+			logger.F("target", target), logger.FNode("successor", succ))
 		return succ, nil
 	}
 	// start de Bruijn routing
@@ -71,14 +66,12 @@ func (n *Node) FindSuccessorInit(ctx context.Context, target domain.ID) (*domain
 				continue
 			}
 			n.lgr.Info("FindSuccessorStep: forwarding to de Bruijn node",
-				logger.F("target", target), logger.FNode("nextHop", d),
-				logger.F("traceID", traceId), logger.F("hops", ctxutil.HopsFromContext(ctx)))
+				logger.F("target", target), logger.FNode("nextHop", d))
 			var res *domain.Node
 			var err error
 			if d.ID.Equal(self.ID) {
 				res, err = n.FindSuccessorStep(ctx, target, currentI, kshift)
 			} else {
-				ctx = ctxutil.IncHops(ctx)
 				res, err = n.cp.FindSuccessorStep(ctx, target, currentI, kshift, d.Addr)
 			}
 			if err == nil && res != nil {
@@ -98,9 +91,7 @@ func (n *Node) FindSuccessorInit(ctx context.Context, target domain.ID) (*domain
 	}
 	// if all the nodes in the de Bruijn list not response, fallback to successor
 	n.lgr.Warn("FindSuccessorInit: no de Bruijn responded or present, falling back to successor",
-		logger.F("target", target), logger.FNode("successor", succ),
-		logger.F("traceID", traceId), logger.F("hops", ctxutil.HopsFromContext(ctx)))
-	ctx = ctxutil.IncHops(ctx)
+		logger.F("target", target), logger.FNode("successor", succ))
 	return n.cp.FindSuccessorStart(ctx, target, succ.Addr)
 }
 
@@ -114,7 +105,6 @@ func (n *Node) FindSuccessorStep(ctx context.Context, target, currentI, kshift d
 		return nil, err
 	}
 	self := n.rt.Self()
-	traceId := trace.GetTraceID(ctx)
 	// check if the target is in (self, successor]
 	succ := n.rt.FirstSuccessor()
 	if succ == nil {
@@ -122,8 +112,7 @@ func (n *Node) FindSuccessorStep(ctx context.Context, target, currentI, kshift d
 		return nil, status.Error(codes.Internal, "node not initialized (routing table not initialized)")
 	} else if target.Between(self.ID, succ.ID) {
 		n.lgr.Info("EndLookup: target in (self, successor], returning successor",
-			logger.F("target", target), logger.FNode("successor", succ),
-			logger.F("traceID", traceId), logger.F("hops", ctxutil.HopsFromContext(ctx)))
+			logger.F("target", target), logger.FNode("successor", succ))
 		return succ, nil
 	}
 	// start de Bruijn routing
@@ -143,14 +132,12 @@ func (n *Node) FindSuccessorStep(ctx context.Context, target, currentI, kshift d
 					continue
 				}
 				n.lgr.Info("FindSuccessorStep: forwarding to de Bruijn node",
-					logger.F("target", target), logger.FNode("nextHop", d),
-					logger.F("traceID", traceId), logger.F("hops", ctxutil.HopsFromContext(ctx)))
+					logger.F("target", target), logger.FNode("nextHop", d))
 				var res *domain.Node
 				var err error
 				if d.ID.Equal(self.ID) {
 					res, err = n.FindSuccessorStep(ctx, target, nextI, nextKshift)
 				} else {
-					ctx = ctxutil.IncHops(ctx)
 					res, err = n.cp.FindSuccessorStep(ctx, target, nextI, nextKshift, d.Addr)
 				}
 				if err == nil && res != nil {
@@ -170,16 +157,12 @@ func (n *Node) FindSuccessorStep(ctx context.Context, target, currentI, kshift d
 		}
 		// if all the nodes in the de Bruijn list not response, fallback to successor
 		n.lgr.Warn("FindSuccessorStep: no de Bruijn responded or present, falling back to successor",
-			logger.F("target", target), logger.FNode("nextHop", succ),
-			logger.F("traceID", traceId), logger.F("hops", ctxutil.HopsFromContext(ctx)))
-		ctx = ctxutil.IncHops(ctx)
+			logger.F("target", target), logger.FNode("nextHop", succ))
 		return n.cp.FindSuccessorStart(ctx, target, succ.Addr)
 	}
 	// next hop is successor
 	n.lgr.Info("FindSuccessorStep: forwarding to successor",
-		logger.F("target", target), logger.FNode("nextHop", succ),
-		logger.F("traceID", traceId), logger.F("hops", ctxutil.HopsFromContext(ctx)))
-	ctx = ctxutil.IncHops(ctx)
+		logger.F("target", target), logger.FNode("nextHop", succ))
 	return n.cp.FindSuccessorStep(ctx, target, currentI, kshift, succ.Addr)
 }
 

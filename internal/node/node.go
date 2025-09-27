@@ -2,10 +2,10 @@ package node
 
 import (
 	"KoordeDHT/internal/client"
-	"KoordeDHT/internal/ctxutil"
 	"KoordeDHT/internal/logger"
 	"KoordeDHT/internal/routingtable"
 	"KoordeDHT/internal/storage"
+	"context"
 	"fmt"
 )
 
@@ -38,7 +38,7 @@ func (n *Node) Join(bootstrapAddr string) error {
 	if bootstrapAddr == self.Addr {
 		return fmt.Errorf("join: bootstrap address cannot be self address %s", bootstrapAddr)
 	}
-	ctx, cancel := ctxutil.NewContext(ctxutil.WithTrace(self.ID), ctxutil.WithTimeout(n.cp.Timeout()), ctxutil.WithHops())
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	succ, err := n.cp.FindSuccessorStart(ctx, self.ID, bootstrapAddr)
 	if err != nil {
@@ -49,7 +49,7 @@ func (n *Node) Join(bootstrapAddr string) error {
 	}
 	n.lgr.Info("join: candidate successor found", logger.FNode("successor", succ))
 	// 2. Ask successor for its predecessor
-	ctx, cancel = ctxutil.NewContext(ctxutil.WithTimeout(n.cp.Timeout()))
+	ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
 	pred, err := n.cp.GetPredecessor(ctx, succ.Addr)
 	if err != nil {
@@ -59,7 +59,7 @@ func (n *Node) Join(bootstrapAddr string) error {
 		n.lgr.Info("join: successor has predecessor", logger.FNode("predecessor", pred))
 	}
 	// 3. Notify successor that we may be its predecessor
-	ctx, cancel = ctxutil.NewContext(ctxutil.WithTimeout(n.cp.Timeout()))
+	ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
 	if err := n.cp.Notify(ctx, self, succ.Addr); err != nil {
 		return fmt.Errorf("join: failed to notify successor %s: %w", succ.Addr, err)
