@@ -95,6 +95,7 @@ func (s *clientService) GetStore(_ *emptypb.Empty, stream clientv1.ClientAPI_Get
 			return err
 		}
 		res := &clientv1.GetStoreResponse{
+			Id: r.RawKey,
 			Item: &clientv1.Resource{
 				Key:   r.Key.String(),
 				Value: r.Value,

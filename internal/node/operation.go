@@ -277,8 +277,9 @@ func (n *Node) Put(ctx context.Context, key string, value string) error {
 	}
 	// Build the resource object
 	res := domain.Resource{
-		Key:   id,
-		Value: value,
+		Key:    id,
+		RawKey: key,
+		Value:  value,
 	}
 	// If this node is the successor, store locally
 	if succ.ID.Equal(n.rt.Self().ID) {

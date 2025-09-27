@@ -265,8 +265,9 @@ func (p *Pool) StoreRemoteWithContext(ctx context.Context, res domain.Resource, 
 	}
 	// Build the request from the domain.Resource
 	req := &pb.StoreRequest{
-		Key:   res.Key,
-		Value: res.Value,
+		Key:    res.Key,
+		RawKey: res.RawKey,
+		Value:  res.Value,
 	}
 	// Perform the RPC
 	_, err = client.Store(ctx, req)
@@ -307,8 +308,9 @@ func (p *Pool) RetrieveRemoteWithContext(ctx context.Context, key domain.ID, ser
 	}
 	// Build the domain.Resource from the response
 	res := &domain.Resource{
-		Key:   key,
-		Value: resp.Value,
+		Key:    key,
+		RawKey: resp.RawKey,
+		Value:  resp.Value,
 	}
 	return res, nil
 }

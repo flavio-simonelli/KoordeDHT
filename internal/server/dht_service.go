@@ -170,8 +170,9 @@ func (s *dhtService) Store(ctx context.Context, req *dhtv1.StoreRequest) (*empty
 	}
 	// create domain resource
 	res := domain.Resource{
-		Key:   id,
-		Value: req.Value,
+		Key:    id,
+		RawKey: req.RawKey,
+		Value:  req.Value,
 	}
 	// call store operation
 	err := s.node.StoreLocal(res)

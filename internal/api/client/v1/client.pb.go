@@ -308,6 +308,7 @@ func (x *NodeInfo) GetAddr() string {
 type GetStoreResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Item          *Resource              `protobuf:"bytes,1,opt,name=item,proto3" json:"item,omitempty"`
+	Id            string                 `protobuf:"bytes,2,opt,name=id,proto3" json:"id,omitempty"` // id of the resource in the dht
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -347,6 +348,13 @@ func (x *GetStoreResponse) GetItem() *Resource {
 		return x.Item
 	}
 	return nil
+}
+
+func (x *GetStoreResponse) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
 }
 
 type GetRoutingTableResponse struct {
@@ -525,9 +533,10 @@ const file_client_v1_client_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\tR\x03key\".\n" +
 	"\bNodeInfo\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04addr\x18\x02 \x01(\tR\x04addr\";\n" +
+	"\x04addr\x18\x02 \x01(\tR\x04addr\"K\n" +
 	"\x10GetStoreResponse\x12'\n" +
-	"\x04item\x18\x01 \x01(\v2\x13.client.v1.ResourceR\x04item\"\xe9\x01\n" +
+	"\x04item\x18\x01 \x01(\v2\x13.client.v1.ResourceR\x04item\x12\x0e\n" +
+	"\x02id\x18\x02 \x01(\tR\x02id\"\xe9\x01\n" +
 	"\x17GetRoutingTableResponse\x12'\n" +
 	"\x04self\x18\x01 \x01(\v2\x13.client.v1.NodeInfoR\x04self\x125\n" +
 	"\vpredecessor\x18\x02 \x01(\v2\x13.client.v1.NodeInfoR\vpredecessor\x123\n" +

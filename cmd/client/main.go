@@ -126,7 +126,11 @@ func main() {
 				break // EOF or error
 			}
 			if resp.GetItem() != nil {
-				fmt.Printf("  - %s => %s\n", resp.Item.Key, resp.Item.Value)
+				fmt.Printf("  - id=%s | key=%s | value=%s\n",
+					resp.Id,
+					resp.Item.Key,
+					resp.Item.Value,
+				)
 			}
 		}
 
@@ -138,6 +142,13 @@ func main() {
 		}
 
 		fmt.Println("Routing table:")
+
+		if resp.Self != nil {
+			fmt.Printf("  Self: %s (%s)\n", resp.Self.Id, resp.Self.Addr)
+		} else {
+			fmt.Println("  Self: nil")
+		}
+
 		if resp.Predecessor != nil {
 			fmt.Printf("  Predecessor: %s (%s)\n", resp.Predecessor.Id, resp.Predecessor.Addr)
 		} else {
