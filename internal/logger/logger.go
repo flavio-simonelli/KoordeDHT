@@ -46,8 +46,9 @@ func FResource(key string, r domain.Resource) Field {
 	return Field{
 		Key: key,
 		Val: map[string]any{
-			"key":   r.Key.ToBinaryString(true),
-			"value": r.Value,
+			"key":    r.Key.ToBinaryString(true),
+			"rawKey": r.RawKey,
+			"value":  r.Value,
 		},
 	}
 }
