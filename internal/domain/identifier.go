@@ -198,11 +198,11 @@ func (x ID) ToBigInt() *big.Int {
 }
 
 // ToBinaryString returns the binary representation of the ID
-// as a string of length sp.Bits. Leading zeros are preserved.
+// as a string of length len(x)*8. Leading zeros are preserved.
 //
 // If withPrefix is true, the string is returned with "0b" prefix.
 // If x is nil, the string "<nil>" is returned instead.
-func (sp Space) ToBinaryString(x ID, withPrefix bool) string {
+func (x ID) ToBinaryString(withPrefix bool) string {
 	if x == nil {
 		return "<nil>"
 	}
@@ -212,17 +212,10 @@ func (sp Space) ToBinaryString(x ID, withPrefix bool) string {
 		sb.WriteString(fmt.Sprintf("%08b", b))
 	}
 
-	// Trim to exactly Bits length (drop unused MSBs if necessary)
-	totalBits := sp.ByteLen * 8
-	binStr := sb.String()
-	if totalBits > sp.Bits {
-		binStr = binStr[totalBits-sp.Bits:]
-	}
-
 	if withPrefix {
-		return "0b" + binStr
+		return "0b" + sb.String()
 	}
-	return binStr
+	return sb.String()
 }
 
 // FromHexString parses a hexadecimal string into an ID, accepting
