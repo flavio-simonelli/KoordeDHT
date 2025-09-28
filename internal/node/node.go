@@ -130,6 +130,7 @@ func (n *Node) Stop() {
 	}
 	// Example: close client pool, timers, background workers...
 	if n.cp != nil {
+		n.Leave()
 		n.cp.Close()
 	}
 	// TODO: add other cleanup if needed

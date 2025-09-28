@@ -79,7 +79,7 @@ func (s *Storage) Delete(id domain.ID) error {
 
 // Between returns all resources with IDs k such that k ∈ (from, to] on the ring.
 // The wrap-around case (from > to) is correctly handled by domain.ID.Between.
-func (s *Storage) Between(from, to domain.ID) ([]domain.Resource, error) {
+func (s *Storage) Between(from, to domain.ID) []domain.Resource {
 	s.mu.RLock()
 	var result []domain.Resource
 	for _, res := range s.data {
@@ -99,7 +99,7 @@ func (s *Storage) Between(from, to domain.ID) ([]domain.Resource, error) {
 		logger.F("count", len(result)),
 		logger.F("keys", keys),
 	)
-	return result, nil
+	return result
 }
 
 // All returns a snapshot of all resources currently stored.

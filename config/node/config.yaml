@@ -16,7 +16,7 @@ dht:
   mode: "private"          # network mode: public | private
 
   bootstrap:
-    mode: "static"              # "dns" | "static" | "init"
+    mode: "init"              # "dns" | "static" | "init"
     dnsName: "bootstrap.koorde.local"
     srv: false                 # se true usa record SRV, altrimenti A/AAAA
     port: 35761                # usato solo se srv=false

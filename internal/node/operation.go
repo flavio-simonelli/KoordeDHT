@@ -225,6 +225,13 @@ func (n *Node) Notify(p *domain.Node) {
 					logger.F("node", pred), logger.F("err", err))
 			}
 		}
+		// send to predecessor the resource for which it is now responsible
+		resources := n.s.Between(p.ID, n.rt.Self().ID)
+		ctx := context.Background()
+		err := n.cp.StoreRemoteWithContext(ctx, resources, p.Addr)
+		if err != nil {
+			n.lgr.Warn("Notify: failed to transfer resources to new predecessor", logger.F("node", p), logger.F("err", err), logger.F("resourceCount", len(resources)))
+		}
 		// log update
 		n.lgr.Info("Notify: predecessor updated", logger.FNode("newPredecessor", p), logger.FNode("oldPredecessor", pred))
 	}
@@ -268,8 +275,9 @@ func (n *Node) Put(ctx context.Context, key string, value string) error {
 	if succ.ID.Equal(n.rt.Self().ID) {
 		return n.StoreLocal(ctx, res)
 	}
+	sres := []domain.Resource{res} // wrap in slice for StoreRemote
 	// Otherwise, forward the resource to the successor
-	if err := n.cp.StoreRemoteWithContext(ctx, res, succ.Addr); err != nil {
+	if err := n.cp.StoreRemoteWithContext(ctx, sres, succ.Addr); err != nil {
 		return fmt.Errorf("put: failed to store resource at successor %s: %w", succ.Addr, err)
 	}
 	// Log success

@@ -156,6 +156,7 @@ func (s *dhtService) Ping(ctx context.Context, _ *emptypb.Empty) (*emptypb.Empty
 // The client sends a stream of StoreRequest messages, and the server replies
 // with an Empty once all resources have been processed.
 func (s *dhtService) Store(stream dhtv1.DHT_StoreServer) error {
+	ctx := stream.Context()
 	for {
 		req, err := stream.Recv()
 		if err == io.EOF {
@@ -187,7 +188,7 @@ func (s *dhtService) Store(stream dhtv1.DHT_StoreServer) error {
 			Value:  req.Value,
 		}
 		// Call store operation
-		if serr := s.node.StoreLocal(res); serr != nil {
+		if serr := s.node.StoreLocal(ctx, res); serr != nil {
 			return serr
 		}
 	}
@@ -244,11 +245,12 @@ func (s *dhtService) Remove(ctx context.Context, req *dhtv1.RemoveRequest) (*emp
 }
 
 // Leave handles a request from successor node indicating that it is leaving the network.
-func (s *dhtService) Leave(ctx context.Context, _ *dhtv1.Node) (*emptypb.Empty, error) {
+func (s *dhtService) Leave(ctx context.Context, req *dhtv1.Node) (*emptypb.Empty, error) {
 	// Check for canceled/expired context
 	if err := ctxutil.CheckContext(ctx); err != nil {
 		return nil, err
 	}
-	s.node.HandleLeave()
+	nodeLeaving := domain.NodeFromProtoDHT(req)
+	s.node.HandleLeave(nodeLeaving)
 	return &emptypb.Empty{}, nil
 }
