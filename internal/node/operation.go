@@ -322,7 +322,8 @@ func (n *Node) Notify(p *domain.Node) {
 		}
 		// send to predecessor the resource for which it is now responsible
 		resources := n.s.Between(p.ID, n.rt.Self().ID)
-		ctx := context.Background()
+		ctx, cancel := context.WithTimeout(context.Background(), n.cp.FailureTimeout())
+		defer cancel()
 		cli, err := n.cp.GetFromPool(p.Addr)
 		if err != nil {
 			n.lgr.Warn("Notify: failed to get connection to new predecessor from pool", logger.F("node", p), logger.F("err", err))
@@ -335,12 +336,6 @@ func (n *Node) Notify(p *domain.Node) {
 		// log update
 		n.lgr.Info("Notify: predecessor updated", logger.FNode("newPredecessor", p), logger.FNode("oldPredecessor", pred))
 	}
-}
-
-// CheckIdValidity verifies that the given ID is valid in this node's
-// identifier space. Returns an error if invalid.
-func (n *Node) CheckIdValidity(id domain.ID) error {
-	return n.rt.Space().IsValidID(id)
 }
 
 // Put stores a resource in the DHT on behalf of an external client.

@@ -201,10 +201,7 @@ func (s *dhtService) GetSuccessorList(ctx context.Context, _ *emptypb.Empty) (*d
 //   - If the request is invalid (missing ID or address, or ID outside the space),
 //     an InvalidArgument status is returned.
 //   - Otherwise, the node logic is invoked to update the predecessor.
-func (s *dhtService) Notify(
-	ctx context.Context,
-	req *dhtv1.Node,
-) (*emptypb.Empty, error) {
+func (s *dhtService) Notify(ctx context.Context, req *dhtv1.Node) (*emptypb.Empty, error) {
 	// Validate context
 	if err := ctxutil.CheckContext(ctx); err != nil {
 		return nil, err
