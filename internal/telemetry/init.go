@@ -2,11 +2,13 @@ package telemetry
 
 import (
 	"KoordeDHT/internal/config"
+	"KoordeDHT/internal/domain"
 	"context"
 	"fmt"
 	"log"
 
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/jaeger"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/propagation"
@@ -15,25 +17,31 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 )
 
-func InitTracer(cfg config.TelemetryConfig, serviceName string) func(context.Context) error {
+func InitTracer(cfg config.TelemetryConfig, serviceName string, nodeId domain.ID) func(context.Context) error {
 	if !cfg.Tracing.Enabled {
 		log.Println("Tracing disabled")
 		return func(context.Context) error { return nil }
 	}
 
-	var (
-		tp *sdktrace.TracerProvider
+	res, err := resource.New(
+		context.Background(),
+		resource.WithAttributes(
+			semconv.ServiceNameKey.String(serviceName),
+			attribute.String("dht.node.id", nodeId.String()),
+		),
 	)
+	if err != nil {
+		log.Fatalf("failed to create resource: %v", err)
+	}
+
+	var tp *sdktrace.TracerProvider
 
 	switch cfg.Tracing.Exporter {
 	case "stdout":
 		exp, _ := stdouttrace.New(stdouttrace.WithPrettyPrint())
 		tp = sdktrace.NewTracerProvider(
 			sdktrace.WithBatcher(exp),
-			sdktrace.WithResource(resource.NewWithAttributes(
-				semconv.SchemaURL,
-				semconv.ServiceNameKey.String(serviceName),
-			)),
+			sdktrace.WithResource(res),
 		)
 	case "jaeger":
 		exp, err := jaeger.New(
@@ -44,10 +52,7 @@ func InitTracer(cfg config.TelemetryConfig, serviceName string) func(context.Con
 		}
 		tp = sdktrace.NewTracerProvider(
 			sdktrace.WithBatcher(exp),
-			sdktrace.WithResource(resource.NewWithAttributes(
-				semconv.SchemaURL,
-				semconv.ServiceNameKey.String(serviceName),
-			)),
+			sdktrace.WithResource(res),
 		)
 	// TODO: aggiungere "otlp", "zipkin", ecc.
 	default:
@@ -62,6 +67,5 @@ func InitTracer(cfg config.TelemetryConfig, serviceName string) func(context.Con
 		),
 	)
 
-	otel.SetTracerProvider(tp)
 	return tp.Shutdown
 }

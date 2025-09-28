@@ -9,6 +9,8 @@ import (
 	"errors"
 	"io"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -39,6 +41,31 @@ func (s *dhtService) FindSuccessor(ctx context.Context, req *dhtv1.FindSuccessor
 	if err := ctxutil.CheckContext(ctx); err != nil {
 		return nil, err
 	}
+
+	// Aggancio lo span dal contesto
+	span := trace.SpanFromContext(ctx)
+	if span != nil {
+		target := domain.ID(req.TargetId)
+		switch mode := req.Mode.(type) {
+		case *dhtv1.FindSuccessorRequest_Initial:
+			span.SetAttributes(
+				attribute.String("dht.findsucc.mode", "init"),
+				attribute.String("dht.findsucc.target", target.Hex()),
+			)
+		case *dhtv1.FindSuccessorRequest_Step:
+			currentI := domain.ID(mode.Step.CurrentI)
+			kshift := domain.ID(mode.Step.KShift)
+			span.SetAttributes(
+				attribute.String("dht.findsucc.mode", "step"),
+				attribute.String("dht.findsucc.target", target.Hex()),
+				attribute.String("dht.findsucc.currentI", currentI.Hex()),
+				attribute.String("dht.findsucc.kshift", kshift.Hex()),
+			)
+		default:
+			span.SetAttributes(attribute.String("dht.findsucc.mode", "invalid"))
+		}
+	}
+
 	// Validate request
 	if req == nil || len(req.TargetId) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "missing target_id")

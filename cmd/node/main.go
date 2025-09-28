@@ -54,10 +54,6 @@ func main() {
 	// Log loaded configuration at DEBUG level
 	cfg.LogConfig(lgr) // log loaded configuration at DEBUG level
 
-	// Initialize Telemetry (if enabled)
-	shutdown := telemetry.InitTracer(cfg.Telemetry, "KoordeDHT-Node")
-	defer shutdown(context.Background())
-
 	// Initialize listener (to determine server address and port)
 	lis, err := cfg.Listen()
 	if err != nil {
@@ -94,6 +90,10 @@ func main() {
 	lgr.Debug("generated node ID", logger.F("id", id.String()))
 	lgr = lgr.Named("node").WithNode(domainNode)
 	lgr.Info("New Node initializing")
+
+	// Initialize Telemetry (if enabled)
+	shutdown := telemetry.InitTracer(cfg.Telemetry, "KoordeDHT-Node", id)
+	defer shutdown(context.Background())
 
 	// Initialize the routing table
 	rt := routingtable.New(
