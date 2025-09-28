@@ -6,10 +6,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/big"
 	"math/bits"
 	"strings"
 )
 
+// Common errors related to domain identifiers.
 var (
 	ErrInvalidID = errors.New("invalid id")
 )
@@ -18,51 +20,71 @@ var (
 // Space
 // -------------------------------
 
-// Space represents the identifier space of the Koorde DHT.
+// Space defines the identifier space and routing parameters
+// of the Koorde Distributed Hash Table (DHT).
 //
-// The identifier space is defined as the set of all integers in the range
-// [0, 2^b - 1], where b = Bits. Each identifier is encoded in big-endian
-// format using ByteLen bytes.
+// The identifier space is defined as the set of integers in the range
+// [0, 2^Bits - 1]. Identifiers are stored in big-endian format using
+// ByteLen bytes.
 //
 // Fields:
-//   - Bits: the number of bits in the identifier space (e.g., 160 for SHA-1).
-//   - ByteLen: the number of bytes required to store an identifier of Bits length.
-//   - GraphGrade: the base k of the underlying de Bruijn graph used for routing.
-//     For example, GraphGrade=2 yields a binary de Bruijn graph, while larger
-//     values allow base-k de Bruijn routing (see Koorde paper, Section 4.1).
 //
-// This struct provides the parameters required to reason about identifiers,
-// their encoding, and the routing properties of the Koorde DHT.
+//   - Bits: total number of bits in the identifier space
+//     (e.g., 160 for SHA-1; 8 or 32 for test deployments).
+//
+//   - ByteLen: number of bytes required to encode an identifier
+//     of length Bits (computed as ceil(Bits / 8)).
+//
+//   - GraphGrade: the base k of the underlying de Bruijn graph
+//     used for routing. For example, GraphGrade=2 yields a
+//     binary de Bruijn graph; larger powers of two enable
+//     base-k de Bruijn routing (see Koorde paper, Section 4.1).
+//
+//   - SuccListSize: number of successor nodes to maintain
+//     for fault tolerance. Analogous to the successor list in
+//     Chord (typically O(log n)); ensures correct lookups in
+//     the presence of node failures.
+//
+// This struct centralizes the DHT's keyspace and routing
+// parameters, allowing consistent reasoning about identifiers,
+// encoding, and routing properties.
 type Space struct {
-	Bits       int
-	ByteLen    int
-	GraphGrade int
+	Bits         int // Number of bits in the identifier space
+	ByteLen      int // Number of bytes needed to represent an identifier
+	GraphGrade   int // Base k of the de Bruijn graph (must be a power of 2)
+	SuccListSize int // Length of the successor list for fault tolerance
 }
 
-// NewSpace creates a new identifier space for the Koorde DHT.
+// NewSpace initializes a new identifier space for the Koorde DHT.
 //
-// The identifier space consists of all integers in the range [0, 2^b - 1],
-// where b is the number of bits. Identifiers are stored in big-endian
-// format using (b+7)/8 bytes.
-//
-// Arguments:
-//   - b: number of bits of the identifier space. Must be > 0.
-//   - degree: base k of the de Bruijn graph used for routing. Must be >= 2.
+// Parameters:
+//   - b: number of bits in the identifier space. Must be > 0.
+//   - degree: base k of the de Bruijn graph used for routing.
+//     Must be >= 2 and preferably a power of 2.
+//   - succListSize: number of successors to maintain for fault tolerance.
+//     Must be > 0 (commonly O(log n)).
 //
 // Returns:
-//   - Space: a new Space instance with computed parameters.
-//   - error: non-nil if the parameters are invalid.
-func NewSpace(b int, degree int) (Space, error) {
+//   - Space: a fully initialized Space instance with derived parameters.
+//   - error: if one or more input parameters are invalid.
+func NewSpace(b int, degree int, succListSize int) (Space, error) {
 	if b <= 0 {
-		return Space{}, fmt.Errorf("invalid ID bits: %d", b)
+		return Space{}, fmt.Errorf("invalid identifier bits: %d (must be > 0)", b)
 	}
 	if degree < 2 {
-		return Space{}, fmt.Errorf("invalid graph degree: %d", degree)
+		return Space{}, fmt.Errorf("invalid graph degree: %d (must be >= 2)", degree)
+	}
+	if degree&(degree-1) != 0 {
+		return Space{}, fmt.Errorf("invalid graph degree: %d (must be a power of 2)", degree)
+	}
+	if succListSize <= 0 {
+		return Space{}, fmt.Errorf("invalid successor list size: %d (must be > 0)", succListSize)
 	}
 	return Space{
-		Bits:       b,
-		ByteLen:    (b + 7) / 8,
-		GraphGrade: degree,
+		Bits:         b,
+		ByteLen:      (b + 7) / 8,
+		GraphGrade:   degree,
+		SuccListSize: succListSize,
 	}, nil
 }
 
@@ -80,170 +102,255 @@ func NewSpace(b int, degree int) (Space, error) {
 // graph calculations).
 type ID []byte
 
-// NewIdFromString generates a new identifier (ID) for a given string within the current identifier space.
+// NewIdFromString derives a new identifier (ID) from the given string,
+// within the current identifier space.
 //
-// The ID is derived by computing the SHA-1 hash of the string.
-// The resulting 160-bit digest is then truncated or padded to match
-// the bit-length specified by the Space.
+// Typical usage includes generating IDs from node addresses (host:port)
+// or resource keys.
 //
-// Steps:
-//  1. Compute SHA-1 of the input string.
+// The ID is produced as follows:
+//  1. Compute the SHA-1 digest (160 bits) of the input string.
 //  2. Copy the most significant bytes (big-endian order) into a buffer
 //     of length sp.ByteLen.
 //  3. If Bits is not a multiple of 8, mask the unused high-order bits
-//     in the first byte to ensure the ID fits exactly into [0, 2^Bits - 1].
+//     in the first byte so that the ID falls strictly within the range
+//     [0, 2^Bits - 1].
+//
+// This ensures the generated ID is uniformly distributed and valid
+// for the configured identifier space.
 func (sp Space) NewIdFromString(s string) ID {
-	h := sha1.Sum([]byte(s)) // [20]byte (160 bits)
-	// Allocate buffer of correct length
+	// SHA-1 digest of the input
+	h := sha1.Sum([]byte(s)) // returns [20]byte (160 bits)
+
+	// allocate buffer of correct length and copy MSBs
 	buf := make([]byte, sp.ByteLen)
-	// Copy the most significant bytes (big-endian)
 	copy(buf, h[:sp.ByteLen])
-	// Mask unused high-order bits if Bits is not a multiple of 8
+
+	// mask unused bits if identifier length is not byte-aligned
 	extraBits := sp.ByteLen*8 - sp.Bits
 	if extraBits > 0 {
 		mask := byte(0xFF >> extraBits)
-		buf[0] &= mask // max one byte to mask
+		buf[0] &= mask // apply mask on the first (most significant) byte
 	}
+
 	return buf
 }
 
-// IsValidID checks whether the given byte slice is a valid ID
-// in the current identifier space (0 <= id < 2^Bits).
+// IsValidID verifies whether the given byte slice represents
+// a valid identifier in the current identifier space.
+//
+// A valid ID must satisfy:
+//  1. Its length matches sp.ByteLen.
+//  2. If Bits is not byte-aligned, the unused high-order bits
+//     in the first byte must be zero (i.e., ID < 2^Bits).
 //
 // Returns:
-//   - nil if the ID is valid
-//   - ErrInvalidID if the length is wrong
+//   - nil if the ID is valid.
+//   - ErrInvalidID if the ID is out of range or has invalid length.
 func (sp Space) IsValidID(id []byte) error {
-	// must have correct length
+	// Check byte length
 	if len(id) != sp.ByteLen {
 		return ErrInvalidID
 	}
-	// mask unused high-order bits
+
+	// Check unused bits in the most significant byte
 	extraBits := sp.ByteLen*8 - sp.Bits
 	if extraBits > 0 {
+		// Mask to isolate the unused bits
 		mask := byte(0xFF << (8 - extraBits))
 		if id[0]&mask != 0 {
 			return ErrInvalidID
 		}
 	}
+
 	return nil
 }
 
-// Hex returns the identifier as a lowercase hexadecimal string.
+// ToHexString returns the identifier as a lowercase hexadecimal string.
 //
-// If the ID is nil, the string "<nil>" is returned instead. This is
-// mainly useful for debugging and logging purposes.
-func (x ID) Hex() string {
+// Options:
+//   - If prefix is true, the string is returned with "0x" prefix.
+//   - If the ID is nil, the string "<nil>" is returned instead.
+//
+// This method is intended for debugging, logging, and user-friendly output.
+func (x ID) ToHexString(prefix bool) string {
 	if x == nil {
 		return "<nil>"
 	}
-	return hex.EncodeToString(x)
+	hexStr := hex.EncodeToString(x)
+	if prefix {
+		return "0x" + hexStr
+	}
+	return hexStr
 }
 
-// String implements fmt.Stringer with 0x prefix.
-func (x ID) String() string {
+// ToBigInt converts the identifier into a non-negative integer.
+// The ID is interpreted as a big-endian unsigned integer.
+//
+// Returns:
+//   - *big.Int representing the numeric value of the ID.
+//   - nil if the ID is nil.
+func (x ID) ToBigInt() *big.Int {
+	if x == nil {
+		return nil
+	}
+	return new(big.Int).SetBytes(x)
+}
+
+// ToBinaryString returns the binary representation of the ID
+// as a string of length sp.Bits. Leading zeros are preserved.
+//
+// If withPrefix is true, the string is returned with "0b" prefix.
+// If x is nil, the string "<nil>" is returned instead.
+func (sp Space) ToBinaryString(x ID, withPrefix bool) string {
 	if x == nil {
 		return "<nil>"
 	}
-	return "0x" + hex.EncodeToString(x)
+
+	var sb strings.Builder
+	for _, b := range x {
+		sb.WriteString(fmt.Sprintf("%08b", b))
+	}
+
+	// Trim to exactly Bits length (drop unused MSBs if necessary)
+	totalBits := sp.ByteLen * 8
+	binStr := sb.String()
+	if totalBits > sp.Bits {
+		binStr = binStr[totalBits-sp.Bits:]
+	}
+
+	if withPrefix {
+		return "0b" + binStr
+	}
+	return binStr
 }
 
-// FromHexString parses a hexadecimal string into an ID within the given Space.
-//
-// The input string may optionally start with "0x" or "0X". The resulting ID
-// is normalized to exactly sp.Bits bits, stored in big-endian format.
+// FromHexString parses a hexadecimal string into an ID, accepting
+// leading zero padding but rejecting any value that exceeds the
+// current identifier space (i.e., value >= 2^Bits).
 //
 // Rules:
-//   - If the hex string encodes more than sp.Bits, only the least significant
-//     sp.Bits are kept (rightmost bytes).
-//   - If shorter than sp.Bits, the value is left-padded with zeros.
-//   - If empty or invalid, an error is returned.
-//   - If Bits is not a multiple of 8, unused high-order bits in the first byte
-//     are masked off.
+//   - The input may optionally start with "0x" or "0X".
+//   - If the decoded value has more bytes than ByteLen, all the extra
+//     most-significant bytes must be zero (pure padding). Otherwise: error.
+//   - If shorter, it's left-padded with zeros (valid).
+//   - If Bits is not a multiple of 8, the unused high-order bits in the
+//     first byte must be zero; if any of those bits is 1: error.
+//   - Empty or non-hex input: error.
 func (sp Space) FromHexString(s string) (ID, error) {
 	str := strings.TrimPrefix(strings.TrimPrefix(s, "0x"), "0X")
 	if str == "" {
-		return nil, fmt.Errorf("invalid hex string: empty")
+		return nil, fmt.Errorf("invalid hex string: empty input")
 	}
-	// Decode hex string into raw bytes
+
+	// Decode the hex string.
 	bt, err := hex.DecodeString(str)
 	if err != nil {
-		return nil, fmt.Errorf("invalid hex string: %s", str)
+		return nil, fmt.Errorf("invalid hex string %q: %w", s, err)
 	}
+
+	// If longer than ByteLen, ensure extra leading bytes are all zero (pure padding).
+	if len(bt) > sp.ByteLen {
+		leading := bt[:len(bt)-sp.ByteLen]
+		for _, b := range leading {
+			if b != 0 {
+				return nil, fmt.Errorf("value exceeds %d-bit space (non-zero leading bytes)", sp.Bits)
+			}
+		}
+		// Keep least significant sp.ByteLen bytes.
+		bt = bt[len(bt)-sp.ByteLen:]
+	}
+
+	// Prepare the ID buffer with left padding if needed.
 	id := make(ID, sp.ByteLen)
-	if len(bt) >= sp.ByteLen {
-		// Keep only the least significant sp.ByteLen bytes
-		copy(id, bt[len(bt)-sp.ByteLen:])
-	} else {
-		// Left-pad with zeros
-		copy(id[sp.ByteLen-len(bt):], bt)
-	}
-	// Mask off unused high-order bits (if Bits is not multiple of 8)
+	copy(id[sp.ByteLen-len(bt):], bt)
+
+	// If Bits is not byte-aligned, the high-order "extraBits" in the first byte must be zero.
 	extraBits := sp.ByteLen*8 - sp.Bits
 	if extraBits > 0 {
-		mask := byte(0xFF >> extraBits)
-		id[0] &= mask
+		topMask := byte(0xFF << (8 - extraBits)) // bits that are *outside* the allowed range
+		if id[0]&topMask != 0 {
+			return nil, fmt.Errorf("value exceeds %d-bit space (non-zero in top %d unused bits)", sp.Bits, extraBits)
+		}
 	}
+
 	return id, nil
 }
 
-// FromUint64 converts a uint64 value into an identifier (ID) within the given Space.
+// FromUint64 converts a uint64 value into an identifier (ID)
+// in the current identifier space.
 //
-// The returned ID has exactly sp.ByteLen bytes and is interpreted as a big-endian
-// integer. The conversion masks off any unused high-order bits if sp.Bits is not
-// a multiple of 8, ensuring that the ID is always a valid element of the identifier
-// space defined by sp.
+// Behavior:
+//   - The value is truncated to fit into sp.Bits bits
+//     (i.e., only the least significant sp.Bits are kept).
+//   - The result is returned as a big-endian byte slice of length sp.ByteLen.
+//   - If Bits is not a multiple of 8, unused high-order bits in the
+//     first byte are masked to zero.
 //
-// This function is typically used when a numeric digit (e.g., from NextDigitBaseK)
-// must be combined with other IDs through modular arithmetic (AddMod, MulKMod, etc.).
+// Typical usage: embedding small integers into the identifier space,
+// e.g., when computing de Bruijn digits (NextDigitBaseK) or applying
+// modular arithmetic on IDs (AddMod, MulKMod, etc.).
 func (sp Space) FromUint64(x uint64) ID {
 	id := make(ID, sp.ByteLen)
+
+	// Fill buffer from least significant byte, big-endian order
 	for i := sp.ByteLen - 1; i >= 0 && x > 0; i-- {
 		id[i] = byte(x & 0xFF)
 		x >>= 8
 	}
-	// mask unused high-order bits
+
+	// Mask unused high-order bits if identifier is not byte-aligned
 	extraBits := sp.ByteLen*8 - sp.Bits
 	if extraBits > 0 {
 		mask := byte(0xFF >> extraBits)
 		id[0] &= mask
 	}
+
 	return id
 }
 
-// Cmp compare two ID in big-endian order.
-// returns:
+// Cmp compares two identifiers in big-endian order.
 //
-//	-1 se a < b
-//	 0 se a == b
-//	+1 se a > b
+// Returns:
+//
+//	-1 if x < b
+//	 0 if x == b
+//	+1 if x > b
+//
+// Note: comparison is purely byte-wise (big-endian), so IDs are
+// treated as unsigned integers in the identifier space.
 func (x ID) Cmp(b ID) int {
 	return bytes.Compare(x, b)
 }
 
-// Equal returns true if the two ID are the same byte to byte.
+// Equal reports whether two identifiers are exactly the same,
+// comparing all bytes.
+//
+// Returns true if x and b have identical length and contents.
 func (x ID) Equal(b ID) bool {
 	return bytes.Equal(x, b)
 }
 
 // Between reports whether the identifier x lies in the circular interval (a, b].
 //
-// Identifiers are compared in big-endian order using the Cmp method.
-// The interval is defined on the identifier ring of size 2^Bits, so it
-// correctly handles wrap-around cases.
+// Identifiers are compared in big-endian order using Cmp, so they are
+// treated as unsigned integers in the identifier space of size 2^Bits.
 //
-// Rules:
-//   - If a == b, the interval (a, a] is interpreted as the entire ring,
-//     and the method always returns true.
-//   - If a < b, the interval is linear: (a, b].
-//   - If a > b, the interval wraps around zero and includes all IDs
+// Interval semantics:
+//   - If a == b: the interval (a, a] covers the entire ring, so the
+//     method always returns true.
+//   - If a < b: the interval is linear (a, b], i.e. strictly greater
+//     than a and less than or equal to b.
+//   - If a > b: the interval wraps around zero and includes all IDs
 //     greater than a or less than or equal to b.
 func (x ID) Between(a, b ID) bool {
-	acmp := a.Cmp(x)  // compare a vs x
-	xbcmp := x.Cmp(b) // compare x vs b
-	abcmp := a.Cmp(b) // compare a vs b
+	// Precompute comparisons
+	acmp := a.Cmp(x)  // a vs x
+	xbcmp := x.Cmp(b) // x vs b
+	abcmp := a.Cmp(b) // a vs b
+
 	if abcmp == 0 {
-		// Interval (a, a] = full ring
+		// (a, a] means the whole ring
 		return true
 	}
 	if abcmp < 0 {
@@ -254,106 +361,117 @@ func (x ID) Between(a, b ID) bool {
 	return acmp < 0 || xbcmp <= 0
 }
 
-// MulKMod computes (GraphGrade * a) modulo 2^Bits, where GraphGrade is the
-// base k of the de Bruijn graph.
+// MulKMod computes (GraphGrade * a) modulo 2^Bits,
+// where GraphGrade is the base k of the de Bruijn graph.
 //
-// The input ID `a` must have exactly sp.ByteLen bytes and is interpreted
-// as a big-endian integer. Multiplication is performed using 64-bit
-// arithmetic on each byte with carry propagation. Any overflow beyond
-// sp.Bits is discarded (i.e., arithmetic is performed modulo 2^Bits).
+// Behavior:
+//   - The input ID `a` must be a valid identifier of length sp.ByteLen.
+//   - Multiplication is performed in big-endian order using
+//     per-byte arithmetic with carry propagation.
+//   - Any overflow beyond sp.Bits is discarded (modular arithmetic).
+//   - If Bits is not a multiple of 8, the unused high-order bits
+//     of the most significant byte are masked to zero.
 //
-// If Bits is not a multiple of 8, the high-order unused bits of the most
-// significant byte are masked off to ensure the result lies within the
-// valid identifier space.
-//
-// Panics if the input ID has a length different from sp.ByteLen.
-func (sp Space) MulKMod(a ID) ID {
-	if len(a) != sp.ByteLen {
-		panic("MulKMod: ID length mismatch") // TODO: vediamo cosa fare qua
+// Panics if the length of `a` is not sp.ByteLen.
+func (sp Space) MulKMod(a ID) (ID, error) {
+	if err := sp.IsValidID(a); err != nil {
+		return nil, err
 	}
 	res := make(ID, sp.ByteLen)
 	carry := uint64(0)
 	k := uint64(sp.GraphGrade)
-	// Process bytes from least significant (end) to most significant (front)
+	// Multiply each byte (big-endian order)
 	for i := sp.ByteLen - 1; i >= 0; i-- {
 		prod := uint64(a[i])*k + carry
 		res[i] = byte(prod & 0xFF)
 		carry = prod >> 8
 	}
-	// Discard carry beyond sp.Bits (mod 2^(8*ByteLen))
-	// Mask unused high-order bits if Bits is not a multiple of 8
+	// Apply mask if identifier size is not byte-aligned
 	extraBits := sp.ByteLen*8 - sp.Bits
 	if extraBits > 0 {
 		mask := byte(0xFF >> extraBits)
 		res[0] &= mask
 	}
-	return res
+	// carry is ignored (mod 2^Bits)
+	return res, nil
 }
 
 // AddMod computes (a + b) modulo 2^Bits.
 //
-// Both input IDs must have exactly sp.ByteLen bytes and are interpreted
-// as big-endian integers. Addition is performed byte by byte starting
-// from the least significant end, with carry propagation.
+// Both inputs must be valid IDs of length sp.ByteLen, interpreted
+// as big-endian unsigned integers. Addition is performed with
+// per-byte carry propagation.
 //
-// Any overflow beyond sp.Bits is discarded (i.e., arithmetic is performed
-// modulo 2^Bits). If Bits is not a multiple of 8, the unused high-order
-// bits of the most significant byte are masked off.
-//
-// Panics if the input IDs have a length different from sp.ByteLen.
-func (sp Space) AddMod(a, b ID) ID {
-	if len(a) != sp.ByteLen || len(b) != sp.ByteLen {
-		panic("AddMod: ID length mismatch") // TODO: vediamo cosa fare qua
+// Behavior:
+//   - Overflow beyond sp.Bits is discarded (arithmetic modulo 2^Bits).
+//   - If Bits is not a multiple of 8, the unused high-order bits in
+//     the most significant byte are masked to zero.
+//   - Returns an error if either input is not a valid ID.
+func (sp Space) AddMod(a, b ID) (ID, error) {
+	if err := sp.IsValidID(a); err != nil {
+		return nil, fmt.Errorf("invalid ID a: %w", err)
 	}
+	if err := sp.IsValidID(b); err != nil {
+		return nil, fmt.Errorf("invalid ID b: %w", err)
+	}
+
 	res := make(ID, sp.ByteLen)
 	carry := 0
-	// Sum from least significant byte to most significant
+
+	// Add from least significant to most significant byte
 	for i := sp.ByteLen - 1; i >= 0; i-- {
 		sum := int(a[i]) + int(b[i]) + carry
 		res[i] = byte(sum & 0xFF)
 		carry = sum >> 8
 	}
-	// Discard any overflow beyond Bits
+
+	// Mask unused bits if identifier size is not byte-aligned
 	extraBits := sp.ByteLen*8 - sp.Bits
 	if extraBits > 0 {
 		mask := byte(0xFF >> extraBits)
 		res[0] &= mask
 	}
-	return res
+
+	return res, nil
 }
 
 // NextDigitBaseK extracts the most significant digit of x in base-k,
 // where k = sp.GraphGrade (must be a power of 2).
 //
-// The operation is done entirely with bit-level arithmetic:
+// Behavior:
 //  1. Compute how many padding bits are in the first byte (extraBits).
-//  2. Compute x = log2(GraphGrade).
-//  3. Extract the top x bits of the ID, skipping the extraBits.
-//  4. Left-shift the entire ID by x bits.
-//  5. Mask out the extraBits at the top so they are always zero.
+//  2. Let r = log2(k). Extract the r most significant bits of x
+//     (after skipping extraBits).
+//  3. Left-shift the entire ID by r bits.
+//  4. Mask the extraBits in the most significant byte to ensure
+//     the result lies strictly in [0, 2^Bits).
 //
-// Returns (digit, rest).
-func (sp Space) NextDigitBaseK(x ID) (digit uint64, rest ID) {
-	if len(x) != sp.ByteLen {
-		panic("NextDigitBaseK: ID length mismatch")
+// Returns:
+//   - digit: the extracted base-k digit as uint64.
+//   - rest:  the remaining ID after shifting left by r bits.
+//   - error: if x is invalid or GraphGrade is not a power of 2.
+func (sp Space) NextDigitBaseK(x ID) (digit uint64, rest ID, err error) {
+	if err := sp.IsValidID(x); err != nil {
+		return 0, nil, fmt.Errorf("NextDigitBaseK: invalid ID: %w", err)
 	}
-	if (sp.GraphGrade & (sp.GraphGrade - 1)) != 0 {
-		panic("NextDigitBaseK: GraphGrade must be a power of 2")
-	}
-	// Extra bits at the top (padding in the first byte)
+
+	// Number of unused MSBs in the first byte
 	extraBits := sp.ByteLen*8 - sp.Bits
-	// x = log2(k)
+
+	// r = log2(k), i.e. number of bits per digit
 	r := bits.TrailingZeros(uint(sp.GraphGrade))
-	// Extract top r bits after skipping extraBits
-	bitPos := extraBits // starting bit position in the stream
+
+	// --- extract the most significant r bits ---
+	bitPos := extraBits // skip the padding bits
 	digit = 0
 	for i := 0; i < r; i++ {
 		byteIndex := (bitPos + i) / 8
-		bitIndex := 7 - ((bitPos + i) % 8) // MSB-first
+		bitIndex := 7 - ((bitPos + i) % 8) // MSB-first order
 		bit := (x[byteIndex] >> bitIndex) & 1
 		digit = (digit << 1) | uint64(bit)
 	}
-	// Shift the ID left by r bits
+
+	// --- shift left by r bits ---
 	rest = make(ID, sp.ByteLen)
 	carry := byte(0)
 	for i := sp.ByteLen - 1; i >= 0; i-- {
@@ -361,10 +479,12 @@ func (sp Space) NextDigitBaseK(x ID) (digit uint64, rest ID) {
 		rest[i] = (val << r) | carry
 		carry = val >> (8 - r)
 	}
-	// Mask unused high-order bits
+
+	// --- mask unused high-order bits ---
 	if extraBits > 0 {
 		mask := byte(0xFF >> extraBits)
 		rest[0] &= mask
 	}
-	return digit, rest
+
+	return digit, rest, nil
 }
