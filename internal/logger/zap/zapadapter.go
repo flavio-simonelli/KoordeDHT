@@ -7,12 +7,12 @@ import (
 	"go.uber.org/zap"
 )
 
-// ZapAdapter adatta *zap.Logger all'interfaccia nei package in internal che usano un logger.
+// ZapAdapter is an adapter to use zap as the logging implementation
+// for the internal/logger interface.
 type ZapAdapter struct {
 	L *zap.Logger
 }
 
-// Applica lo skip di 1 frame per evitare che il caller sia zapadapter.go:XX
 func NewZapAdapter(l *zap.Logger) ZapAdapter {
 	return ZapAdapter{L: l.WithOptions(zap.AddCallerSkip(1))}
 }
@@ -28,7 +28,7 @@ func (z ZapAdapter) Named(name string) logger.Logger {
 func (z ZapAdapter) WithNode(n domain.Node) logger.Logger {
 	return ZapAdapter{L: z.L.With(
 		zap.Any("self", map[string]any{
-			"id":   n.ID.String(),
+			"id":   n.ID.ToBinaryString(true),
 			"addr": n.Addr,
 		}),
 	)}

@@ -2,28 +2,31 @@ package logger
 
 import "KoordeDHT/internal/domain"
 
-// Field rappresenta un campo strutturato (key:value).
+// Field represents a structured key-value field attached to a log entry.
 type Field struct {
 	Key string
 	Val any
 }
 
-// Logger è l'interfaccia minima richiesta da routingtable.
+// Logger defines the minimal logging interface required by other components
+// such as the routing table. It supports structured fields and hierarchical
+// loggers (Named / With).
 type Logger interface {
-	Named(name string) Logger
-	With(fields ...Field) Logger
-	WithNode(n domain.Node) Logger
-	Debug(msg string, fields ...Field)
-	Info(msg string, fields ...Field)
-	Warn(msg string, fields ...Field)
-	Error(msg string, fields ...Field)
+	Named(name string) Logger          // Named returns a new logger with the specified sub-scope name.
+	With(fields ...Field) Logger       // With returns a new logger that includes the given structured fields.
+	WithNode(n domain.Node) Logger     // WithNode returns a new logger with information about the provided node.
+	Debug(msg string, fields ...Field) // Debug logs a debug-level message with optional structured fields.
+	Info(msg string, fields ...Field)  // Info logs an info-level message with optional structured fields.
+	Warn(msg string, fields ...Field)  // Warn logs a warning-level message with optional structured fields.
+	Error(msg string, fields ...Field) // Error logs an error-level message with optional structured fields.
+
 }
 
-// F è un helper per creare un Field in modo conciso.
+// F is a helper for creating a Field in a concise way.
 func F(key string, val any) Field { return Field{Key: key, Val: val} }
 
-// FNode serializza un *domain.Node in un campo strutturato leggibile.
-// Se il puntatore è nil, produce direttamente un valore nil.
+// FNode serializes a *domain.Node into a structured field.
+// If the pointer is nil, the field value is nil.
 func FNode(key string, n *domain.Node) Field {
 	if n == nil {
 		return Field{Key: key, Val: nil}
@@ -31,25 +34,28 @@ func FNode(key string, n *domain.Node) Field {
 	return Field{
 		Key: key,
 		Val: map[string]any{
-			"id":   n.ID.String(),
+			"id":   n.ID.ToBinaryString(true),
 			"addr": n.Addr,
 		},
 	}
 }
 
-// FResource serializza un domain.Resource in un campo strutturato leggibile.
+// FResource serializes a domain.Resource into a structured field
+// containing its key and value.
 func FResource(key string, r domain.Resource) Field {
 	return Field{
 		Key: key,
 		Val: map[string]any{
-			"key":   r.Key.String(),
+			"key":   r.Key.ToBinaryString(true),
 			"value": r.Value,
 		},
 	}
 }
 
-// ----------------------------------------------------------------
-// NopLogger è un'implementazione di Logger che non fa nulla.
+// NopLogger ----------------------------------------------------------------
+// NopLogger is a no-op implementation of Logger.
+// All methods are implemented but do not perform any action.
+// Useful for tests or when logging should be disabled.
 type NopLogger struct{}
 
 func (l *NopLogger) Named(name string) Logger          { return l }
