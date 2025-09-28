@@ -1,11 +1,20 @@
-package config
+package server
 
 import (
 	"fmt"
 	"net"
 )
 
-// pickIP sceglie un indirizzo IP valido in base alla modalità
+// pickIP selects a suitable IPv4 address from the local interfaces
+// according to the given mode ("private" or "public").
+//
+// Rules:
+//   - Only considers interfaces that are up and not loopback.
+//   - Only considers IPv4 addresses (IPv6 is skipped).
+//   - If mode == "private", returns the first private address found.
+//   - If mode == "public", returns the first non-private address found.
+//
+// Returns an error if no suitable address is found.
 func pickIP(mode string) (net.IP, error) {
 	ifaces, err := net.Interfaces()
 	if err != nil {
@@ -13,7 +22,7 @@ func pickIP(mode string) (net.IP, error) {
 	}
 
 	for _, iface := range ifaces {
-		// escludo interfacce spente o loopback
+		// Skip interfaces that are down or loopback
 		if (iface.Flags&net.FlagUp) == 0 || (iface.Flags&net.FlagLoopback) != 0 {
 			continue
 		}
@@ -48,7 +57,8 @@ func pickIP(mode string) (net.IP, error) {
 	return nil, fmt.Errorf("no suitable %s interface found", mode)
 }
 
-// isPrivateIP controlla se l’IP è in uno spazio privato
+// isPrivateIP checks whether the given IPv4 address
+// belongs to one of the RFC1918 private address ranges.
 func isPrivateIP(ip net.IP) bool {
 	privateBlocks := []string{
 		"10.0.0.0/8",
@@ -64,32 +74,32 @@ func isPrivateIP(ip net.IP) bool {
 	return false
 }
 
-// Listen crea un net.Listener scegliendo host/porta corretti
-func (cfg *Config) Listen() (net.Listener, error) {
-	host := cfg.Node.Host
+// Listen creates a TCP listener bound to host:port, selecting
+// a default host IP if none is provided.
+//
+// Parameters:
+//   - mode: "private" or "public", used to decide IP selection.
+//   - host: optional IP address; if empty, pickIP(mode) is used.
+//   - port: TCP port; if 0, a random free port is chosen.
+func Listen(mode, host string, port int) (net.Listener, error) {
 	if host == "" {
-		ip, err := pickIP(cfg.DHT.Mode)
+		ip, err := pickIP(mode)
 		if err != nil {
 			return nil, err
 		}
 		host = ip.String()
 	} else {
-		// Se l'utente ha specificato un IP = validiamo rispetto alla mode
 		ip := net.ParseIP(host)
 		if ip == nil {
 			return nil, fmt.Errorf("invalid IP address: %s", host)
 		}
-		if cfg.DHT.Mode == "private" && !isPrivateIP(ip) {
+		if mode == "private" && !isPrivateIP(ip) {
 			return nil, fmt.Errorf("host %s is not private but mode=private", host)
 		}
-		if cfg.DHT.Mode == "public" && isPrivateIP(ip) {
+		if mode == "public" && isPrivateIP(ip) {
 			return nil, fmt.Errorf("host %s is private but mode=public", host)
 		}
 	}
-	addr := fmt.Sprintf("%s:%d", host, cfg.Node.Port)
-	lis, err := net.Listen("tcp", addr)
-	if err != nil {
-		return nil, err
-	}
-	return lis, nil
+	addr := fmt.Sprintf("%s:%d", host, port)
+	return net.Listen("tcp", addr)
 }
