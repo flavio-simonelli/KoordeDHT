@@ -171,6 +171,11 @@ func (n *Node) stabilizeSuccessor() {
 		ctx, cancel := context.WithTimeout(context.Background(), n.cp.FailureTimeout())
 		defer cancel()
 
+		if succ.ID.Equal(self.ID) {
+			// If successor is self, no need to notify
+			return
+		}
+
 		cli, err := n.cp.GetFromPool(succ.Addr)
 		if err != nil {
 			n.lgr.Error("stabilize: client for successor not found in pool",
@@ -199,6 +204,10 @@ func (n *Node) fixSuccessorList() {
 	succ := n.rt.FirstSuccessor()
 	if succ == nil {
 		n.lgr.Error("fixSuccessorList: no successor set")
+		return
+	}
+	if succ.ID.Equal(n.rt.Self().ID) {
+		// Single-node mode, nothing to do
 		return
 	}
 
@@ -352,27 +361,31 @@ func (n *Node) fixDeBruijn() {
 	// Step 2: get anchor (predecessor of succ)
 	var anchor *domain.Node
 	{
-		ctx, cancel := context.WithTimeout(context.Background(), n.cp.FailureTimeout())
-		cli, err := n.cp.GetFromPool(succ.Addr)
-		if err != nil {
-			ephCli, conn, err := n.cp.DialEphemeral(succ.Addr)
+		if succ.ID.Equal(self.ID) {
+			anchor = n.rt.GetPredecessor()
+		} else {
+			ctx, cancel := context.WithTimeout(context.Background(), n.cp.FailureTimeout())
+			cli, err := n.cp.GetFromPool(succ.Addr)
 			if err != nil {
-				n.lgr.Warn("fixDeBruijn: could not dial anchor successor",
+				ephCli, conn, err := n.cp.DialEphemeral(succ.Addr)
+				if err != nil {
+					n.lgr.Warn("fixDeBruijn: could not dial anchor successor",
+						logger.FNode("succ", succ),
+						logger.F("err", err))
+					cancel()
+					return
+				}
+				cli = ephCli
+				defer conn.Close()
+			}
+			anchor, err = client.GetPredecessor(ctx, cli, n.rt.Space())
+			cancel()
+			if err != nil {
+				n.lgr.Warn("fixDeBruijn: could not get the anchor",
 					logger.FNode("succ", succ),
 					logger.F("err", err))
-				cancel()
 				return
 			}
-			cli = ephCli
-			defer conn.Close()
-		}
-		anchor, err = client.GetPredecessor(ctx, cli, n.rt.Space())
-		cancel()
-		if err != nil {
-			n.lgr.Warn("fixDeBruijn: could not get the anchor",
-				logger.FNode("succ", succ),
-				logger.F("err", err))
-			return
 		}
 		if anchor == nil {
 			n.lgr.Warn("fixDeBruijn: anchor is nil", logger.FNode("succ", succ))
@@ -395,25 +408,29 @@ func (n *Node) fixDeBruijn() {
 
 	var succList []*domain.Node
 	{
-		ctx, cancel := context.WithTimeout(context.Background(), n.cp.FailureTimeout())
-		cli, err := n.cp.GetFromPool(anchor.Addr)
-		if err != nil {
-			ephCli, conn, err := n.cp.DialEphemeral(anchor.Addr)
+		if anchor.ID.Equal(self.ID) {
+			succList = n.rt.SuccessorList()
+		} else {
+			ctx, cancel := context.WithTimeout(context.Background(), n.cp.FailureTimeout())
+			cli, err := n.cp.GetFromPool(anchor.Addr)
 			if err != nil {
-				n.lgr.Warn("fixDeBruijn: could not dial anchor",
+				ephCli, conn, err := n.cp.DialEphemeral(anchor.Addr)
+				if err != nil {
+					n.lgr.Warn("fixDeBruijn: could not dial anchor",
+						logger.FNode("anchor", anchor), logger.F("err", err))
+					cancel()
+					return
+				}
+				cli = ephCli
+				defer conn.Close()
+			}
+			succList, err = client.GetSuccessorList(ctx, cli, n.rt.Space())
+			cancel()
+			if err != nil {
+				n.lgr.Warn("fixDeBruijn: could not get successor list from anchor",
 					logger.FNode("anchor", anchor), logger.F("err", err))
-				cancel()
 				return
 			}
-			cli = ephCli
-			defer conn.Close()
-		}
-		succList, err = client.GetSuccessorList(ctx, cli, n.rt.Space())
-		cancel()
-		if err != nil {
-			n.lgr.Warn("fixDeBruijn: could not get successor list from anchor",
-				logger.FNode("anchor", anchor), logger.F("err", err))
-			return
 		}
 	}
 	for i := 1; i < n.rt.Space().GraphGrade; i++ {

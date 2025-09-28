@@ -139,7 +139,6 @@ func (p *Pool) DialEphemeral(addr string) (dhtv1.DHTClient, *grpc.ClientConn, er
 	if closed {
 		return nil, nil, fmt.Errorf("clientpool: pool is closed")
 	}
-	p.mu.Unlock()
 	if addr == "" {
 		return nil, nil, fmt.Errorf("clientpool: empty address")
 	}

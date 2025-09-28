@@ -82,7 +82,7 @@ func (n *Node) FindSuccessorInit(ctx context.Context, target domain.ID) (*domain
 		return nil, status.Error(codes.Internal, "node not initialized (routing table not initialized)")
 	} else if target.Between(self.ID, succ.ID) {
 		n.lgr.Info("EndLookup: target in (self, successor], returning successor",
-			logger.F("target", target), logger.FNode("successor", succ))
+			logger.F("target", target.ToHexString(true)), logger.FNode("successor", succ))
 		return succ, nil
 	}
 	// start de Bruijn routing
@@ -350,32 +350,24 @@ func (n *Node) CheckIdValidity(id domain.ID) error {
 //
 // Context is propagated so that timeouts and cancellations from the client
 // apply also to the routing and storage steps.
-func (n *Node) Put(ctx context.Context, key string, value string) error {
+func (n *Node) Put(ctx context.Context, res *domain.Resource) error {
 	// Check if the context has already been canceled or expired
 	if err := ctxutil.CheckContext(ctx); err != nil {
 		return err
 	}
-	// Translate the client key into a DHT identifier
-	id := n.rt.Space().NewIdFromString(key)
 	// Find the successor node responsible for this ID
-	succ, err := n.FindSuccessorInit(ctx, id)
+	succ, err := n.FindSuccessorInit(ctx, res.Key)
 	if err != nil {
-		return fmt.Errorf("put: failed to find successor for key %s: %w", key, err)
+		return fmt.Errorf("put: failed to find successor for key %s: %w", res.RawKey, err)
 	}
 	if succ == nil {
-		return fmt.Errorf("put: no successor found for key %s", key)
-	}
-	// Build the resource object
-	res := domain.Resource{
-		Key:    id,
-		RawKey: key,
-		Value:  value,
+		return fmt.Errorf("put: no successor found for key %s", res.RawKey)
 	}
 	// If this node is the successor, store locally
 	if succ.ID.Equal(n.rt.Self().ID) {
-		return n.StoreLocal(ctx, res)
+		return n.StoreLocal(ctx, *res)
 	}
-	sres := []domain.Resource{res} // wrap in slice for StoreRemote
+	sres := []domain.Resource{*res} // wrap in slice for StoreRemote
 	// Otherwise, forward the resource to the successor
 	cli, err := n.cp.GetFromPool(succ.Addr)
 	if err != nil {
@@ -385,7 +377,7 @@ func (n *Node) Put(ctx context.Context, key string, value string) error {
 		return fmt.Errorf("put: failed to store resource at successor %s: %w", succ.Addr, err)
 	}
 	// Log success
-	n.lgr.Info("Put: resource stored at successor", logger.F("key", key), logger.FNode("successor", succ))
+	n.lgr.Info("Put: resource stored at successor", logger.F("key", res.RawKey), logger.FNode("successor", succ))
 	return nil
 }
 
@@ -398,17 +390,16 @@ func (n *Node) Put(ctx context.Context, key string, value string) error {
 //   - *domain.Resource if found
 //   - status.Error(codes.NotFound, ...) if the resource does not exist
 //   - error in case of routing or RPC issues
-func (n *Node) Get(ctx context.Context, key string) (*domain.Resource, error) {
+func (n *Node) Get(ctx context.Context, id domain.ID) (*domain.Resource, error) {
 	if err := ctxutil.CheckContext(ctx); err != nil {
 		return nil, err
 	}
-	id := n.rt.Space().NewIdFromString(key)
 	succ, err := n.FindSuccessorInit(ctx, id) // is used the context from client
 	if err != nil {
-		return nil, fmt.Errorf("get: failed to find successor for key %s: %w", key, err)
+		return nil, fmt.Errorf("get: failed to find successor for key %s: %w", id.ToHexString(true), err)
 	}
 	if succ == nil {
-		return nil, fmt.Errorf("get: no successor found for key %s", key)
+		return nil, fmt.Errorf("get: no successor found for key %s", id.ToHexString(true))
 	}
 	// If this node is the successor, retrieve locally
 	if succ.ID.Equal(n.rt.Self().ID) {
@@ -480,7 +471,7 @@ func (n *Node) StoreLocal(ctx context.Context, resource domain.Resource) error {
 		return nil
 	}
 	// Non sono responsabile → tenta forwarding
-	if err := n.Put(ctx, resource.RawKey, resource.Value); err != nil {
+	if err := n.Put(ctx, &resource); err != nil {
 		// qui ritorniamo errore reale, utile per capire se è problema di routing
 		return fmt.Errorf("forwarding store to successor failed: %w", err)
 	}

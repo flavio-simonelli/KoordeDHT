@@ -7,9 +7,7 @@ import (
 	"KoordeDHT/internal/node"
 	"context"
 	"errors"
-	"fmt"
 
-	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

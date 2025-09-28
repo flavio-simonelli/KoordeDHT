@@ -27,7 +27,7 @@ func InitTracer(cfg config.TelemetryConfig, serviceName string, nodeId domain.ID
 		context.Background(),
 		resource.WithAttributes(
 			semconv.ServiceNameKey.String(serviceName),
-			attribute.String("dht.node.id", nodeId.String()),
+			attribute.String("dht.node.id", nodeId.ToHexString(true)),
 		),
 	)
 	if err != nil {

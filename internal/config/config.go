@@ -175,9 +175,6 @@ func (cfg *Config) ValidateConfig() error {
 			errs = append(errs, "bootstrap.port must be > 0 when using A/AAAA (srv=false)")
 		}
 	case "static":
-		if len(b.Peers) == 0 {
-			errs = append(errs, "bootstrap.peers cannot be empty in mode=static")
-		}
 		for _, p := range b.Peers {
 			if _, _, err := net.SplitHostPort(p); err != nil {
 				errs = append(errs, fmt.Sprintf("invalid peer address %q in bootstrap.peers: %v", p, err))
