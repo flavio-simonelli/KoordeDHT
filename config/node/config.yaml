@@ -1,43 +1,43 @@
 logger:
-  active: true          # enable/disable logging (true | false)
-  level: "info"           # log level: debug, info, warn, error
-  encoding: "console"      # log encoding: console | json
-  mode: "stdout"           # output mode: stdout | file
+  active: true             # Enable or disable logging (true | false)
+  level: "info"            # Minimum log level: debug | info | warn | error
+  encoding: "console"      # Log output format: console (human-readable) | json
+  mode: "stdout"           # Log destination: stdout | file
 
-  file:                    # used only if mode = file
-    path: "logs/app.log"
-    maxSize: 5             # MB per log file
-    maxBackups: 3          # number of old files to retain
-    maxAge: 1              # days to retain log files
-    compress: true         # compress old log files
+  file:                    # File logging settings (used only if mode = file)
+    path: "logs/app.log"   # Path to the log file
+    maxSize: 5             # Maximum size (in MB) per log file before rotation
+    maxBackups: 3          # Number of rotated log files to retain
+    maxAge: 1              # Maximum age (in days) to retain old log files
+    compress: true         # Compress old log files when rotating
 
 dht:
-  idBits: 8                # identifier size (keyspace = 2^idBits)
-  mode: "private"          # network mode: public | private
+  idBits: 8                # Identifier space size (keyspace = 2^idBits)
+  mode: "private"          # Network mode: public (real network) | private (local/isolated)
 
   bootstrap:
-    mode: "init"              # "dns" | "static" | "init"
-    dnsName: "bootstrap.koorde.local"
-    srv: false                 # se true usa record SRV, altrimenti A/AAAA
-    port: 35761                # usato solo se srv=false
-    peers: [""]                 # lista statica solo se mode=static (es. ["100.x.x.x:43243", "101.x.x.x:43243"])
+    mode: "static"              # Bootstrap strategy: dns | static
+    dnsName: "bootstrap.koorde.local" # DNS name used when mode = dns
+    srv: false                  # Use DNS SRV records if true, otherwise A/AAAA records
+    port: 35761                 # Bootstrap port (used only when srv = false)
+    peers: []                   # Static peer list (used only when mode = static)
 
   deBruijn:
-    degree: 2              # de Bruijn graph degree (2 = minimal, log n = optimal, utilizzare obbligatoriamente potenze di 2 per lavorare direttamente con stringhe binarie)
-    backupSize: 0          # number of backup predecessors for de Bruijn pointer
-    fixInterval: 10s       # refresh interval for de Bruijn pointers
+    degree: 2              # Degree of the de Bruijn graph (2 = minimal, log n = optimal; must be a power of 2 for binary string representation)
+    fixInterval: 10s       # Periodic refresh interval for de Bruijn pointers
+    failureTimeout: 3s     # Timeout for gRPC calls during de Bruijn pointer stabilization
 
   faultTolerance:
-    successorListSize: 4   # length of successor list (≈ log n)
-    stabilizationInterval: 5s  # stabilization procedure interval
-    failureTimeout: 3s     # max time before marking a node as failed
+    successorListSize: 4   # Number of successors to maintain (≈ log n for fault tolerance)
+    stabilizationInterval: 5s  # Periodic interval for successor stabilization
+    failureTimeout: 3s     # Timeout for gRPC calls during stabilization; successors exceeding this timeout are marked as failed
 
 node:
-    id: ""                 # hexadecimal node identifier (empty = random)
-    host: ""               # server host (empty = all interfaces (in base a come è configurata dht mode))"
-    port: 0               # server port (0 = random available port)
+  id: ""                   # Node identifier in hexadecimal (empty = random ID)
+  host: ""                 # Server host address (empty = all interfaces, depending on DHT mode)
+  port: 0                  # gRPC server port (0 = automatically select a free port)
 
 telemetry:
   tracing:
-    enabled: true
-    exporter: jaeger   # oppure jaeger, otlp, ecc.
+    enabled: true          # Enable or disable distributed tracing (true | false)
+    exporter: jaeger       # Tracing exporter to use (currently only Jaeger is supported)
