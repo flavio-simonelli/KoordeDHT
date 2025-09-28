@@ -30,6 +30,7 @@ func main() {
 	// Parse command-line flags
 	configPath := flag.String("config", defaultConfigPath, "path to configuration file")
 	flag.Parse()
+
 	// Load configuration
 	cfg, err := config.LoadConfig(*configPath)
 	if err != nil {
@@ -39,6 +40,7 @@ func main() {
 	if err := cfg.ValidateConfig(); err != nil {
 		log.Fatalf("invalid configuration: %v", err)
 	}
+
 	// Initialize logger
 	var lgr logger.Logger
 	if cfg.Logger.Active {
@@ -99,7 +101,6 @@ func main() {
 	rt := routingtable.New(
 		&domainNode,
 		space,
-		cfg.DHT.FaultTolerance.SuccessorListSize,
 		routingtable.WithLogger(lgr.Named("routingtable")),
 	)
 	lgr.Debug("initialized routing table")
@@ -182,7 +183,7 @@ func main() {
 	defer stop()
 
 	// Start periodic stabilization workers (run until ctx is canceled)
-	n.StartStabilizers(ctx, cfg.DHT.FaultTolerance.StabilizationInterval)
+	n.StartStabilizers(ctx, cfg.DHT.FaultTolerance.StabilizationInterval, cfg.DHT.DeBruijn.FixInterval)
 	lgr.Debug("Stabilization workers started")
 
 	select {

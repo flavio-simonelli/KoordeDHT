@@ -2,6 +2,7 @@ package node
 
 import (
 	"KoordeDHT/internal/client"
+	"KoordeDHT/internal/domain"
 	"KoordeDHT/internal/logger"
 	"KoordeDHT/internal/routingtable"
 	"KoordeDHT/internal/storage"
@@ -30,90 +31,94 @@ func New(rout *routingtable.RoutingTable, clientpool *client.Pool, storage *stor
 	return n
 }
 
-// TODO: da mettere nella join come codice
-/*
-// TryBootstrapJoin iterates over the given peers and attempts to join the DHT
-// by calling FindSuccessorStart(selfID) on each peer using the client pool.
+// Join connects this node to an existing Koorde DHT using the given list of bootstrap peers.
+// It attempts to contact each peer in order until one responds successfully to a FindSuccessorStart(selfID).
+// Once a valid successor is found, the node initializes its routing table, successor list,
+// and de Bruijn pointers. If all peers fail, the join returns an error.
 //
 // Parameters:
-//   - pool:    client connection pool
-//   - selfID:  the local node identifier
-//   - peers:   list of bootstrap peer addresses ("host:port")
-//   - timeout: per-RPC timeout applied to each attempt
+//   - peers:   slice of bootstrap peer addresses ("host:port")
 //
 // Returns:
-//   - *domain.Node: the successor node for selfID if join succeeded
-//   - error: if no peer responded successfully
-func (p *Pool) TryBootstrapJoin(selfID domain.ID, timeout time.Duration, peers []string) (*domain.Node, error) {
-	var lastErr error
-
-	for _, addr := range peers {
-		// Create a context with timeout for this attempt
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
-		defer cancel()
-
-		succ, err := p.FindSuccessorStart(ctx, selfID, addr)
-		if err == nil && succ != nil {
-			return succ, nil
-		}
-		if err != nil {
-			lastErr = fmt.Errorf("FindSuccessorStart to %s failed: %w", addr, err)
-		} else {
-			lastErr = fmt.Errorf("peer %s returned nil successor", addr)
-		}
+//   - error: if no bootstrap peer responded successfully
+func (n *Node) Join(peers []string) error {
+	if len(peers) == 0 {
+		return fmt.Errorf("join: no bootstrap peers provided")
 	}
-
-	if lastErr == nil {
-		lastErr = fmt.Errorf("no bootstrap peers provided")
-	}
-	return nil, fmt.Errorf("bootstrap join failed: %w", lastErr)
-}
-*/
-
-// Join connects this node to an existing Koorde DHT using the given bootstrap peer.
-// It sets predecessor/successor pointers, initializes the successor list, and sets de Bruijn links.
-func (n *Node) Join(bootstrapAddr string) error {
 	self := n.rt.Self()
-	// 1. Ask bootstrap to find our successor
-	if bootstrapAddr == self.Addr {
-		return fmt.Errorf("join: bootstrap address cannot be self address %s", bootstrapAddr)
+	var succ *domain.Node
+	var lastErr error
+	// Try each peer until one succeeds (RPC FindSuccessor for self.ID)
+	for _, addr := range peers {
+		if addr == self.Addr {
+			continue // skip self
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), n.cp.FailureTimeout())
+		cli, conn, err := n.cp.DialEphemeral(addr)
+		if err != nil {
+			lastErr = fmt.Errorf("join: failed to dial bootstrap %s: %w", addr, err)
+			cancel()
+			continue
+		}
+		succ, lastErr = client.FindSuccessorStart(ctx, cli, n.Space(), self.ID)
+		cancel()
+		conn.Close()
+		if lastErr == nil && succ != nil {
+			n.lgr.Info("join: candidate successor found",
+				logger.F("bootstrap", addr),
+				logger.FNode("successor", succ))
+			break
+		}
+		if lastErr != nil {
+			n.lgr.Warn("join: bootstrap attempt failed",
+				logger.F("bootstrap", addr), logger.F("err", lastErr))
+		} else {
+			lastErr = fmt.Errorf("bootstrap %s returned nil successor", addr)
+		}
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	succ, err := n.cp.FindSuccessorStart(ctx, self.ID, bootstrapAddr)
-	if err != nil {
-		return fmt.Errorf("join: failed to find successor via bootstrap %s: %w", bootstrapAddr, err)
-	}
+
 	if succ == nil {
-		return fmt.Errorf("join: bootstrap %s returned nil successor", bootstrapAddr)
+		return fmt.Errorf("join: all bootstrap attempts failed: %w", lastErr)
 	}
-	n.lgr.Info("join: candidate successor found", logger.FNode("successor", succ))
-	// 2. Ask successor for its predecessor
-	ctx, cancel = context.WithCancel(context.Background())
-	defer cancel()
-	pred, err := n.cp.GetPredecessor(ctx, succ.Addr)
+
+	// Ask successor for its predecessor
+	ctx, cancel := context.WithTimeout(context.Background(), n.cp.FailureTimeout())
+	cli, conn, err := n.cp.DialEphemeral(succ.Addr)
 	if err != nil {
+		cancel()
+		return fmt.Errorf("join: failed to dial successor %s: %w", succ.Addr, err)
+	}
+	pred, err := client.GetPredecessor(ctx, cli, n.Space())
+	cancel()
+	if err != nil {
+		conn.Close()
 		return fmt.Errorf("join: failed to get predecessor of successor %s: %w", succ.Addr, err)
 	}
 	if pred != nil {
 		n.lgr.Info("join: successor has predecessor", logger.FNode("predecessor", pred))
 	}
-	// 3. Notify successor that we may be its predecessor
-	ctx, cancel = context.WithCancel(context.Background())
-	defer cancel()
-	if err := n.cp.Notify(ctx, self, succ.Addr); err != nil {
+
+	// Notify successor that we may be its predecessor
+	ctx, cancel = context.WithTimeout(context.Background(), n.cp.FailureTimeout())
+	err = client.Notify(ctx, cli, self)
+	cancel()
+	conn.Close()
+	if err != nil {
 		return fmt.Errorf("join: failed to notify successor %s: %w", succ.Addr, err)
 	}
-	// 4. Update local routing table (release old, set new)
-	n.cp.AddRef(pred.Addr)
-	n.rt.SetPredecessor(pred)
+
+	// Update local routing table (release old, set new)
+	if pred != nil {
+		n.cp.AddRef(pred.Addr)
+		n.rt.SetPredecessor(pred)
+	}
 	n.cp.AddRef(succ.Addr)
 	n.rt.SetSuccessor(0, succ)
 
-	// 5. Initialize successor list using the new successor
+	// Initialize successor list using the new successor
 	n.fixSuccessorList()
 
-	// 6. Initialize de Bruijn pointers
+	// Initialize de Bruijn pointers
 	n.fixDeBruijn()
 
 	n.lgr.Info("join: completed successfully",
@@ -122,6 +127,16 @@ func (n *Node) Join(bootstrapAddr string) error {
 	return nil
 }
 
+// CreateNewDHT initializes this node as the first member of a new Koorde DHT.
+//
+// In single-node mode, the routing table is set so that:
+//   - The predecessor entry point to self.
+//   - The first successor entry points to self.
+//   - The first de Bruijn entry points to self.
+//   - All other routing entries remain nil.
+//
+// This method must be called only once, when no bootstrap peers
+// are available and the node is intended to start a brand new DHT ring.
 func (n *Node) CreateNewDHT() {
 	n.rt.InitSingleNode()
 }
@@ -138,24 +153,31 @@ func (n *Node) Leave() error {
 		return nil
 	}
 
+	cli, err := n.cp.GetFromPool(succ.Addr)
+	if err != nil {
+		return fmt.Errorf("leave: failed to get client for successor %s: %w", succ.Addr, err)
+	}
+
 	// 1. Notifica al successore che sto lasciando
 	{
 		ctx, cancel := context.WithTimeout(context.Background(), n.cp.FailureTimeout())
-		defer cancel()
-		if err := n.cp.Leave(ctx, self, succ.Addr); err != nil {
-			n.lgr.Error("leave: failed to notify successor", logger.F("err", err))
-			// non ritorno subito → provo comunque a trasferire i dati
+		if err := client.Leave(ctx, cli, self); err != nil {
+			n.lgr.Error("leave: failed to notify successor", logger.F("successor", succ.Addr), logger.F("err", err))
+			// Continue anyway with resource transfer
 		}
+		cancel()
 	}
 
 	// 2. Trasferimento risorse al successore
 	data := n.s.All()
 	if len(data) > 0 {
 		ctx, cancel := context.WithTimeout(context.Background(), n.cp.FailureTimeout())
-		defer cancel()
-		if err := n.cp.StoreRemote(ctx, data, succ.Addr); err != nil {
+		if err := client.StoreRemote(ctx, cli, data); err != nil {
+			cancel()
 			return fmt.Errorf("leave: failed to transfer %d resources to successor %s: %w", len(data), succ.Addr, err)
 		}
+		cancel()
+		n.lgr.Info("leave: transferred resources to successor", logger.F("count", len(data)), logger.FNode("successor", succ))
 	}
 
 	n.lgr.Info("leave: node has gracefully left the DHT", logger.FNode("self", self))

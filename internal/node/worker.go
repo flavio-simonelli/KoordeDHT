@@ -1,6 +1,7 @@
 package node
 
 import (
+	"KoordeDHT/internal/client"
 	"KoordeDHT/internal/domain"
 	"KoordeDHT/internal/logger"
 	"context"
@@ -8,24 +9,42 @@ import (
 )
 
 // StartStabilizers runs periodic maintenance tasks for Koorde.
-func (n *Node) StartStabilizers(ctx context.Context, interval time.Duration) {
+// It launches two independent loops:
+//   - Chord-style stabilizers (successor/predecessor management) at chordInterval
+//   - De Bruijn pointer maintenance at deBruijnInterval
+//
+// Both loops stop when ctx is canceled.
+func (n *Node) StartStabilizers(ctx context.Context, chordInterval, deBruijnInterval time.Duration) {
+	// Chord-style stabilizers
 	go func() {
-		ticker := time.NewTicker(interval)
+		ticker := time.NewTicker(chordInterval)
 		defer ticker.Stop()
 
 		for {
 			select {
 			case <-ctx.Done():
-				n.lgr.Info("stabilizer stopped")
+				n.lgr.Info("chord stabilizers stopped")
 				return
 			case <-ticker.C:
-				n.stabilizeSuccessor() // keep successor pointer consistent
-				n.fixSuccessorList()   // refresh successor list
-				n.checkPredecessor()   // remove dead predecessor if needed
-				n.fixDeBruijn()        // maintain de Bruijn pointer
-				n.printRoutingTable()
-				n.printClientPoolStats()
-				n.printStorageStats()
+				n.stabilizeSuccessor()
+				n.fixSuccessorList()
+				n.checkPredecessor()
+			}
+		}
+	}()
+
+	// De Bruijn stabilizer
+	go func() {
+		ticker := time.NewTicker(deBruijnInterval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				n.lgr.Info("de Bruijn stabilizer stopped")
+				return
+			case <-ticker.C:
+				n.fixDeBruijn()
 			}
 		}
 	}()
@@ -45,81 +64,93 @@ func (n *Node) printRoutingTable() {
 	n.rt.DebugLog()
 }
 
-// stabilizeSuccessor checks whether our successor is still valid
-// and updates it if its predecessor is a better candidate.
+// stabilizeSuccessor verifies that the current successor is alive and valid.
+// If the successor is unresponsive, it tries to promote another candidate
+// from the successor list. If no candidates are found, the node reverts to
+// single-node mode. If the successor's predecessor is a better fit, the
+// routing table is updated accordingly.
+//
+// The procedure is:
+//  1. Query the current successor for its predecessor.
+//  2. If the successor is unreachable, attempt to promote a candidate
+//     from the successor list. If none is available, reset to single-node mode.
+//  3. If the successor’s predecessor is closer, adopt it as the new successor.
+//  4. Notify the successor that we may be its predecessor.
 func (n *Node) stabilizeSuccessor() {
 	self := n.rt.Self()
 	succ := n.rt.FirstSuccessor()
 	if succ == nil {
-		n.lgr.Error("IMPOSSIBLE -> stabilize: successor nil")
+		n.lgr.Error("stabilize: successor is nil (invalid state)")
 		return
 	}
-	// Ask successor for its predecessor
-	ctx, cancel := context.WithTimeout(context.Background(), n.cp.FailureTimeout())
-	defer cancel()
-	pred, err := n.cp.GetPredecessor(ctx, succ.Addr)
-	if err != nil {
-		n.lgr.Warn("stabilize: could not contact successor",
-			logger.FNode("succ", succ),
-			logger.F("err", err))
-		// Promote next available successor from the list
+
+	// Step 1: ask successor for its predecessor
+	var pred *domain.Node
+	{
+		ctx, cancel := context.WithTimeout(context.Background(), n.cp.FailureTimeout())
+		defer cancel()
+		if succ.ID.Equal(self.ID) {
+			pred = n.rt.GetPredecessor()
+		} else {
+			cli, err := n.cp.GetFromPool(succ.Addr)
+			if err != nil {
+				n.lgr.Warn("stabilize: failed to get client for successor",
+					logger.FNode("succ", succ),
+					logger.F("err", err))
+				return
+			}
+			pred, err = client.GetPredecessor(ctx, cli, n.rt.Space())
+			if err != nil {
+				n.lgr.Warn("stabilize: could not get predecessor from successor",
+					logger.FNode("succ", succ),
+					logger.F("err", err))
+			}
+		}
+	}
+
+	// Step 2: if unreachable, promote candidate from successor list
+	if pred == nil {
+		n.lgr.Warn("stabilize: successor unresponsive, attempting promotion",
+			logger.FNode("old_successor", succ))
+
 		promoted := false
-		for i := 1; i < n.rt.SuccListSize(); i++ {
+		for i := 1; i < n.Space().SuccListSize; i++ {
 			candidate := n.rt.GetSuccessor(i)
 			if candidate == nil {
 				continue
 			}
-			n.lgr.Debug("stabilize: promoting new successor",
-				logger.FNode("old", succ),
-				logger.FNode("new", candidate))
-
 			n.rt.PromoteCandidate(i)
-
 			if err := n.cp.Release(succ.Addr); err != nil {
 				n.lgr.Warn("stabilize: failed to release old successor",
 					logger.FNode("old", succ), logger.F("err", err))
 			}
-
 			succ = candidate
 			promoted = true
 			break
 		}
 		if !promoted {
-			// no candidate found
-			// Release predecessor
+			// No candidates found, reset to single-node mode
+			n.lgr.Warn("stabilize: no candidates found, reverting to single-node mode")
 			if pred := n.rt.GetPredecessor(); pred != nil {
-				if err := n.cp.Release(pred.Addr); err != nil {
-					n.lgr.Warn("stabilize: failed to release predecessor",
-						logger.FNode("pred", pred), logger.F("err", err))
-				}
+				_ = n.cp.Release(pred.Addr)
 			}
-			// Release successor list
 			for _, nd := range n.rt.SuccessorList() {
 				if nd != nil {
-					if err := n.cp.Release(nd.Addr); err != nil {
-						n.lgr.Warn("stabilize: failed to release successor",
-							logger.FNode("succ", nd), logger.F("err", err))
-					}
+					_ = n.cp.Release(nd.Addr)
 				}
 			}
-			// Release de Bruijn list
 			for _, nd := range n.rt.DeBruijnList() {
 				if nd != nil {
-					if err := n.cp.Release(nd.Addr); err != nil {
-						n.lgr.Warn("stabilize: failed to release deBruijn entry",
-							logger.FNode("node", nd), logger.F("err", err))
-					}
+					_ = n.cp.Release(nd.Addr)
 				}
 			}
 			n.rt.InitSingleNode()
 			return
 		}
 	}
-	// If successor’s predecessor is closer, promote it
+
+	// Step 3: if predecessor is closer, adopt it as new successor
 	if pred != nil && pred.ID.Between(self.ID, succ.ID) && !pred.ID.Equal(self.ID) {
-		n.lgr.Debug("stabilize: successor updated",
-			logger.FNode("old_successor", succ),
-			logger.FNode("new_successor", pred))
 		// AddRef new successor
 		if err := n.cp.AddRef(pred.Addr); err != nil {
 			n.lgr.Warn("stabilize: failed to add new successor to pool",
@@ -134,36 +165,66 @@ func (n *Node) stabilizeSuccessor() {
 		}
 		succ = pred
 	}
-	// Notify successor that we might be its predecessor
-	ctx, cancel = context.WithTimeout(context.Background(), n.cp.FailureTimeout())
-	defer cancel()
-	if err := n.cp.Notify(ctx, self, succ.Addr); err != nil {
-		n.lgr.Warn("stabilize: notify failed",
-			logger.FNode("succ", succ), logger.F("err", err))
+
+	// Step 4: notify successor
+	{
+		ctx, cancel := context.WithTimeout(context.Background(), n.cp.FailureTimeout())
+		defer cancel()
+
+		cli, err := n.cp.GetFromPool(succ.Addr)
+		if err != nil {
+			n.lgr.Error("stabilize: client for successor not found in pool",
+				logger.FNode("succ", succ), logger.F("err", err))
+			return
+		}
+
+		if err := client.Notify(ctx, cli, self); err != nil {
+			n.lgr.Warn("stabilize: notify RPC failed",
+				logger.FNode("succ", succ), logger.F("err", err))
+		}
 	}
 }
 
-// fixSuccessorList refreshes the local successor list by asking
-// the first successor for its list. It ensures reference counting
-// by AddRef() on the new list before setting it, and Release() on
-// the old list afterwards.
+// fixSuccessorList refreshes the local successor list by contacting
+// the first successor. It maintains reference counts by AddRef() for
+// new entries before installing them, and Release() for nodes that
+// are no longer part of the list.
+//
+// The procedure is:
+//  1. Fetch the successor list from the first successor.
+//  2. Merge it into a new list of fixed size, always starting with self’s successor.
+//  3. Update the routing table.
+//  4. Adjust client pool references.
 func (n *Node) fixSuccessorList() {
 	succ := n.rt.FirstSuccessor()
 	if succ == nil {
 		n.lgr.Error("fixSuccessorList: no successor set")
 		return
 	}
-	// Ask successor for its successor list
-	ctx, cancel := context.WithTimeout(context.Background(), n.cp.FailureTimeout())
-	defer cancel()
-	remoteList, err := n.cp.GetSuccessorList(ctx, succ.Addr)
-	if err != nil {
-		n.lgr.Warn("fixSuccessorList: could not fetch successor list",
-			logger.FNode("succ", succ),
-			logger.F("err", err))
-		return
+
+	// Step 1: fetch successor list from first successor
+	var remoteList []*domain.Node
+	{
+		ctx, cancel := context.WithTimeout(context.Background(), n.cp.FailureTimeout())
+		cli, err := n.cp.GetFromPool(succ.Addr)
+		if err != nil {
+			n.lgr.Error("fixSuccessorList: failed to get from pool",
+				logger.FNode("succ", succ),
+				logger.F("err", err))
+			cancel()
+			return
+		}
+		remoteList, err = client.GetSuccessorList(ctx, cli, n.rt.Space())
+		cancel()
+		if err != nil {
+			n.lgr.Warn("fixSuccessorList: could not get successor list",
+				logger.FNode("succ", succ),
+				logger.F("err", err))
+			return
+		}
 	}
-	// Old list snapshot (for later release)
+
+	// Step 2: snapshot current list (for later release)
 	oldList := n.rt.SuccessorList()
 	oldSet := make(map[string]*domain.Node, len(oldList))
 	for _, nd := range oldList {
@@ -171,8 +232,9 @@ func (n *Node) fixSuccessorList() {
 			oldSet[nd.Addr] = nd
 		}
 	}
-	// Build new list
-	size := n.rt.SuccListSize()
+
+	// Step 3: build new list (fixed size, first entry is successor)
+	size := n.Space().SuccListSize
 	newList := make([]*domain.Node, size)
 	newList[0] = succ
 	for i := 1; i < size; i++ {
@@ -182,13 +244,16 @@ func (n *Node) fixSuccessorList() {
 			}
 		}
 	}
+
+	// Step 4: compute new set for reference management
 	newSet := make(map[string]*domain.Node, len(newList))
 	for _, nd := range newList {
 		if nd != nil {
 			newSet[nd.Addr] = nd
 		}
 	}
-	// addRef sui nuovi nodi
+
+	// addRef new nodes
 	for addr, nd := range newSet {
 		if _, ok := oldSet[addr]; !ok {
 			if err := n.cp.AddRef(addr); err != nil {
@@ -201,7 +266,7 @@ func (n *Node) fixSuccessorList() {
 	// Replace in routing table
 	n.rt.SetSuccessorList(newList)
 
-	// Release sui nodi rimossi
+	// Release removed nodes
 	for addr, nd := range oldSet {
 		if _, ok := newSet[addr]; !ok {
 			if err := n.cp.Release(addr); err != nil {
@@ -212,60 +277,110 @@ func (n *Node) fixSuccessorList() {
 	}
 }
 
-// checkPredecessor verifies whether our predecessor is still alive.
-// If it does not respond, we drop it.
+// checkPredecessor verifies whether the current predecessor is still alive.
+// The method proceeds as follows:
+//   - If no predecessor is set or the predecessor is self, it returns immediately.
+//   - Otherwise, it tries to obtain a gRPC client for the predecessor from the pool.
+//   - If the client cannot be retrieved or a Ping RPC fails, the predecessor is
+//     considered dead: it is released from the pool and cleared in the routing table.
+//
+// Note: a failed notification or release does not stop the cleanup process;
+// the predecessor pointer is always cleared in case of failure.
 func (n *Node) checkPredecessor() {
 	pred := n.rt.GetPredecessor()
 	if pred == nil || pred.ID.Equal(n.rt.Self().ID) {
 		return
 	}
-	// Try a lightweight ping
+
+	// Acquire client connection from pool
+	cli, err := n.cp.GetFromPool(pred.Addr)
+	if err != nil {
+		n.lgr.Warn("checkPredecessor: failed to get client for predecessor",
+			logger.FNode("pred", pred),
+			logger.F("err", err))
+		// Without a client, assume predecessor is dead
+		n.rt.SetPredecessor(nil)
+		return
+	}
+
+	// Attempt a lightweight ping
 	ctx, cancel := context.WithTimeout(context.Background(), n.cp.FailureTimeout())
 	defer cancel()
-	if err := n.cp.Ping(ctx, pred.Addr); err != nil {
+	if err := client.Ping(ctx, cli); err != nil {
 		n.lgr.Warn("checkPredecessor: predecessor unresponsive, clearing",
 			logger.FNode("pred", pred),
 			logger.F("err", err))
-		// Release from client pool
+
+		// Release client from pool
 		if err := n.cp.Release(pred.Addr); err != nil {
 			n.lgr.Warn("checkPredecessor: failed to release predecessor from pool",
 				logger.FNode("pred", pred),
 				logger.F("err", err))
 		}
-		// Clear predecessor
+
+		// Clear predecessor reference
 		n.rt.SetPredecessor(nil)
 	}
 }
 
-// fixDeBruijn refreshes the de Bruijn window.
-// It finds the anchor (predecessor of k*m mod 2^b), updates digit 0,
-// then fills the remaining digits using the anchor's successor list.
+// fixDeBruijn refreshes the de Bruijn window for this node.
+// The procedure is:
+//  1. Compute the anchor as the predecessor of (k * self.ID) mod 2^b.
+//  2. Set digit 0 of the de Bruijn window to the anchor.
+//  3. Fill the remaining digits with entries from the anchor’s successor list.
+//  4. Update the local routing table and adjust client pool references.
 func (n *Node) fixDeBruijn() {
 	self := n.rt.Self()
-	// Compute target = (k * self.ID) mod 2^b
-	target := n.rt.Space().MulKMod(self.ID)
-	n.lgr.Debug("fixDeBruijn: checking target", logger.F("target", target.String()))
+	// Step 1: compute target = (k * self.ID) mod 2^b
+	target, err := n.rt.Space().MulKMod(self.ID)
+	if err != nil {
+		n.lgr.Error("fixDeBruijn: failed to compute target", logger.F("err", err))
+		return
+	}
+
 	// Lookup successor of target
 	ctx, cancel := context.WithTimeout(context.Background(), n.cp.FailureTimeout())
-	defer cancel()
 	succ, err := n.FindSuccessorInit(ctx, target)
+	cancel()
 	if err != nil || succ == nil {
 		n.lgr.Warn("fixDeBruijn: could not find successor",
-			logger.F("target", target.String()),
+			logger.F("target", target.ToHexString(true)),
 			logger.F("err", err))
 		return
 	}
-	// Get predecessor of that successor (anchor)
-	ctx, cancel = context.WithTimeout(context.Background(), n.cp.FailureTimeout())
-	defer cancel()
-	anchor, err := n.cp.GetPredecessor(ctx, succ.Addr)
-	if err != nil || anchor == nil {
-		n.lgr.Warn("fixDeBruijn: could not get anchor predecessor",
-			logger.FNode("succ", succ),
-			logger.F("err", err))
-		return
+
+	// Step 2: get anchor (predecessor of succ)
+	var anchor *domain.Node
+	{
+		ctx, cancel := context.WithTimeout(context.Background(), n.cp.FailureTimeout())
+		cli, err := n.cp.GetFromPool(succ.Addr)
+		if err != nil {
+			ephCli, conn, err := n.cp.DialEphemeral(succ.Addr)
+			if err != nil {
+				n.lgr.Warn("fixDeBruijn: could not dial anchor successor",
+					logger.FNode("succ", succ),
+					logger.F("err", err))
+				cancel()
+				return
+			}
+			cli = ephCli
+			defer conn.Close()
+		}
+		anchor, err = client.GetPredecessor(ctx, cli, n.rt.Space())
+		cancel()
+		if err != nil {
+			n.lgr.Warn("fixDeBruijn: could not get the anchor",
+				logger.FNode("succ", succ),
+				logger.F("err", err))
+			return
+		}
+		if anchor == nil {
+			n.lgr.Warn("fixDeBruijn: anchor is nil", logger.FNode("succ", succ))
+			return
+		}
 	}
-	// Snapshot finestra attuale (oldSet)
+
+	// Snapshot current window
 	oldList := n.rt.DeBruijnList()
 	oldSet := make(map[string]*domain.Node)
 	for _, node := range oldList {
@@ -273,29 +388,49 @@ func (n *Node) fixDeBruijn() {
 			oldSet[node.Addr] = node
 		}
 	}
-	// Costruisci nuova finestra (newNodes + newSet)
+
+	// Step 3: build new window (digit 0 = anchor, others from anchor’s successor list)
 	newNodes := make([]*domain.Node, n.rt.Space().GraphGrade)
 	newNodes[0] = anchor
-	ctx, cancel = context.WithTimeout(context.Background(), n.cp.FailureTimeout())
-	defer cancel()
-	list, err := n.cp.GetSuccessorList(ctx, anchor.Addr)
-	if err != nil {
-		n.lgr.Warn("fixDeBruijn: could not fetch successor list from anchor",
-			logger.FNode("anchor", anchor), logger.F("err", err))
-		return
-	}
-	for i := 1; i < n.rt.Space().GraphGrade; i++ {
-		if i-1 < len(list) {
-			newNodes[i] = list[i-1]
+
+	var succList []*domain.Node
+	{
+		ctx, cancel := context.WithTimeout(context.Background(), n.cp.FailureTimeout())
+		cli, err := n.cp.GetFromPool(anchor.Addr)
+		if err != nil {
+			ephCli, conn, err := n.cp.DialEphemeral(anchor.Addr)
+			if err != nil {
+				n.lgr.Warn("fixDeBruijn: could not dial anchor",
+					logger.FNode("anchor", anchor), logger.F("err", err))
+				cancel()
+				return
+			}
+			cli = ephCli
+			defer conn.Close()
+		}
+		succList, err = client.GetSuccessorList(ctx, cli, n.rt.Space())
+		cancel()
+		if err != nil {
+			n.lgr.Warn("fixDeBruijn: could not get successor list from anchor",
+				logger.FNode("anchor", anchor), logger.F("err", err))
+			return
 		}
 	}
+	for i := 1; i < n.rt.Space().GraphGrade; i++ {
+		if i-1 < len(succList) {
+			newNodes[i] = succList[i-1]
+		}
+	}
+
+	// Build set of new nodes
 	newSet := make(map[string]*domain.Node)
 	for _, node := range newNodes {
 		if node != nil {
 			newSet[node.Addr] = node
 		}
 	}
-	// AddRef nodi nuovi
+
+	// Step 4: update client pool references
 	for addr, cand := range newSet {
 		if _, ok := oldSet[addr]; !ok {
 			if err := n.cp.AddRef(addr); err != nil {
@@ -304,9 +439,7 @@ func (n *Node) fixDeBruijn() {
 			}
 		}
 	}
-	// aggiorna la finestra
 	n.rt.SetDeBruijnList(newNodes)
-	// Release nodi rimossi
 	for addr, old := range oldSet {
 		if _, ok := newSet[addr]; !ok {
 			if err := n.cp.Release(addr); err != nil {
@@ -315,6 +448,7 @@ func (n *Node) fixDeBruijn() {
 			}
 		}
 	}
+
 	n.lgr.Debug("fixDeBruijn: updated de Bruijn window",
 		logger.F("degree", n.rt.Space().GraphGrade))
 }

@@ -1,6 +1,7 @@
 package node
 
 import (
+	"KoordeDHT/internal/client"
 	"KoordeDHT/internal/ctxutil"
 	"KoordeDHT/internal/domain"
 	"KoordeDHT/internal/logger"
@@ -23,22 +24,42 @@ func (n *Node) Space() *domain.Space {
 	return n.rt.Space()
 }
 
-// findNextHop restituisce l'indice del nodo predecessore più vicino a currentI
-// nella lista fornita (che rappresenta una sequenza ordinata di nodi).
-// - Usa la funzione ID.Between per il confronto
-// - Se trova nil nella lista lo salta e logga un warning
-// - Se non trova alcun intervallo valido ritorna l'ultimo indice valido
+// findNextHop scans a circular, ordered list of nodes and determines
+// the index of the node whose identifier immediately precedes currentI.
+//
+// Nil entries are skipped: if either endpoint of an interval is nil,
+// the function advances to the next non-nil entry before comparing.
+// Each skipped nil entry triggers a warning log.
+//
+// Returns the index of the predecessor node, or -1 if no valid interval is found.
 func (n *Node) findNextHop(list []*domain.Node, currentI domain.ID) int {
-	for i := range list {
-		curr, next := list[i], list[(i+1)%len(list)]
-		if curr == nil || next == nil {
-			n.lgr.Error("findNextHop: nil node in list", logger.F("index", i))
+	if len(list) == 0 {
+		return -1
+	}
+
+	for i := 0; i < len(list); i++ {
+		curr := list[i]
+		if curr == nil {
+			n.lgr.Warn("findNextHop: nil node in list", logger.F("index", i))
 			continue
 		}
+
+		// find next non-nil
+		j := (i + 1) % len(list)
+		for list[j] == nil && j != i {
+			n.lgr.Warn("findNextHop: skipping nil node in list", logger.F("index", j))
+			j = (j + 1) % len(list)
+		}
+		if j == i { // all nil except curr
+			break
+		}
+
+		next := list[j]
 		if currentI.Between(curr.ID, next.ID) {
 			return i
 		}
 	}
+
 	return -1
 }
 
@@ -46,11 +67,13 @@ func (n *Node) findNextHop(list []*domain.Node, currentI domain.ID) int {
 // ovvero senza currentI e kshift
 // in questo caso la funzione deve iniziare la ricerca del successore partendo dal nodo corrente
 // e seguendo la logica del protocollo Koorde
+// è la funzione che faccio partire in qualsisasi caso in cui voglio avviare una lookup da me stesso
 func (n *Node) FindSuccessorInit(ctx context.Context, target domain.ID) (*domain.Node, error) {
 	// check for canceled/expired context
 	if err := ctxutil.CheckContext(ctx); err != nil {
 		return nil, err
 	}
+
 	self := n.rt.Self()
 	// check if the target is in (self, successor]
 	succ := n.rt.FirstSuccessor()
@@ -65,10 +88,26 @@ func (n *Node) FindSuccessorInit(ctx context.Context, target domain.ID) (*domain
 	// start de Bruijn routing
 	Bruijn := n.rt.DeBruijnList()
 	if Bruijn != nil && len(Bruijn) > 0 {
-		// calculate I and kshift
-		digit, kshift := n.rt.Space().NextDigitBaseK(target)
-		currentI := n.rt.Space().MulKMod(self.ID)
-		currentI = n.rt.Space().AddMod(currentI, n.rt.Space().FromUint64(digit))
+		// calculate digit and kshift
+		digit, kshift, err := n.rt.Space().NextDigitBaseK(target)
+		if err != nil {
+			n.lgr.Error("FindSuccessorInit: failed to compute next digit and kshift",
+				logger.F("target", target), logger.F("err", err))
+			return nil, status.Error(codes.Internal, "failed to compute next digit and kshift")
+		}
+		// compute currentI = k * ID + digit
+		currentI, err := n.rt.Space().MulKMod(self.ID)
+		if err != nil {
+			n.lgr.Error("FindSuccessorInit: failed to compute currentI during MulKMod",
+				logger.F("target", target), logger.F("err", err))
+			return nil, status.Error(codes.Internal, "failed to compute currentI")
+		}
+		currentI, err = n.rt.Space().AddMod(currentI, n.rt.Space().FromUint64(digit))
+		if err != nil {
+			n.lgr.Error("FindSuccessorInit: failed to compute currentI during AddMod",
+				logger.F("target", target), logger.F("err", err))
+			return nil, status.Error(codes.Internal, "failed to compute currentI")
+		}
 		// find the closest preceding node to currentI
 		index := n.findNextHop(Bruijn, currentI)
 		for i := index; i >= 0; i-- {
@@ -83,7 +122,13 @@ func (n *Node) FindSuccessorInit(ctx context.Context, target domain.ID) (*domain
 			if d.ID.Equal(self.ID) {
 				res, err = n.FindSuccessorStep(ctx, target, currentI, kshift)
 			} else {
-				res, err = n.cp.FindSuccessorStep(ctx, target, currentI, kshift, d.Addr)
+				cli, err := n.cp.GetFromPool(d.Addr)
+				if err != nil {
+					n.lgr.Warn("FindSuccessorInit: failed to get connection from pool",
+						logger.F("tryIdx", i), logger.F("addr", d.Addr), logger.F("err", err))
+					continue
+				}
+				res, err = client.FindSuccessorStep(ctx, cli, n.Space(), target, currentI, kshift)
 			}
 			if err == nil && res != nil {
 				return res, nil
@@ -103,7 +148,13 @@ func (n *Node) FindSuccessorInit(ctx context.Context, target domain.ID) (*domain
 	// if all the nodes in the de Bruijn list not response, fallback to successor
 	n.lgr.Warn("FindSuccessorInit: no de Bruijn responded or present, falling back to successor",
 		logger.F("target", target), logger.FNode("successor", succ))
-	return n.cp.FindSuccessorStart(ctx, target, succ.Addr)
+	cli, err := n.cp.GetFromPool(succ.Addr)
+	if err != nil {
+		n.lgr.Error("FindSuccessorInit: failed to get connection from pool for successor",
+			logger.F("addr", succ.Addr), logger.F("err", err))
+		return nil, status.Error(codes.Internal, "failed to get connection to successor")
+	}
+	return client.FindSuccessorStart(ctx, cli, n.Space(), target)
 }
 
 // FindSuccessorStep questa funzione è quella che viene chiamata dal server se riceve una richiesta di FindSuccessor in modalità STEP
@@ -132,9 +183,24 @@ func (n *Node) FindSuccessorStep(ctx context.Context, target, currentI, kshift d
 		// extract the de Bruijn link
 		Bruijn := n.rt.DeBruijnList()
 		if Bruijn != nil && len(Bruijn) > 0 {
-			nextDigit, nextKshift := n.rt.Space().NextDigitBaseK(kshift)
-			nextI := n.rt.Space().MulKMod(currentI)
-			nextI = n.rt.Space().AddMod(nextI, n.rt.Space().FromUint64(nextDigit))
+			nextDigit, nextKshift, err := n.rt.Space().NextDigitBaseK(kshift)
+			if err != nil {
+				n.lgr.Error("FindSuccessorStep: failed to compute next digit and kshift",
+					logger.F("target", target), logger.F("err", err))
+				return nil, status.Error(codes.Internal, "failed to compute next digit and kshift")
+			}
+			nextI, err := n.rt.Space().MulKMod(currentI)
+			if err != nil {
+				n.lgr.Error("FindSuccessorStep: failed to compute nextI during MulKMod",
+					logger.F("target", target), logger.F("err", err))
+				return nil, status.Error(codes.Internal, "failed to compute nextI")
+			}
+			nextI, err = n.rt.Space().AddMod(nextI, n.rt.Space().FromUint64(nextDigit))
+			if err != nil {
+				n.lgr.Error("FindSuccessorStep: failed to compute nextI during AddMod",
+					logger.F("target", target), logger.F("err", err))
+				return nil, status.Error(codes.Internal, "failed to compute nextI")
+			}
 			// find the closest preceding node to currentI
 			index := n.findNextHop(Bruijn, nextI)
 			for i := index; i >= 0; i-- {
@@ -149,7 +215,13 @@ func (n *Node) FindSuccessorStep(ctx context.Context, target, currentI, kshift d
 				if d.ID.Equal(self.ID) {
 					res, err = n.FindSuccessorStep(ctx, target, nextI, nextKshift)
 				} else {
-					res, err = n.cp.FindSuccessorStep(ctx, target, nextI, nextKshift, d.Addr)
+					cli, err := n.cp.GetFromPool(d.Addr)
+					if err != nil {
+						n.lgr.Warn("FindSuccessorStep: failed to get connection from pool",
+							logger.F("tryIdx", i), logger.F("addr", d.Addr), logger.F("err", err))
+						continue
+					}
+					res, err = client.FindSuccessorStep(ctx, cli, n.Space(), target, nextI, nextKshift)
 				}
 				if err == nil && res != nil {
 					return res, nil
@@ -169,12 +241,24 @@ func (n *Node) FindSuccessorStep(ctx context.Context, target, currentI, kshift d
 		// if all the nodes in the de Bruijn list not response, fallback to successor
 		n.lgr.Warn("FindSuccessorStep: no de Bruijn responded or present, falling back to successor",
 			logger.F("target", target), logger.FNode("nextHop", succ))
-		return n.cp.FindSuccessorStart(ctx, target, succ.Addr)
+		cli, err := n.cp.GetFromPool(succ.Addr)
+		if err != nil {
+			n.lgr.Error("FindSuccessorStep: failed to get connection from pool for successor",
+				logger.F("addr", succ.Addr), logger.F("err", err))
+			return nil, status.Error(codes.Internal, "failed to get connection to successor")
+		}
+		return client.FindSuccessorStart(ctx, cli, n.Space(), target)
 	}
 	// next hop is successor
 	n.lgr.Info("FindSuccessorStep: forwarding to successor",
 		logger.F("target", target), logger.FNode("nextHop", succ))
-	return n.cp.FindSuccessorStep(ctx, target, currentI, kshift, succ.Addr)
+	cli, err := n.cp.GetFromPool(succ.Addr)
+	if err != nil {
+		n.lgr.Error("FindSuccessorStep: failed to get connection from pool for successor",
+			logger.F("addr", succ.Addr), logger.F("err", err))
+		return nil, status.Error(codes.Internal, "failed to get connection to successor")
+	}
+	return client.FindSuccessorStep(ctx, cli, n.Space(), target, currentI, kshift)
 }
 
 // Self returns the node information of this node.
@@ -239,7 +323,12 @@ func (n *Node) Notify(p *domain.Node) {
 		// send to predecessor the resource for which it is now responsible
 		resources := n.s.Between(p.ID, n.rt.Self().ID)
 		ctx := context.Background()
-		err := n.cp.StoreRemote(ctx, resources, p.Addr)
+		cli, err := n.cp.GetFromPool(p.Addr)
+		if err != nil {
+			n.lgr.Warn("Notify: failed to get connection to new predecessor from pool", logger.F("node", p), logger.F("err", err))
+			return
+		}
+		err = client.StoreRemote(ctx, cli, resources)
 		if err != nil {
 			n.lgr.Warn("Notify: failed to transfer resources to new predecessor", logger.F("node", p), logger.F("err", err), logger.F("resourceCount", len(resources)))
 		}
@@ -288,7 +377,11 @@ func (n *Node) Put(ctx context.Context, key string, value string) error {
 	}
 	sres := []domain.Resource{res} // wrap in slice for StoreRemote
 	// Otherwise, forward the resource to the successor
-	if err := n.cp.StoreRemote(ctx, sres, succ.Addr); err != nil {
+	cli, err := n.cp.GetFromPool(succ.Addr)
+	if err != nil {
+		return fmt.Errorf("put: failed to get connection to successor %s: %w", succ.Addr, err)
+	}
+	if err := client.StoreRemote(ctx, cli, sres); err != nil {
 		return fmt.Errorf("put: failed to store resource at successor %s: %w", succ.Addr, err)
 	}
 	// Log success
@@ -329,7 +422,11 @@ func (n *Node) Get(ctx context.Context, key string) (*domain.Resource, error) {
 		return &res, nil
 	}
 	// Otherwise, forward the request to the successor
-	res, err := n.cp.RetrieveRemote(ctx, id, succ.Addr)
+	cli, err := n.cp.GetFromPool(succ.Addr)
+	if err != nil {
+		return nil, fmt.Errorf("get: failed to get connection to successor %s: %w", succ.Addr, err)
+	}
+	res, err := client.RetrieveRemote(ctx, cli, n.Space(), id)
 	if err != nil {
 		return nil, fmt.Errorf("get: failed to retrieve resource from successor %s: %w", succ.Addr, err)
 	}
@@ -342,17 +439,16 @@ func (n *Node) Get(ctx context.Context, key string) (*domain.Resource, error) {
 // successor node.
 //
 // Returns NotFound if the resource does not exist.
-func (n *Node) Delete(ctx context.Context, key string) error {
+func (n *Node) Delete(ctx context.Context, id domain.ID) error {
 	if err := ctxutil.CheckContext(ctx); err != nil {
 		return err
 	}
-	id := n.rt.Space().NewIdFromString(key)
 	succ, err := n.FindSuccessorInit(ctx, id)
 	if err != nil {
-		return fmt.Errorf("delete: failed to find successor for key %s: %w", key, err)
+		return fmt.Errorf("delete: failed to find successor for key %s: %w", id.ToHexString(true), err)
 	}
 	if succ == nil {
-		return fmt.Errorf("delete: no successor found for key %s", key)
+		return fmt.Errorf("delete: no successor found for key %s", id.ToHexString(true))
 	}
 	// If this node is the successor, delete locally
 	if succ.ID.Equal(n.rt.Self().ID) {
@@ -365,7 +461,11 @@ func (n *Node) Delete(ctx context.Context, key string) error {
 		return nil
 	}
 	// Otherwise, forward the request to the successor
-	if err := n.cp.RemoveRemote(ctx, id, succ.Addr); err != nil {
+	cli, err := n.cp.GetFromPool(succ.Addr)
+	if err != nil {
+		return fmt.Errorf("delete: failed to get connection to successor %s: %w", succ.Addr, err)
+	}
+	if err := client.RemoveRemote(ctx, cli, id); err != nil {
 		return fmt.Errorf("delete: failed to remove resource at successor %s: %w", succ.Addr, err)
 	}
 	return nil
@@ -402,17 +502,16 @@ func (n *Node) GetAllResourceStored() []domain.Resource {
 	return n.s.All()
 }
 
-func (n *Node) LookUp(ctx context.Context, key string) (*domain.Node, error) {
+func (n *Node) LookUp(ctx context.Context, id domain.ID) (*domain.Node, error) {
 	if err := ctxutil.CheckContext(ctx); err != nil {
 		return nil, err
 	}
-	id := n.rt.Space().NewIdFromString(key)
 	succ, err := n.FindSuccessorInit(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("get: failed to find successor for key %s: %w", key, err)
+		return nil, fmt.Errorf("get: failed to find successor for key %s: %w", id.ToHexString(true), err)
 	}
 	if succ == nil {
-		return nil, fmt.Errorf("get: no successor found for key %s", key)
+		return nil, fmt.Errorf("get: no successor found for key %s", id.ToHexString(true))
 	}
 	return succ, nil
 }
