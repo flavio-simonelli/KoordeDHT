@@ -3,22 +3,23 @@ package bootstrap
 import (
 	"KoordeDHT/internal/config"
 	"fmt"
-	"math/rand"
 	"net"
 	"strings"
 )
 
-// ResolveBootstrap restituisce una lista di indirizzi "host:porta" dai bootstrap config.
+// ResolveBootstrap resolves bootstrap peers into a list of "host:port" addresses.
+//
+// Rules:
+//   - mode=static → returns the configured peers.
+//   - mode=dns    → resolves peers via DNS (SRV or A/AAAA).
+//   - if resolution returns an empty list, it's not an error: it means
+//     the current node may start a new DHT as the first node.
 func ResolveBootstrap(cfg config.BootstrapConfig) ([]string, error) {
 	switch cfg.Mode {
-	case "init":
-		// Primo nodo: nessun peer, ma non è un errore
-		return nil, nil
 	case "static":
 		return cfg.Peers, nil
 	case "dns":
 		if cfg.SRV {
-			// Lookup SRV record: es. _koorde._tcp.bootstrap.koorde.local
 			_, addrs, err := net.LookupSRV("koorde", "tcp", cfg.DNSName)
 			if err != nil {
 				return nil, fmt.Errorf("SRV lookup failed: %w", err)
@@ -30,7 +31,6 @@ func ResolveBootstrap(cfg config.BootstrapConfig) ([]string, error) {
 			}
 			return out, nil
 		}
-		// Lookup A/AAAA record: es. bootstrap.koorde.local → IP
 		hosts, err := net.LookupHost(cfg.DNSName)
 		if err != nil {
 			return nil, fmt.Errorf("A/AAAA lookup failed: %w", err)
@@ -44,14 +44,4 @@ func ResolveBootstrap(cfg config.BootstrapConfig) ([]string, error) {
 	default:
 		return nil, fmt.Errorf("unsupported bootstrap mode: %s", cfg.Mode)
 	}
-}
-
-// PickRandom sceglie casualmente un indirizzo dalla lista.
-// Restituisce errore se la lista è vuota.
-func PickRandom(peers []string) (string, error) {
-	if len(peers) == 0 {
-		return "", fmt.Errorf("no bootstrap peers available")
-	}
-	idx := rand.Intn(len(peers))
-	return peers[idx], nil
 }
