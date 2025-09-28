@@ -7,6 +7,7 @@ import (
 	"KoordeDHT/internal/node"
 	"context"
 	"errors"
+	"io"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -151,35 +152,45 @@ func (s *dhtService) Ping(ctx context.Context, _ *emptypb.Empty) (*emptypb.Empty
 	return &emptypb.Empty{}, nil
 }
 
-// Store saves or updates a resource in the local node's storage.
-func (s *dhtService) Store(ctx context.Context, req *dhtv1.StoreRequest) (*emptypb.Empty, error) {
-	// Check for canceled/expired context
-	if err := ctxutil.CheckContext(ctx); err != nil {
-		return nil, err
+// Store handles a client-streaming request to store multiple resources.
+// The client sends a stream of StoreRequest messages, and the server replies
+// with an Empty once all resources have been processed.
+func (s *dhtService) Store(stream dhtv1.DHT_StoreServer) error {
+	for {
+		req, err := stream.Recv()
+		if err == io.EOF {
+			// client has finished sending requests
+			return stream.SendAndClose(&emptypb.Empty{})
+		}
+		if err != nil {
+			return status.Errorf(codes.Internal, "failed to receive request: %v", err)
+		}
+		// Check for canceled/expired context
+		if cerr := ctxutil.CheckContext(stream.Context()); cerr != nil {
+			return cerr
+		}
+		if req == nil || len(req.Key) == 0 {
+			return status.Error(codes.InvalidArgument, "missing key")
+		}
+		if len(req.Value) == 0 {
+			return status.Error(codes.InvalidArgument, "missing value")
+		}
+		// Validate key
+		id := domain.ID(req.Key)
+		if verr := s.node.CheckIdValidity(id); verr != nil {
+			return status.Error(codes.InvalidArgument, "invalid key")
+		}
+		// Create domain resource
+		res := domain.Resource{
+			Key:    id,
+			RawKey: req.RawKey,
+			Value:  req.Value,
+		}
+		// Call store operation
+		if serr := s.node.StoreLocal(res); serr != nil {
+			return serr
+		}
 	}
-	if req == nil || len(req.Key) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "missing key")
-	}
-	if len(req.Value) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "missing value")
-	}
-	// Validate key
-	id := domain.ID(req.Key)
-	if err := s.node.CheckIdValidity(id); err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid key")
-	}
-	// create domain resource
-	res := domain.Resource{
-		Key:    id,
-		RawKey: req.RawKey,
-		Value:  req.Value,
-	}
-	// call store operation
-	err := s.node.StoreLocal(res)
-	if err != nil {
-		return nil, err
-	}
-	return &emptypb.Empty{}, nil
 }
 
 // Retrieve fetches a resource from the local node's storage by its key.
@@ -229,5 +240,15 @@ func (s *dhtService) Remove(ctx context.Context, req *dhtv1.RemoveRequest) (*emp
 		}
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+	return &emptypb.Empty{}, nil
+}
+
+// Leave handles a request from successor node indicating that it is leaving the network.
+func (s *dhtService) Leave(ctx context.Context, _ *dhtv1.Node) (*emptypb.Empty, error) {
+	// Check for canceled/expired context
+	if err := ctxutil.CheckContext(ctx); err != nil {
+		return nil, err
+	}
+	s.node.HandleLeave()
 	return &emptypb.Empty{}, nil
 }

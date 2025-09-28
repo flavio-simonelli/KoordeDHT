@@ -30,7 +30,7 @@ func NewMemoryStorage(lgr logger.Logger) *Storage {
 // Put inserts or updates the given resource in the store.
 // The resource is indexed by its ID, serialized as a hexadecimal string.
 // Returns nil in all cases (reserved for future implementations).
-func (s *Storage) Put(resource domain.Resource) error {
+func (s *Storage) Put(resource domain.Resource) {
 	key := resource.Key.String()
 	s.mu.Lock()
 	_, existed := s.data[key]
@@ -41,7 +41,6 @@ func (s *Storage) Put(resource domain.Resource) error {
 	} else {
 		s.lgr.Debug("Put: resource inserted", logger.FResource("resource", resource))
 	}
-	return nil
 }
 
 // Get retrieves the resource with the given ID.

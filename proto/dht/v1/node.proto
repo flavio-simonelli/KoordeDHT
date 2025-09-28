@@ -95,7 +95,7 @@ service DHT {
     rpc Ping(google.protobuf.Empty) returns (google.protobuf.Empty);
 
     // Store a resource (Put). If the key already exists, overwrite it.
-    rpc Store(StoreRequest) returns (google.protobuf.Empty);
+    rpc Store(stream StoreRequest) returns (google.protobuf.Empty);
 
     // Retrieve a resource (Get).
     // Returns NotFound if the key does not exist.
@@ -105,7 +105,7 @@ service DHT {
     // Returns NotFound if the key does not exist.
     rpc Remove(RemoveRequest) returns (google.protobuf.Empty);
 
-    // Gracefully leave the DHT, notifying the successor to take over this node's keys.
+    // Gracefully leave the DHT, notifying the successor that the predecessor leave.
     // Returns InvalidArgument if the node is not the successor of this node.
-    //rpc Leave(stream StoreRequest) returns (google.protobuf.Empty);
+    rpc Leave(Node) returns (google.protobuf.Empty);
 }

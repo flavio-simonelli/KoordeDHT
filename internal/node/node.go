@@ -86,6 +86,42 @@ func (n *Node) CreateNewDHT() {
 	n.rt.InitSingleNode()
 }
 
+// Leave gracefully removes the current node from the DHT.
+// It notifies the successor and transfers all stored resources.
+func (n *Node) Leave() error {
+	self := n.rt.Self()
+	succ := n.rt.FirstSuccessor()
+
+	// Caso singolo nodo nell’anello
+	if succ == nil || succ.ID.Equal(self.ID) {
+		n.lgr.Warn("leave: single node in DHT, no need to notify others", logger.FNode("self", self))
+		return nil
+	}
+
+	// 1. Notifica al successore che sto lasciando
+	{
+		ctx, cancel := context.WithTimeout(context.Background(), n.cp.Timeout())
+		defer cancel()
+		if err := n.cp.Leave(ctx, self, succ.Addr); err != nil {
+			n.lgr.Error("leave: failed to notify successor", logger.F("err", err))
+			// non ritorno subito → provo comunque a trasferire i dati
+		}
+	}
+
+	// 2. Trasferimento risorse al successore
+	data := n.s.All()
+	if len(data) > 0 {
+		ctx, cancel := context.WithTimeout(context.Background(), n.cp.Timeout())
+		defer cancel()
+		if err := n.cp.StoreRemoteWithContext(ctx, data, succ.Addr); err != nil {
+			return fmt.Errorf("leave: failed to transfer %d resources to successor %s: %w", len(data), succ.Addr, err)
+		}
+	}
+
+	n.lgr.Info("leave: node has gracefully left the DHT", logger.FNode("self", self))
+	return nil
+}
+
 // Stop releases all resources owned by the node.
 // Should be called on shutdown.
 func (n *Node) Stop() {

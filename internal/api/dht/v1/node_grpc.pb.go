@@ -28,6 +28,7 @@ const (
 	DHT_Store_FullMethodName            = "/dht.v1.DHT/Store"
 	DHT_Retrieve_FullMethodName         = "/dht.v1.DHT/Retrieve"
 	DHT_Remove_FullMethodName           = "/dht.v1.DHT/Remove"
+	DHT_Leave_FullMethodName            = "/dht.v1.DHT/Leave"
 )
 
 // DHTClient is the client API for DHT service.
@@ -47,13 +48,16 @@ type DHTClient interface {
 	// Ping to check liveness of the node (debug).
 	Ping(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Store a resource (Put). If the key already exists, overwrite it.
-	Store(ctx context.Context, in *StoreRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	Store(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[StoreRequest, emptypb.Empty], error)
 	// Retrieve a resource (Get).
 	// Returns NotFound if the key does not exist.
 	Retrieve(ctx context.Context, in *RetrieveRequest, opts ...grpc.CallOption) (*RetrieveResponse, error)
 	// Remove a resource (Delete).
 	// Returns NotFound if the key does not exist.
 	Remove(ctx context.Context, in *RemoveRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Gracefully leave the DHT, notifying the successor that the predecessor leave.
+	// Returns InvalidArgument if the node is not the successor of this node.
+	Leave(ctx context.Context, in *Node, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type dHTClient struct {
@@ -114,15 +118,18 @@ func (c *dHTClient) Ping(ctx context.Context, in *emptypb.Empty, opts ...grpc.Ca
 	return out, nil
 }
 
-func (c *dHTClient) Store(ctx context.Context, in *StoreRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *dHTClient) Store(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[StoreRequest, emptypb.Empty], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, DHT_Store_FullMethodName, in, out, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &DHT_ServiceDesc.Streams[0], DHT_Store_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	return out, nil
+	x := &grpc.GenericClientStream[StoreRequest, emptypb.Empty]{ClientStream: stream}
+	return x, nil
 }
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type DHT_StoreClient = grpc.ClientStreamingClient[StoreRequest, emptypb.Empty]
 
 func (c *dHTClient) Retrieve(ctx context.Context, in *RetrieveRequest, opts ...grpc.CallOption) (*RetrieveResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -138,6 +145,16 @@ func (c *dHTClient) Remove(ctx context.Context, in *RemoveRequest, opts ...grpc.
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, DHT_Remove_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *dHTClient) Leave(ctx context.Context, in *Node, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, DHT_Leave_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -161,13 +178,16 @@ type DHTServer interface {
 	// Ping to check liveness of the node (debug).
 	Ping(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
 	// Store a resource (Put). If the key already exists, overwrite it.
-	Store(context.Context, *StoreRequest) (*emptypb.Empty, error)
+	Store(grpc.ClientStreamingServer[StoreRequest, emptypb.Empty]) error
 	// Retrieve a resource (Get).
 	// Returns NotFound if the key does not exist.
 	Retrieve(context.Context, *RetrieveRequest) (*RetrieveResponse, error)
 	// Remove a resource (Delete).
 	// Returns NotFound if the key does not exist.
 	Remove(context.Context, *RemoveRequest) (*emptypb.Empty, error)
+	// Gracefully leave the DHT, notifying the successor that the predecessor leave.
+	// Returns InvalidArgument if the node is not the successor of this node.
+	Leave(context.Context, *Node) (*emptypb.Empty, error)
 	mustEmbedUnimplementedDHTServer()
 }
 
@@ -193,14 +213,17 @@ func (UnimplementedDHTServer) Notify(context.Context, *Node) (*emptypb.Empty, er
 func (UnimplementedDHTServer) Ping(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Ping not implemented")
 }
-func (UnimplementedDHTServer) Store(context.Context, *StoreRequest) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Store not implemented")
+func (UnimplementedDHTServer) Store(grpc.ClientStreamingServer[StoreRequest, emptypb.Empty]) error {
+	return status.Errorf(codes.Unimplemented, "method Store not implemented")
 }
 func (UnimplementedDHTServer) Retrieve(context.Context, *RetrieveRequest) (*RetrieveResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Retrieve not implemented")
 }
 func (UnimplementedDHTServer) Remove(context.Context, *RemoveRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Remove not implemented")
+}
+func (UnimplementedDHTServer) Leave(context.Context, *Node) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Leave not implemented")
 }
 func (UnimplementedDHTServer) mustEmbedUnimplementedDHTServer() {}
 func (UnimplementedDHTServer) testEmbeddedByValue()             {}
@@ -313,23 +336,12 @@ func _DHT_Ping_Handler(srv interface{}, ctx context.Context, dec func(interface{
 	return interceptor(ctx, in, info, handler)
 }
 
-func _DHT_Store_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(StoreRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(DHTServer).Store(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: DHT_Store_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DHTServer).Store(ctx, req.(*StoreRequest))
-	}
-	return interceptor(ctx, in, info, handler)
+func _DHT_Store_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(DHTServer).Store(&grpc.GenericServerStream[StoreRequest, emptypb.Empty]{ServerStream: stream})
 }
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type DHT_StoreServer = grpc.ClientStreamingServer[StoreRequest, emptypb.Empty]
 
 func _DHT_Retrieve_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RetrieveRequest)
@@ -367,6 +379,24 @@ func _DHT_Remove_Handler(srv interface{}, ctx context.Context, dec func(interfac
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DHT_Leave_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Node)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DHTServer).Leave(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DHT_Leave_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DHTServer).Leave(ctx, req.(*Node))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // DHT_ServiceDesc is the grpc.ServiceDesc for DHT service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -395,10 +425,6 @@ var DHT_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _DHT_Ping_Handler,
 		},
 		{
-			MethodName: "Store",
-			Handler:    _DHT_Store_Handler,
-		},
-		{
 			MethodName: "Retrieve",
 			Handler:    _DHT_Retrieve_Handler,
 		},
@@ -406,7 +432,17 @@ var DHT_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "Remove",
 			Handler:    _DHT_Remove_Handler,
 		},
+		{
+			MethodName: "Leave",
+			Handler:    _DHT_Leave_Handler,
+		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "Store",
+			Handler:       _DHT_Store_Handler,
+			ClientStreams: true,
+		},
+	},
 	Metadata: "dht/v1/node.proto",
 }

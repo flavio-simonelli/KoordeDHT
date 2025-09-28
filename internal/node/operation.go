@@ -266,7 +266,7 @@ func (n *Node) Put(ctx context.Context, key string, value string) error {
 	}
 	// If this node is the successor, store locally
 	if succ.ID.Equal(n.rt.Self().ID) {
-		return n.StoreLocal(res)
+		return n.StoreLocal(ctx, res)
 	}
 	// Otherwise, forward the resource to the successor
 	if err := n.cp.StoreRemoteWithContext(ctx, res, succ.Addr); err != nil {
@@ -353,8 +353,19 @@ func (n *Node) Delete(ctx context.Context, key string) error {
 }
 
 // StoreLocal memorizza la risorsa nel nodo locale utilizzando lo storage interno. (chiamata da operazioni node -> node)
-func (n *Node) StoreLocal(resource domain.Resource) error {
-	return n.s.Put(resource)
+func (n *Node) StoreLocal(ctx context.Context, resource domain.Resource) error {
+	pred := n.rt.GetPredecessor()
+	// Se non ha predecessore -> considerati responsabile (fase bootstrap)
+	if pred == nil || resource.Key.Between(pred.ID, n.rt.Self().ID) {
+		n.s.Put(resource)
+		return nil
+	}
+	// Non sono responsabile → tenta forwarding
+	if err := n.Put(ctx, resource.RawKey, resource.Value); err != nil {
+		// qui ritorniamo errore reale, utile per capire se è problema di routing
+		return fmt.Errorf("forwarding store to successor failed: %w", err)
+	}
+	return nil
 }
 
 // RetrieveLocal ottiene la risorsa con la chiave specificata dal nodo locale utilizzando lo storage interno. (chiamata da operazioni node -> node)
@@ -385,4 +396,21 @@ func (n *Node) LookUp(ctx context.Context, key string) (*domain.Node, error) {
 		return nil, fmt.Errorf("get: no successor found for key %s", key)
 	}
 	return succ, nil
+}
+
+func (n *Node) HandleLeave(leaveNode *domain.Node) error {
+	if leaveNode == nil || !leaveNode.ID.Equal(n.rt.GetPredecessor().ID) {
+		n.lgr.Warn("HandleLeave: ignoring leave for nil or non-predecessor node")
+		return fmt.Errorf("handle leave: ignoring leave for nil or non-predecessor node")
+	}
+	// rimuovi il nodo da predecessore
+	n.rt.SetPredecessor(nil)
+	// rilascia la connessione dal pool
+	if err := n.cp.Release(leaveNode.Addr); err != nil {
+		n.lgr.Warn("HandleLeave: failed to release leaving node from pool",
+			logger.F("node", leaveNode), logger.F("err", err))
+	}
+	n.lgr.Info("HandleLeave: node removed from routing table and connection pool",
+		logger.FNode("leavingNode", leaveNode))
+	return nil
 }

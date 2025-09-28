@@ -256,27 +256,41 @@ func (p *Pool) Ping(ctx context.Context, serverAddr string) error {
 	return nil
 }
 
-// StoreRemoteWithContext sends a StoreValue RPC to the given remote node to store
-func (p *Pool) StoreRemoteWithContext(ctx context.Context, res domain.Resource, serverAddr string) error {
-	// RetrieveLocal the client from the pool
+// StoreRemoteWithContext streams a batch of resources to a remote node via the Store RPC.
+// It opens a client-stream, sends each resource in the slice, and finally closes the stream.
+func (p *Pool) StoreRemoteWithContext(ctx context.Context, resources []domain.Resource, serverAddr string) error {
 	client, err := p.Get(serverAddr)
 	if err != nil {
 		return fmt.Errorf("%w: %s", ErrClientNotInPool, serverAddr)
 	}
-	// Build the request from the domain.Resource
-	req := &pb.StoreRequest{
-		Key:    res.Key,
-		RawKey: res.RawKey,
-		Value:  res.Value,
+
+	// open the client stream
+	stream, err := client.Store(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to open store stream to %s: %w", serverAddr, err)
 	}
-	// Perform the RPC
-	_, err = client.Store(ctx, req)
+
+	// send each resource
+	for _, res := range resources {
+		req := &pb.StoreRequest{
+			Key:    res.Key,
+			RawKey: res.RawKey,
+			Value:  res.Value,
+		}
+		if err := stream.Send(req); err != nil {
+			return fmt.Errorf("failed to send resource (rawKey=%s) to %s: %w", res.RawKey, serverAddr, err)
+		}
+	}
+
+	// close and wait for server ack
+	_, err = stream.CloseAndRecv()
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			return ErrTimeout
 		}
-		return fmt.Errorf("client: Store RPC to %s failed: %w", serverAddr, err)
+		return fmt.Errorf("store stream to %s failed: %w", serverAddr, err)
 	}
+
 	return nil
 }
 
@@ -342,6 +356,26 @@ func (p *Pool) RemoveRemoteWithContext(ctx context.Context, key domain.ID, serve
 			return ErrTimeout
 		}
 		return fmt.Errorf("client: Remove RPC to %s failed: %w", serverAddr, err)
+	}
+	return nil
+}
+
+// Leave sends a Leave RPC to the given remote node to inform it that this node is leaving the DHT.
+func (p *Pool) Leave(ctx context.Context, self *domain.Node, serverAddr string) error {
+	// RetrieveLocal the client from the pool
+	client, err := p.Get(serverAddr)
+	if err != nil {
+		return fmt.Errorf("%w: %s", ErrClientNotInPool, serverAddr)
+	}
+	// Build the request from the domain.Node
+	req := self.ToProtoDHT()
+	// Perform the RPC
+	_, err = client.Leave(ctx, req)
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return ErrTimeout
+		}
+		return fmt.Errorf("client: Leave RPC to %s failed: %w", serverAddr, err)
 	}
 	return nil
 }
