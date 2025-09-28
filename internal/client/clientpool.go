@@ -13,6 +13,10 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+var (
+	ErrNoConnInPool = fmt.Errorf("clientpool: no connection in pool")
+)
+
 // --------------------------------------
 // refConn
 // --------------------------------------
@@ -34,36 +38,36 @@ type refConn struct {
 // It uses reference counting to avoid closing connections that are still in use
 // (a node can appear in multiple roles, e.g., successor and de Bruijn pointer).
 type Pool struct {
-	selfId   domain.ID
-	selfAddr string
-	lgr      logger.Logger
-	mu       sync.Mutex
-	clients  map[string]*refConn
-	timeout  time.Duration // default timeout for RPC calls
+	selfId         domain.ID
+	selfAddr       string
+	lgr            logger.Logger
+	mu             sync.Mutex
+	clients        map[string]*refConn
+	closed         bool          // indicates if the pool has been closed
+	failureTimeout time.Duration // timeout for RPC calls (after which the server is considered unresponsive)
 }
 
 // New creates a new empty Pool. It accepts a list of functional options
 // to configure the pool (logger).
-func New(selfId domain.ID, selfAddr string, timeout time.Duration, opt ...Option) *Pool {
+func New(selfId domain.ID, selfAddr string, failTO time.Duration, opt ...Option) *Pool {
 	p := &Pool{
-		selfId:   selfId,
-		selfAddr: selfAddr,
-		clients:  make(map[string]*refConn),
-		lgr:      &logger.NopLogger{}, // default: no logging
-		timeout:  timeout,
+		selfId:         selfId,
+		selfAddr:       selfAddr,
+		clients:        make(map[string]*refConn),
+		lgr:            &logger.NopLogger{}, // default: no logging
+		closed:         false,
+		failureTimeout: failTO,
 	}
 	// Apply functional options
 	for _, o := range opt {
 		o(p)
 	}
-	// Log pool creation
-	p.lgr.Debug("client pool initialized")
 	return p
 }
 
-// Timeout returns the default timeout for RPC calls.
-func (p *Pool) Timeout() time.Duration {
-	return p.timeout
+// FailureTimeout returns the default timeout for RPC calls.
+func (p *Pool) FailureTimeout() time.Duration {
+	return p.failureTimeout
 }
 
 // AddRef ensures that a gRPC connection to the given node exists in the pool.
@@ -71,27 +75,25 @@ func (p *Pool) Timeout() time.Duration {
 // If not, a new connection is created and tracked with an initial reference count of 1.
 //
 // This method should be called whenever a node is added to the RoutingTable
-// (e.g., as successor or de Bruijn pointer).
+// (e.g., as successor or de Bruijn pointer or Predecessor).
 func (p *Pool) AddRef(addr string) error {
+	if addr == "" {
+		return fmt.Errorf("clientpool: empty address")
+	}
 	if addr == p.selfAddr {
-		p.lgr.Warn("AddRef: attempted to AddRef to self, ignored",
-			logger.F("addr", addr))
-		return nil
+		return fmt.Errorf("clientpool: requested self address")
 	}
 	p.mu.Lock()
-	// Se già presente incremento refcount
+	if p.closed {
+		return fmt.Errorf("clientpool: pool is closed")
+	}
+	// if connection already exists, increment refs and return
 	if rc, ok := p.clients[addr]; ok {
 		rc.refs++
-		refs := rc.refs
 		p.mu.Unlock()
-
-		p.lgr.Debug("AddRef: connection refcount incremented",
-			logger.F("addr", addr),
-			logger.F("refs", refs),
-		)
 		return nil
 	}
-	// Altrimenti creo la connessione dentro al lock (per evitare race)
+	// otherwise create new connection
 	conn, dialErr := grpc.NewClient(
 		addr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -99,57 +101,66 @@ func (p *Pool) AddRef(addr string) error {
 	)
 	if dialErr != nil {
 		p.mu.Unlock()
-		p.lgr.Error("AddRef: failed to establish connection",
-			logger.F("addr", addr),
-			logger.F("err", dialErr),
-		)
 		return dialErr
 	}
 	p.clients[addr] = &refConn{conn: conn, refs: 1}
 	p.mu.Unlock()
-	p.lgr.Debug("AddRef: new connection established",
-		logger.F("addr", addr),
-		logger.F("refs", 1),
-	)
+	p.lgr.Debug("Pool: new connection added", logger.F("addr", addr))
 	return nil
 }
 
-// Get returns a gRPC client for the given node.
-// If the connection exists in the pool, it reuses it.
-// Otherwise, it creates a one-shot connection that is not tracked
-// in the pool and must be closed by the caller after use.
-func (p *Pool) Get(addr string) (dhtv1.DHTClient, error) {
+// GetFromPool returns a gRPC client backed by a pooled connection.
+// The connection is managed by the pool and MUST NOT be closed by the caller.
+func (p *Pool) GetFromPool(addr string) (dhtv1.DHTClient, error) {
 	if addr == "" {
-		p.lgr.Warn("Get: Get called with empty address")
 		return nil, fmt.Errorf("clientpool: empty address")
 	}
+	if addr == p.selfAddr {
+		return nil, fmt.Errorf("clientpool: requested self address")
+	}
 	p.mu.Lock()
+	if p.closed {
+		return nil, fmt.Errorf("clientpool: pool is closed")
+	}
 	rc, ok := p.clients[addr]
 	p.mu.Unlock()
-	if ok {
-		p.lgr.Debug("Get: reused pooled connection",
-			logger.F("addr", addr),
-			logger.F("refs", rc.refs),
-		)
-		// Connection managed by pool, caller must NOT close it
-		return dhtv1.NewDHTClient(rc.conn), nil
+	if !ok {
+		return nil, ErrNoConnInPool
 	}
-	// Create ephemeral connection (not pooled, caller must close it)
+	return dhtv1.NewDHTClient(rc.conn), nil
+}
+
+// DialEphemeral creates a new one-shot gRPC connection to the given address.
+// The connection is NOT added to the pool; the caller is responsible for closing it.
+func (p *Pool) DialEphemeral(addr string) (dhtv1.DHTClient, *grpc.ClientConn, error) {
+	p.mu.Lock()
+	closed := p.closed
+	p.mu.Unlock()
+	if closed {
+		return nil, nil, fmt.Errorf("clientpool: pool is closed")
+	}
+	p.mu.Unlock()
+	if addr == "" {
+		return nil, nil, fmt.Errorf("clientpool: empty address")
+	}
+	if addr == p.selfAddr {
+		return nil, nil, fmt.Errorf("clientpool: requested self address")
+	}
 	conn, err := grpc.NewClient(
 		addr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()), // plaintext, no TLS
 	)
 	if err != nil {
-		p.lgr.Error("Get: failed to create ephemeral connection",
+		p.lgr.Error("DialEphemeral: failed to dial",
 			logger.F("addr", addr),
 			logger.F("err", err),
 		)
-		return nil, fmt.Errorf("clientpool: failed to dial %s: %w", addr, err)
+		return nil, nil, fmt.Errorf("clientpool: failed to dial %s: %w", addr, err)
 	}
-	p.lgr.Debug("Get: ephemeral connection created",
+	p.lgr.Debug("DialEphemeral: connection created",
 		logger.F("addr", addr),
 	)
-	return dhtv1.NewDHTClient(conn), nil
+	return dhtv1.NewDHTClient(conn), conn, nil
 }
 
 // Release decreases the reference count for the given node.
@@ -159,15 +170,16 @@ func (p *Pool) Get(addr string) (dhtv1.DHTClient, error) {
 // This method must be called whenever a node is removed from
 // the RoutingTable (e.g., no longer a successor or de Bruijn pointer).
 func (p *Pool) Release(addr string) error {
-	if addr == p.selfAddr {
-		p.lgr.Warn("Pool: attempted to Release self, ignored",
-			logger.F("addr", addr))
-		return nil
+	if addr == "" {
+		return fmt.Errorf("clientpool: empty address")
 	}
 	var rc *refConn
 	var refs int
 	var ok bool
 	p.mu.Lock()
+	if p.closed {
+		return fmt.Errorf("clientpool: pool is closed")
+	}
 	rc, ok = p.clients[addr]
 	if ok {
 		rc.refs--
@@ -177,20 +189,10 @@ func (p *Pool) Release(addr string) error {
 		}
 	}
 	p.mu.Unlock()
-	// log
-	if !ok {
-		p.lgr.Warn("Pool: Release called for unknown connection",
-			logger.F("addr", addr))
-		return fmt.Errorf("clientpool: no connection found for node %s", addr)
-	}
-	if refs > 0 {
-		p.lgr.Debug("Pool: connection refcount decremented",
-			logger.F("addr", addr),
-			logger.F("refs", refs),
-		)
+	if !ok || refs > 0 {
 		return nil
 	}
-	// se refs == 0, chiudiamo la connessione
+	// if refs == 0, close the connection
 	if err := rc.conn.Close(); err != nil {
 		p.lgr.Error("Pool: failed to close connection",
 			logger.F("addr", addr),
@@ -198,42 +200,47 @@ func (p *Pool) Release(addr string) error {
 		)
 		return fmt.Errorf("clientpool: failed to close connection for node %s: %w", addr, err)
 	}
-	p.lgr.Info("Pool: connection closed",
-		logger.F("addr", addr),
-	)
+	p.lgr.Debug("Pool: connection removed", logger.F("addr", addr))
 	return nil
 }
 
 // Close shuts down all active gRPC connections and clears the pool.
-// This method is typically called during node shutdown to ensure
-// that all resources are properly released.
 //
-// If one or more connections fail to close, the first error encountered
-// is returned. All connections are attempted to be closed regardless.
+// This method is safe to call multiple times; only the first call
+// has an effect. Subsequent calls return immediately without error.
+//
+// Close ensures that all client connections are closed and the pool
+// is marked as unusable. If one or more connections fail to close,
+// the first encountered error is returned, but all connections are
+// attempted regardless.
 func (p *Pool) Close() error {
 	p.mu.Lock()
-	// snapshot delle connessioni
-	conns := make(map[string]*refConn, len(p.clients))
-	for addr, rc := range p.clients {
-		conns[addr] = rc
+	if p.closed {
+		// Pool already closed → nothing to do
+		p.mu.Unlock()
+		return nil
 	}
-	p.clients = make(map[string]*refConn) // reset
+	p.closed = true
+
+	// Take a snapshot of current connections
+	conns := make([]*grpc.ClientConn, 0, len(p.clients))
+	for _, rc := range p.clients {
+		conns = append(conns, rc.conn)
+	}
+
+	// Reset the pool map so new operations see an empty pool
+	p.clients = make(map[string]*refConn)
 	p.mu.Unlock()
 
 	var firstErr error
-	for addr, rc := range conns {
-		if err := rc.conn.Close(); err != nil {
-			p.lgr.Error("Pool: failed to close connection",
-				logger.F("addr", addr),
-				logger.F("err", err),
-			)
+	for _, conn := range conns {
+		// Attempt to close each connection
+		if err := conn.Close(); err != nil {
+			// Record the first error but keep closing the rest
 			if firstErr == nil {
-				firstErr = fmt.Errorf("clientpool: failed to close connection for node %s: %w", addr, err)
+				firstErr = err
 			}
-		} else {
-			p.lgr.Info("Pool: connection closed",
-				logger.F("addr", addr),
-			)
+			p.lgr.Error("Pool: failed to close connection", logger.F("err", err))
 		}
 	}
 	return firstErr
@@ -245,6 +252,11 @@ func (p *Pool) Close() error {
 // If the pool is empty, the snapshot will contain an empty slice.
 func (p *Pool) DebugLog() {
 	p.mu.Lock()
+	if p.closed {
+		p.lgr.Debug("ClientPool snapshot: pool is closed")
+		p.mu.Unlock()
+		return
+	}
 	snapshot := make(map[string]int, len(p.clients))
 	for addr, rc := range p.clients {
 		snapshot[addr] = rc.refs
