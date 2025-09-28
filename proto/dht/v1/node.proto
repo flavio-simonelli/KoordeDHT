@@ -51,11 +51,16 @@ message SuccessorList {
 // Storage operations (node-to-node)
 // ---------------------------------------------------------------
 
-// Store a resource (Put).
-message StoreRequest {
+// Resource stored in the DHT.
+message Resource {
   bytes key = 1;
   string raw_key = 2; // for debugging
   string value = 3;
+}
+
+// Store a resource (Put).
+message StoreRequest {
+  Resource resource = 1;
 }
 
 // Retrieve a resource (Get).
@@ -64,14 +69,14 @@ message RetrieveRequest {
 }
 
 message RetrieveResponse {
-  string raw_key = 1; // for debugging
-  string value = 2;
+  Resource resource = 1;
 }
 
 // Remove a resource (Delete).
 message RemoveRequest {
   bytes key = 1;
 }
+
 
 // ---------------------------------------------------------------
 // Service definition

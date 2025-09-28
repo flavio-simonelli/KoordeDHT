@@ -30,6 +30,46 @@ func New(rout *routingtable.RoutingTable, clientpool *client.Pool, storage *stor
 	return n
 }
 
+// TODO: da mettere nella join come codice
+/*
+// TryBootstrapJoin iterates over the given peers and attempts to join the DHT
+// by calling FindSuccessorStart(selfID) on each peer using the client pool.
+//
+// Parameters:
+//   - pool:    client connection pool
+//   - selfID:  the local node identifier
+//   - peers:   list of bootstrap peer addresses ("host:port")
+//   - timeout: per-RPC timeout applied to each attempt
+//
+// Returns:
+//   - *domain.Node: the successor node for selfID if join succeeded
+//   - error: if no peer responded successfully
+func (p *Pool) TryBootstrapJoin(selfID domain.ID, timeout time.Duration, peers []string) (*domain.Node, error) {
+	var lastErr error
+
+	for _, addr := range peers {
+		// Create a context with timeout for this attempt
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+
+		succ, err := p.FindSuccessorStart(ctx, selfID, addr)
+		if err == nil && succ != nil {
+			return succ, nil
+		}
+		if err != nil {
+			lastErr = fmt.Errorf("FindSuccessorStart to %s failed: %w", addr, err)
+		} else {
+			lastErr = fmt.Errorf("peer %s returned nil successor", addr)
+		}
+	}
+
+	if lastErr == nil {
+		lastErr = fmt.Errorf("no bootstrap peers provided")
+	}
+	return nil, fmt.Errorf("bootstrap join failed: %w", lastErr)
+}
+*/
+
 // Join connects this node to an existing Koorde DHT using the given bootstrap peer.
 // It sets predecessor/successor pointers, initializes the successor list, and sets de Bruijn links.
 func (n *Node) Join(bootstrapAddr string) error {
@@ -100,7 +140,7 @@ func (n *Node) Leave() error {
 
 	// 1. Notifica al successore che sto lasciando
 	{
-		ctx, cancel := context.WithTimeout(context.Background(), n.cp.Timeout())
+		ctx, cancel := context.WithTimeout(context.Background(), n.cp.FailureTimeout())
 		defer cancel()
 		if err := n.cp.Leave(ctx, self, succ.Addr); err != nil {
 			n.lgr.Error("leave: failed to notify successor", logger.F("err", err))
@@ -111,9 +151,9 @@ func (n *Node) Leave() error {
 	// 2. Trasferimento risorse al successore
 	data := n.s.All()
 	if len(data) > 0 {
-		ctx, cancel := context.WithTimeout(context.Background(), n.cp.Timeout())
+		ctx, cancel := context.WithTimeout(context.Background(), n.cp.FailureTimeout())
 		defer cancel()
-		if err := n.cp.StoreRemoteWithContext(ctx, data, succ.Addr); err != nil {
+		if err := n.cp.StoreRemote(ctx, data, succ.Addr); err != nil {
 			return fmt.Errorf("leave: failed to transfer %d resources to successor %s: %w", len(data), succ.Addr, err)
 		}
 	}

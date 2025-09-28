@@ -12,6 +12,17 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// IsValidID checks whether the given ID is valid
+// in the identifier space of this node.
+func (n *Node) IsValidID(bytes []byte) error {
+	return n.rt.Space().IsValidID(bytes)
+}
+
+// Space returns the identifier space used by this node.
+func (n *Node) Space() *domain.Space {
+	return n.rt.Space()
+}
+
 // findNextHop restituisce l'indice del nodo predecessore più vicino a currentI
 // nella lista fornita (che rappresenta una sequenza ordinata di nodi).
 // - Usa la funzione ID.Between per il confronto
@@ -228,7 +239,7 @@ func (n *Node) Notify(p *domain.Node) {
 		// send to predecessor the resource for which it is now responsible
 		resources := n.s.Between(p.ID, n.rt.Self().ID)
 		ctx := context.Background()
-		err := n.cp.StoreRemoteWithContext(ctx, resources, p.Addr)
+		err := n.cp.StoreRemote(ctx, resources, p.Addr)
 		if err != nil {
 			n.lgr.Warn("Notify: failed to transfer resources to new predecessor", logger.F("node", p), logger.F("err", err), logger.F("resourceCount", len(resources)))
 		}
@@ -277,7 +288,7 @@ func (n *Node) Put(ctx context.Context, key string, value string) error {
 	}
 	sres := []domain.Resource{res} // wrap in slice for StoreRemote
 	// Otherwise, forward the resource to the successor
-	if err := n.cp.StoreRemoteWithContext(ctx, sres, succ.Addr); err != nil {
+	if err := n.cp.StoreRemote(ctx, sres, succ.Addr); err != nil {
 		return fmt.Errorf("put: failed to store resource at successor %s: %w", succ.Addr, err)
 	}
 	// Log success
@@ -318,7 +329,7 @@ func (n *Node) Get(ctx context.Context, key string) (*domain.Resource, error) {
 		return &res, nil
 	}
 	// Otherwise, forward the request to the successor
-	res, err := n.cp.RetrieveRemoteWithContext(ctx, id, succ.Addr)
+	res, err := n.cp.RetrieveRemote(ctx, id, succ.Addr)
 	if err != nil {
 		return nil, fmt.Errorf("get: failed to retrieve resource from successor %s: %w", succ.Addr, err)
 	}
@@ -354,7 +365,7 @@ func (n *Node) Delete(ctx context.Context, key string) error {
 		return nil
 	}
 	// Otherwise, forward the request to the successor
-	if err := n.cp.RemoveRemoteWithContext(ctx, id, succ.Addr); err != nil {
+	if err := n.cp.RemoveRemote(ctx, id, succ.Addr); err != nil {
 		return fmt.Errorf("delete: failed to remove resource at successor %s: %w", succ.Addr, err)
 	}
 	return nil

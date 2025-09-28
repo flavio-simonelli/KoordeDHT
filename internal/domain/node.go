@@ -32,7 +32,7 @@ func (n *Node) ToProtoDHT() *dhtv1.Node {
 // into its domain representation.
 //
 // Returns nil if the input is nil, or an error if the ID is invalid.
-func NodeFromProtoDHT(sp Space, p *dhtv1.Node) (*Node, error) {
+func NodeFromProtoDHT(sp *Space, p *dhtv1.Node) (*Node, error) {
 	if p == nil {
 		return nil, nil
 	}
@@ -64,7 +64,7 @@ func (n *Node) ToProtoClient() *clientv1.NodeInfo {
 //
 // The ID string is expected to be in hexadecimal form, optionally prefixed with "0x".
 // Returns nil if the input is nil, or an error if the ID is invalid.
-func NodeFromProtoClient(sp Space, p *clientv1.NodeInfo) (*Node, error) {
+func NodeFromProtoClient(sp *Space, p *clientv1.NodeInfo) (*Node, error) {
 	if p == nil {
 		return nil, nil
 	}

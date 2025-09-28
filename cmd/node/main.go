@@ -55,7 +55,7 @@ func main() {
 	cfg.LogConfig(lgr) // log loaded configuration at DEBUG level
 
 	// Initialize listener (to determine server address and port)
-	lis, err := cfg.Listen()
+	lis, err := server.Listen(cfg.DHT.Mode, cfg.Node.Host, cfg.Node.Port)
 	if err != nil {
 		lgr.Error("Fatal: failed to initialize listener", logger.F("err", err))
 		os.Exit(1)
@@ -65,12 +65,12 @@ func main() {
 	lgr.Debug("create listener", logger.F("addr", addr))
 
 	// Initialize the identifier space
-	space, err := domain.NewSpace(cfg.DHT.IDBits, cfg.DHT.DeBruijn.Degree)
+	space, err := domain.NewSpace(cfg.DHT.IDBits, cfg.DHT.DeBruijn.Degree, cfg.DHT.FaultTolerance.SuccessorListSize)
 	if err != nil {
-		lgr.Error("failed to initialize identifier space", logger.F("id_bits", cfg.DHT.IDBits), logger.F("degree", cfg.DHT.DeBruijn.Degree), logger.F("err", err))
+		lgr.Error("failed to initialize identifier space", logger.F("err", err))
 		os.Exit(1)
 	}
-	lgr.Debug("identifier space initialized", logger.F("id_bits", space.Bits), logger.F("degree", space.GraphGrade), logger.F("sizeByte", space.ByteLen))
+	lgr.Debug("identifier space initialized", logger.F("id_bits", space.Bits), logger.F("degree", space.GraphGrade), logger.F("sizeByte", space.ByteLen), logger.F("SuccessorListSize", space.SuccListSize))
 
 	// Initialize the local node
 	var id domain.ID
@@ -79,7 +79,7 @@ func main() {
 	} else {
 		id, err = space.FromHexString(cfg.Node.Id) // use configured ID
 		if err != nil {
-			lgr.Error("invalid node ID in configuration", logger.F("id", cfg.Node.Id), logger.F("err", err))
+			lgr.Error("invalid node ID in configuration", logger.F("err", err))
 			os.Exit(1)
 		}
 	}
@@ -87,7 +87,7 @@ func main() {
 		ID:   id,
 		Addr: addr,
 	}
-	lgr.Debug("generated node ID", logger.F("id", id.String()))
+	lgr.Debug("generated node ID", logger.F("id", id.ToBinaryString(true)))
 	lgr = lgr.Named("node").WithNode(domainNode)
 	lgr.Info("New Node initializing")
 
@@ -102,7 +102,7 @@ func main() {
 		cfg.DHT.FaultTolerance.SuccessorListSize,
 		routingtable.WithLogger(lgr.Named("routingtable")),
 	)
-	lgr.Debug("initialize routing table")
+	lgr.Debug("initialized routing table")
 
 	// Initialize the client pool
 	cp := client.New(
@@ -111,13 +111,13 @@ func main() {
 		cfg.DHT.FaultTolerance.FailureTimeout,
 		client.WithLogger(lgr.Named("clientpool")),
 	)
-	lgr.Debug("initialize client pool")
+	lgr.Debug("initialized client pool")
 
 	// Initialize the storage
 	store := storage.NewMemoryStorage(
 		lgr.Named("storage"),
 	)
-	lgr.Debug("initialize in-memory storage")
+	lgr.Debug("initialized in-memory storage")
 
 	// Initialize the node
 	n := node.New(
@@ -126,10 +126,10 @@ func main() {
 		store,
 		node.WithLogger(lgr),
 	)
-	lgr.Debug("initialize new struct node")
+	lgr.Debug("initialized new struct node")
 
 	// Initialize the gRPC server
-	grpcOpts := []grpc.ServerOption{}
+	var grpcOpts []grpc.ServerOption
 	if cfg.Telemetry.Tracing.Enabled {
 		grpcOpts = append(grpcOpts,
 			grpc.StatsHandler(otelgrpc.NewServerHandler()),
@@ -164,19 +164,8 @@ func main() {
 	}
 	lgr.Debug("resolved bootstrap peers", logger.F("peers", peers))
 	if len(peers) != 0 {
-		peer, err := bootstrap.PickRandom(peers)
-		lgr.Debug("picked random peers used in like bootstrap", logger.F("peers", peer))
-		if err != nil {
-			lgr.Error("failed to pick a bootstrap peer", logger.F("err", err))
-			// cleanup before exit
-			n.Stop()
-			s.Stop()
-			os.Exit(1)
-		}
-		lgr.Debug("joining DHT", logger.F("peer", peer))
-
-		if err := n.Join(peer); err != nil {
-			lgr.Error("failed to join DHT", logger.F("peer", peer), logger.F("err", err))
+		if err := n.Join(peers); err != nil {
+			lgr.Error("failed to join DHT", logger.F("err", err))
 			// cleanup before exit
 			n.Stop()
 			s.Stop()

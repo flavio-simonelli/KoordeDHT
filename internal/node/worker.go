@@ -55,7 +55,7 @@ func (n *Node) stabilizeSuccessor() {
 		return
 	}
 	// Ask successor for its predecessor
-	ctx, cancel := context.WithTimeout(context.Background(), n.cp.Timeout())
+	ctx, cancel := context.WithTimeout(context.Background(), n.cp.FailureTimeout())
 	defer cancel()
 	pred, err := n.cp.GetPredecessor(ctx, succ.Addr)
 	if err != nil {
@@ -135,7 +135,7 @@ func (n *Node) stabilizeSuccessor() {
 		succ = pred
 	}
 	// Notify successor that we might be its predecessor
-	ctx, cancel = context.WithTimeout(context.Background(), n.cp.Timeout())
+	ctx, cancel = context.WithTimeout(context.Background(), n.cp.FailureTimeout())
 	defer cancel()
 	if err := n.cp.Notify(ctx, self, succ.Addr); err != nil {
 		n.lgr.Warn("stabilize: notify failed",
@@ -154,7 +154,7 @@ func (n *Node) fixSuccessorList() {
 		return
 	}
 	// Ask successor for its successor list
-	ctx, cancel := context.WithTimeout(context.Background(), n.cp.Timeout())
+	ctx, cancel := context.WithTimeout(context.Background(), n.cp.FailureTimeout())
 	defer cancel()
 	remoteList, err := n.cp.GetSuccessorList(ctx, succ.Addr)
 	if err != nil {
@@ -220,7 +220,7 @@ func (n *Node) checkPredecessor() {
 		return
 	}
 	// Try a lightweight ping
-	ctx, cancel := context.WithTimeout(context.Background(), n.cp.Timeout())
+	ctx, cancel := context.WithTimeout(context.Background(), n.cp.FailureTimeout())
 	defer cancel()
 	if err := n.cp.Ping(ctx, pred.Addr); err != nil {
 		n.lgr.Warn("checkPredecessor: predecessor unresponsive, clearing",
@@ -246,7 +246,7 @@ func (n *Node) fixDeBruijn() {
 	target := n.rt.Space().MulKMod(self.ID)
 	n.lgr.Debug("fixDeBruijn: checking target", logger.F("target", target.String()))
 	// Lookup successor of target
-	ctx, cancel := context.WithTimeout(context.Background(), n.cp.Timeout())
+	ctx, cancel := context.WithTimeout(context.Background(), n.cp.FailureTimeout())
 	defer cancel()
 	succ, err := n.FindSuccessorInit(ctx, target)
 	if err != nil || succ == nil {
@@ -256,7 +256,7 @@ func (n *Node) fixDeBruijn() {
 		return
 	}
 	// Get predecessor of that successor (anchor)
-	ctx, cancel = context.WithTimeout(context.Background(), n.cp.Timeout())
+	ctx, cancel = context.WithTimeout(context.Background(), n.cp.FailureTimeout())
 	defer cancel()
 	anchor, err := n.cp.GetPredecessor(ctx, succ.Addr)
 	if err != nil || anchor == nil {
@@ -276,7 +276,7 @@ func (n *Node) fixDeBruijn() {
 	// Costruisci nuova finestra (newNodes + newSet)
 	newNodes := make([]*domain.Node, n.rt.Space().GraphGrade)
 	newNodes[0] = anchor
-	ctx, cancel = context.WithTimeout(context.Background(), n.cp.Timeout())
+	ctx, cancel = context.WithTimeout(context.Background(), n.cp.FailureTimeout())
 	defer cancel()
 	list, err := n.cp.GetSuccessorList(ctx, anchor.Addr)
 	if err != nil {
