@@ -4,7 +4,7 @@ import "KoordeDHT/internal/logger"
 
 type Option func(*Node)
 
-// WithLogger imposta il lgr usato dalla routing table.
+// WithLogger sets a custom logger for the Node.
 func WithLogger(l logger.Logger) Option {
 	return func(n *Node) {
 		if l != nil {
