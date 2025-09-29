@@ -253,12 +253,9 @@ func (n *Node) Stop() {
 	if n == nil {
 		return
 	}
-	n.Leave()
-
+	_ = n.Leave()
 	if n.cp != nil {
-		n.Leave()
-		n.cp.Close()
+		_ = n.cp.Close()
 	}
-	// TODO: add other cleanup if needed
 	n.lgr.Info("node stopped gracefully")
 }

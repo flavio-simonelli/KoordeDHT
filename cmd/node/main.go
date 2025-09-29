@@ -159,8 +159,8 @@ func main() {
 	if err != nil {
 		lgr.Error("failed to resolve bootstrap peers", logger.F("err", err))
 		// cleanup before exit
-		n.Stop()
 		s.Stop()
+		n.Stop()
 		os.Exit(1)
 	}
 	lgr.Debug("resolved bootstrap peers", logger.F("peers", peers))
@@ -168,8 +168,8 @@ func main() {
 		if err := n.Join(peers); err != nil {
 			lgr.Error("failed to join DHT", logger.F("err", err))
 			// cleanup before exit
-			n.Stop()
 			s.Stop()
+			n.Stop()
 			os.Exit(1)
 		}
 		lgr.Debug("joined DHT")
@@ -179,8 +179,7 @@ func main() {
 	}
 
 	// Setup signal handler for graceful shutdown
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
+	ctx, stabilizerStop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 
 	// Start periodic stabilization workers (run until ctx is canceled)
 	n.StartStabilizers(ctx, cfg.DHT.FaultTolerance.StabilizationInterval, cfg.DHT.DeBruijn.FixInterval, cfg.DHT.Storage.FixInterval)
@@ -190,7 +189,7 @@ func main() {
 	case <-ctx.Done():
 		lgr.Info("shutdown signal received, stopping server gracefully...")
 
-		n.Stop() // stop node
+		stabilizerStop() // stop stabilization workers
 
 		// Allow some time for graceful stop
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -207,11 +206,13 @@ func main() {
 			lgr.Info("server stopped gracefully")
 		case <-shutdownCtx.Done():
 			lgr.Warn("graceful stop timed out, forcing shutdown")
-			s.Stop()
 		}
+
+		n.Stop() // stop node
 
 	case err := <-serveErr:
 		lgr.Error("gRPC server terminated unexpectedly", logger.F("err", err))
+		stabilizerStop()
 		n.Stop()
 		os.Exit(1)
 	}
