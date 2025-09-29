@@ -344,9 +344,14 @@ func (n *Node) fixSuccessorList() {
 	newList[0] = succ
 	for i := 1; i < size; i++ {
 		if i-1 < len(remoteList) {
-			if remoteList[i-1] != nil && !remoteList[i-1].ID.Equal(n.rt.Self().ID) {
-				newList[i] = remoteList[i-1]
+			if remoteList[i-1] != nil {
+				if remoteList[i-1].ID.Equal(n.rt.Self().ID) {
+					break
+				} else {
+					newList[i] = remoteList[i-1]
+				}
 			}
+
 		}
 	}
 
