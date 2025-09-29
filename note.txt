@@ -4,3 +4,26 @@ KoordeDHT$ protoc \
   --go_out=. --go_opt=module=github.com/flaviosimonelli/KoordeDHT \
   --go-grpc_out=. --go-grpc_opt=module=github.com/flaviosimonelli/KoordeDHT \
   proto/dht/v1/node.proto
+
+
+docker run --rm -it \
+  -p 5000:5000 \
+  -e NODE_ID=0x99 \                       # ID del nodo (hex) oppure vuoto = random
+  -e NODE_HOST=0.0.0.0 \                  # Host bind (in genere 0.0.0.0 nel container)
+  -e NODE_PORT=5000 \                     # Porta gRPC del nodo
+  \
+  -e BOOTSTRAP_MODE=dns \                 # "dns" oppure "static"
+  -e BOOTSTRAP_DNSNAME=bootstrap.koorde.local \  # Nome DNS bootstrap
+  -e BOOTSTRAP_SRV=false \                # true = usa SRV, false = usa A/AAAA
+  -e BOOTSTRAP_PORT=35761 \               # Porta se non usi SRV
+  -e BOOTSTRAP_PEERS="10.0.1.5:5000,10.0.1.6:5000" \ # Peers statici se BOOTSTRAP_MODE=static
+  \
+  -e TRACE_ENABLED=true \                 # Abilita tracing
+  -e TRACE_EXPORTER=otlp \                # "otlp" oppure "jaeger"
+  -e TRACE_ENDPOINT=localhost:4317 \      # Endpoint collector tracing
+  \
+  -e REGISTER_ENABLED=true \              # Abilita self-registration DNS
+  -e REGISTER_ZONE_ID=Z123456ABCDEFG \    # Hosted Zone ID di Route53
+  -e REGISTER_SUFFIX=.koorde.local \      # Suffisso dominio (es. .koorde.local)
+  -e REGISTER_TTL=60 \                    # TTL in secondi per il record DNS
+  koorde-node:latest
