@@ -34,7 +34,7 @@ func FNode(key string, n *domain.Node) Field {
 	return Field{
 		Key: key,
 		Val: map[string]any{
-			"id":   n.ID.ToBinaryString(true),
+			"id":   n.ID.ToHexString(true),
 			"addr": n.Addr,
 		},
 	}
@@ -46,7 +46,7 @@ func FResource(key string, r domain.Resource) Field {
 	return Field{
 		Key: key,
 		Val: map[string]any{
-			"key":    r.Key.ToBinaryString(true),
+			"key":    r.Key.ToHexString(true),
 			"rawKey": r.RawKey,
 			"value":  r.Value,
 		},
