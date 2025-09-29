@@ -20,7 +20,7 @@ func ResolveBootstrap(cfg config.BootstrapConfig) ([]string, error) {
 		return cfg.Peers, nil
 	case "dns":
 		if cfg.SRV {
-			_, addrs, err := net.LookupSRV("koorde", "tcp", cfg.DNSName)
+			_, addrs, err := net.LookupSRV("", "", cfg.DNSName)
 			if err != nil {
 				return nil, fmt.Errorf("SRV lookup failed: %w", err)
 			}

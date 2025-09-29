@@ -2,6 +2,7 @@ package main
 
 import (
 	"KoordeDHT/internal/bootstrap"
+	"KoordeDHT/internal/bootstrap/register"
 	"KoordeDHT/internal/client"
 	"KoordeDHT/internal/config"
 	"KoordeDHT/internal/domain"
@@ -15,6 +16,7 @@ import (
 	"context"
 	"flag"
 	"log"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
@@ -177,6 +179,43 @@ func main() {
 	} else {
 		n.CreateNewDHT()
 		lgr.Debug("new DHT created")
+	}
+
+	// Register node in DNS
+	if cfg.DHT.Bootstrap.Register.Enabled {
+		host := lis.Addr().(*net.TCPAddr).IP.String() //TODO: potrebbe dare problemi con loopback (se usato)
+		port := lis.Addr().(*net.TCPAddr).Port
+		r53Client, err := register.NewClient(context.Background())
+		if err != nil {
+			lgr.Error("failed to init route53 client", logger.F("err", err))
+			s.Stop()
+			n.Stop()
+			os.Exit(1)
+		}
+
+		if err := register.RegisterNode(
+			context.Background(),
+			r53Client,
+			cfg.DHT.Bootstrap.Register,
+			n.Self().ID.ToHexString(true),
+			host,
+			port,
+		); err != nil {
+			lgr.Error("failed to register node in Route53", logger.F("err", err))
+		}
+		defer func() {
+			// Deregister node on shutdown
+			if err := register.DeregisterNode(
+				context.Background(),
+				r53Client,
+				cfg.DHT.Bootstrap.Register,
+				n.Self().ID.ToHexString(true),
+				host,
+				port,
+			); err != nil {
+				lgr.Warn("failed to deregister node from Route53", logger.F("err", err))
+			}
+		}()
 	}
 
 	// Setup signal handler for graceful shutdown

@@ -1,57 +1,79 @@
-package bootstrap
+package register
 
 import (
+	koordeConfig "KoordeDHT/internal/config"
 	"context"
 	"fmt"
-	"time"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/route53/types"
 )
 
-// RegisterBootstrap crea o aggiorna un record SRV in Route53
-func RegisterBootstrap(ctx context.Context, hostedZoneID, domain, targetHost string, port int) error {
-	// Carica configurazione AWS dal contesto (IAM Role, env vars, ecc.)
-	cfg, err := config.LoadDefaultConfig(ctx)
-	if err != nil {
-		return fmt.Errorf("unable to load AWS config: %w", err)
+// RegisterNode creates or updates an SRV record in Route53 for the given node.
+func RegisterNode(ctx context.Context, client *route53.Client, cfg koordeConfig.RegisterConfig, nodeID string, targetHost string, port int) error {
+	domain := strings.TrimSuffix(cfg.DomainSuffix, ".")
+	recordName := fmt.Sprintf("%s.%s.", nodeID, domain)
+	if strings.HasSuffix(targetHost, ".") {
+		targetHost = targetHost[:len(targetHost)-1]
 	}
 
-	client := route53.NewFromConfig(cfg)
-
-	// Definiamo il record SRV
-	record := &types.ResourceRecordSet{
-		Name: aws.String(fmt.Sprintf("_koorde._tcp.%s", domain)),
-		Type: types.RRTypeSrv,
-		TTL:  aws.Int64(30), // TTL basso per aggiornamenti veloci
-		ResourceRecords: []types.ResourceRecord{
-			{
-				Value: aws.String(fmt.Sprintf("0 5 %d %s.", port, targetHost)),
+	input := &route53.ChangeResourceRecordSetsInput{
+		HostedZoneId: aws.String(cfg.HostedZoneID),
+		ChangeBatch: &types.ChangeBatch{
+			Changes: []types.Change{
+				{
+					Action: types.ChangeActionUpsert,
+					ResourceRecordSet: &types.ResourceRecordSet{
+						Name: aws.String(recordName),
+						Type: types.RRTypeSrv,
+						TTL:  aws.Int64(cfg.TTL),
+						ResourceRecords: []types.ResourceRecord{
+							{
+								// Format: priority weight port target
+								Value: aws.String(fmt.Sprintf("0 0 %d %s.", port, targetHost)),
+							},
+						},
+					},
+				},
 			},
 		},
 	}
 
-	// ChangeBatch
-	change := &route53.ChangeBatch{
-		Changes: []types.Change{
-			{
-				Action:            types.ChangeActionUpsert,
-				ResourceRecordSet: record,
+	_, err := client.ChangeResourceRecordSets(ctx, input)
+	return err
+}
+
+// DeregisterNode removes the SRV record for the given node from Route53.
+func DeregisterNode(ctx context.Context, client *route53.Client, cfg koordeConfig.RegisterConfig, nodeID string, targetHost string, port int) error {
+	domain := strings.TrimSuffix(cfg.DomainSuffix, ".")
+	recordName := fmt.Sprintf("%s.%s.", nodeID, domain)
+	if strings.HasSuffix(targetHost, ".") {
+		targetHost = targetHost[:len(targetHost)-1]
+	}
+
+	input := &route53.ChangeResourceRecordSetsInput{
+		HostedZoneId: aws.String(cfg.HostedZoneID),
+		ChangeBatch: &types.ChangeBatch{
+			Changes: []types.Change{
+				{
+					Action: types.ChangeActionDelete,
+					ResourceRecordSet: &types.ResourceRecordSet{
+						Name: aws.String(recordName),
+						Type: types.RRTypeSrv,
+						TTL:  aws.Int64(cfg.TTL),
+						ResourceRecords: []types.ResourceRecord{
+							{
+								Value: aws.String(fmt.Sprintf("0 0 %d %s.", port, targetHost)),
+							},
+						},
+					},
+				},
 			},
 		},
 	}
 
-	// Chiamata API
-	_, err = client.ChangeResourceRecordSets(ctx, &route53.ChangeResourceRecordSetsInput{
-		HostedZoneId: aws.String(hostedZoneID),
-		ChangeBatch:  change,
-	})
-
-	if err != nil {
-		return fmt.Errorf("failed to register bootstrap SRV record: %w", err)
-	}
-
-	return nil
+	_, err := client.ChangeResourceRecordSets(ctx, input)
+	return err
 }

@@ -17,15 +17,15 @@ dht:
 
   bootstrap:
     mode: "static"              # Bootstrap strategy: dns | static
-    dnsName: "bootstrap.koorde.local" # DNS name used when mode = dns
+    dnsName: "" # DNS name used when mode = dns
     srv: false                  # Use DNS SRV records if true, otherwise A/AAAA records
     port: 35761                 # Bootstrap port (used only when srv = false)
     peers: []                   # Static peer list (used only when mode = static)
 
     register:
       enabled: true                    # Se true, il nodo si registra in Route53
-      hostedZoneId: "Z1234567890"      # ID della hosted zone
-      domainSuffix: "nodes.koordedht.local" # Dove creare i record dei nodi
+      hostedZoneId: ""      # ID della hosted zone
+      domainSuffix: "" # Dove creare i record dei nodi
       ttl: 30                          # TTL per i record
 
   deBruijn:
