@@ -1,23 +1,18 @@
 FROM golang:1.25 AS builder
-LABEL authors="flaviosimonelli"
 
 WORKDIR /app
 
-# Copia tutto il codice dentro il container
+COPY go.mod go.sum ./
+RUN go mod download
+
+
 COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -o /koorde ./cmd/node
 
-# Compila il binario
-RUN go build -o /koorde ./cmd/node/
 
-# Fase finale: immagine leggera
-FROM debian:12-slim
+FROM gcr.io/distroless/base-debian12
 
-WORKDIR /app
+COPY --from=builder /koorde /usr/local/bin/koorde
+COPY config/node/config.yaml /etc/koorde/config.yaml
 
-# Copia il binario compilato
-COPY --from=builder /koorde /app/node
-
-# Porta gRPC (modifica se diversa)
-EXPOSE 41781
-
-ENTRYPOINT ["/app/node"]
+ENTRYPOINT ["/usr/local/bin/koorde"]

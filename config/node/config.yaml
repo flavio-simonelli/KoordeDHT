@@ -1,5 +1,5 @@
 logger:
-  active: true             # Enable or disable logging (true | false)
+  active: false             # Enable or disable logging (true | false)
   level: "info"            # Minimum log level: debug | info | warn | error
   encoding: "console"      # Log output format: console (human-readable) | json
   mode: "stdout"           # Log destination: stdout | file
@@ -16,9 +16,9 @@ dht:
   mode: "private"          # Network mode: public (real network) | private (local/isolated)
 
   bootstrap:
-    mode: "static"              # Bootstrap strategy: dns | static
+    mode: "dns"              # Bootstrap strategy: dns | static
     dnsName: "" # DNS name used when mode = dns
-    srv: false                  # Use DNS SRV records if true, otherwise A/AAAA records
+    srv: true                  # Use DNS SRV records if true, otherwise A/AAAA records
     port: 35761                 # Bootstrap port (used only when srv = false)
     peers: []                   # Static peer list (used only when mode = static)
 
