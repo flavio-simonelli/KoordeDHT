@@ -212,21 +212,25 @@ func Ping(ctx context.Context, client pb.DHTClient) error {
 }
 
 // StoreRemote streams a batch of resources to a remote node via the Store RPC.
-// It opens a client-stream, sends each resource in the slice, and finally closes the stream.
 //
-// The caller must provide a ready-to-use gRPC client.
-// This function does not manage client connection pooling or closing.
+// Behavior:
+//   - Opens a client stream.
+//   - Attempts to send all resources in the input slice.
+//   - Collects any resources that could not be sent successfully.
+//   - Closes the stream and waits for server acknowledgment.
 //
 // Returns:
-//   - nil on success
-//   - ErrTimeout if the RPC timed out
-//   - a wrapped RPC error otherwise
-func StoreRemote(ctx context.Context, client pb.DHTClient, resources []domain.Resource) error {
+//   - A slice of resources that failed to be stored (empty if all succeeded).
+//   - An error if the stream could not be opened or if the final acknowledgment failed.
+//     (In such case, all resources are considered failed.)
+func StoreRemote(ctx context.Context, client pb.DHTClient, resources []domain.Resource) ([]domain.Resource, error) {
 	// Open the client stream
 	stream, err := client.Store(ctx)
 	if err != nil {
-		return fmt.Errorf("client: failed to open store stream: %w", err)
+		return resources, fmt.Errorf("client: failed to open store stream: %w", err)
 	}
+
+	var failed []domain.Resource
 
 	// Send each resource
 	for _, res := range resources {
@@ -234,7 +238,8 @@ func StoreRemote(ctx context.Context, client pb.DHTClient, resources []domain.Re
 			Resource: res.ToProtoDHT(),
 		}
 		if err := stream.Send(req); err != nil {
-			return fmt.Errorf("client: failed to send resource (rawKey=%s): %w", res.RawKey, err)
+			// Mark as failed, continue with others
+			failed = append(failed, res)
 		}
 	}
 
@@ -242,12 +247,12 @@ func StoreRemote(ctx context.Context, client pb.DHTClient, resources []domain.Re
 	_, err = stream.CloseAndRecv()
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return ErrTimeout
+			return resources, ErrTimeout
 		}
-		return fmt.Errorf("client: store stream failed: %w", err)
+		return resources, fmt.Errorf("client: store stream failed: %w", err)
 	}
 
-	return nil
+	return failed, nil
 }
 
 // RetrieveRemote sends a RetrieveValue RPC to the given remote node to fetch

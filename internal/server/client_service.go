@@ -70,7 +70,7 @@ func (s *clientService) Put(ctx context.Context, req *clientv1.PutRequest) (*emp
 	res := domain.ResourceFromProtoClient(s.node.Space(), req.Resource)
 
 	// Store resource
-	if err := s.node.Put(ctx, res); err != nil {
+	if err := s.node.Put(ctx, *res); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to store resource: %v", err)
 	}
 

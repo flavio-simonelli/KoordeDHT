@@ -109,10 +109,10 @@ func (n *Node) Join(peers []string) error {
 
 	// Update local routing table (release old, set new)
 	if pred != nil {
-		n.cp.AddRef(pred.Addr)
+		_ = n.cp.AddRef(pred.Addr)
 		n.rt.SetPredecessor(pred)
 	}
-	n.cp.AddRef(succ.Addr)
+	_ = n.cp.AddRef(succ.Addr)
 	n.rt.SetSuccessor(0, succ)
 
 	// Initialize successor list using the new successor
@@ -172,7 +172,7 @@ func (n *Node) Leave() error {
 	data := n.s.All()
 	if len(data) > 0 {
 		ctx, cancel := context.WithTimeout(context.Background(), n.cp.FailureTimeout())
-		if err := client.StoreRemote(ctx, cli, data); err != nil {
+		if _, err := client.StoreRemote(ctx, cli, data); err != nil {
 			cancel()
 			return fmt.Errorf("leave: failed to transfer %d resources to successor %s: %w", len(data), succ.Addr, err)
 		}
