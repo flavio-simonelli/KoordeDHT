@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 type TracingConfig struct {
 	Enabled  bool   `yaml:"enabled"`
 	Exporter string `yaml:"exporter"`
+	Endpoint string `yaml:"endpoint"`
 }
 
 type TelemetryConfig struct {
@@ -48,12 +50,20 @@ type FaultToleranceConfig struct {
 	FailureTimeout        time.Duration `yaml:"failureTimeout"`
 }
 
+type RegisterConfig struct {
+	Enabled      bool   `yaml:"enabled"`
+	HostedZoneID string `yaml:"hostedZoneId"`
+	DomainSuffix string `yaml:"domainSuffix"`
+	TTL          int64  `yaml:"ttl"`
+}
+
 type BootstrapConfig struct {
-	Mode    string   `yaml:"mode"`
-	DNSName string   `yaml:"dnsName"`
-	SRV     bool     `yaml:"srv"`
-	Port    int      `yaml:"port"`
-	Peers   []string `yaml:"peers"`
+	Mode     string         `yaml:"mode"`
+	DNSName  string         `yaml:"dnsName"`
+	SRV      bool           `yaml:"srv"`
+	Port     int            `yaml:"port"`
+	Peers    []string       `yaml:"peers"`
+	Register RegisterConfig `yaml:"register"`
 }
 
 type StorageConfig struct {
@@ -104,6 +114,99 @@ func LoadConfig(path string) (*Config, error) {
 	}
 
 	return &cfg, nil
+}
+
+// ApplyEnvOverrides applies environment variable overrides to the configuration.
+//
+// Behavior:
+//   - This method modifies only selected fields of the Config struct that are
+//     commonly node-specific or deployment-dependent.
+//   - For each supported field, if a corresponding environment variable is set,
+//     its value overrides the value loaded from the YAML configuration file.
+//   - Supported overrides include:
+//     NODE_ID              -> cfg.Node.Id
+//     NODE_HOST            -> cfg.Node.Host
+//     NODE_PORT            -> cfg.Node.Port
+//     BOOTSTRAP_MODE       -> cfg.DHT.Bootstrap.Mode
+//     BOOTSTRAP_DNSNAME    -> cfg.DHT.Bootstrap.DNSName
+//     BOOTSTRAP_SRV        -> cfg.DHT.Bootstrap.SRV
+//     BOOTSTRAP_PORT       -> cfg.DHT.Bootstrap.Port
+//     BOOTSTRAP_PEERS      -> cfg.DHT.Bootstrap.Peers (comma-separated list)
+//     REGISTER_ENABLED     -> cfg.DHT.Bootstrap.Register.Enabled
+//     REGISTER_ZONE_ID     -> cfg.DHT.Bootstrap.Register.HostedZoneID
+//     REGISTER_SUFFIX      -> cfg.DHT.Bootstrap.Register.DomainSuffix
+//     REGISTER_TTL         -> cfg.DHT.Bootstrap.Register.TTL
+//     TRACE_ENABLED        -> cfg.Telemetry.Tracing.Enabled
+//     TRACE_EXPORTER       -> cfg.Telemetry.Tracing.Exporter
+//     TRACE_ENDPOINT       -> cfg.Telemetry.Tracing.Endpoint
+//
+// Type conversions:
+//   - Integer fields (e.g., NODE_PORT, BOOTSTRAP_PORT) are parsed using strconv.Atoi;
+//     invalid values are ignored.
+//   - Boolean field BOOTSTRAP_SRV accepts "true", "1", or "yes" (case-insensitive)
+//     as true; any other non-empty value is treated as false.
+//   - Lists such as BOOTSTRAP_PEERS are parsed by splitting the string on commas.
+//
+// Usage:
+//
+//	cfg, _ := LoadConfig("config.yaml")
+//	cfg.ApplyEnvOverrides()
+func (cfg *Config) ApplyEnvOverrides() {
+	if v := os.Getenv("NODE_ID"); v != "" {
+		cfg.Node.Id = v
+	}
+	if v := os.Getenv("NODE_HOST"); v != "" {
+		cfg.Node.Host = v
+	}
+	if v := os.Getenv("NODE_PORT"); v != "" {
+		if port, err := strconv.Atoi(v); err == nil {
+			cfg.Node.Port = port
+		}
+	}
+
+	if v := os.Getenv("BOOTSTRAP_MODE"); v != "" {
+		cfg.DHT.Bootstrap.Mode = v
+	}
+	if v := os.Getenv("BOOTSTRAP_DNSNAME"); v != "" {
+		cfg.DHT.Bootstrap.DNSName = v
+	}
+	if v := os.Getenv("BOOTSTRAP_SRV"); v != "" {
+		v = strings.ToLower(v)
+		cfg.DHT.Bootstrap.SRV = v == "true" || v == "1" || v == "yes"
+	}
+	if v := os.Getenv("BOOTSTRAP_PORT"); v != "" {
+		if port, err := strconv.Atoi(v); err == nil {
+			cfg.DHT.Bootstrap.Port = port
+		}
+	}
+	if v := os.Getenv("BOOTSTRAP_PEERS"); v != "" {
+		cfg.DHT.Bootstrap.Peers = strings.Split(v, ",")
+	}
+	if v := os.Getenv("TRACE_ENABLED"); v != "" {
+		v = strings.ToLower(v)
+		cfg.Telemetry.Tracing.Enabled = v == "true" || v == "1" || v == "yes"
+	}
+	if v := os.Getenv("TRACE_EXPORTER"); v != "" {
+		cfg.Telemetry.Tracing.Exporter = v
+	}
+	if v := os.Getenv("TRACE_ENDPOINT"); v != "" {
+		cfg.Telemetry.Tracing.Endpoint = v
+	}
+	if v := os.Getenv("REGISTER_ENABLED"); v != "" {
+		v = strings.ToLower(v)
+		cfg.DHT.Bootstrap.Register.Enabled = v == "true" || v == "1" || v == "yes"
+	}
+	if v := os.Getenv("REGISTER_ZONE_ID"); v != "" {
+		cfg.DHT.Bootstrap.Register.HostedZoneID = v
+	}
+	if v := os.Getenv("REGISTER_SUFFIX"); v != "" {
+		cfg.DHT.Bootstrap.Register.DomainSuffix = v
+	}
+	if v := os.Getenv("REGISTER_TTL"); v != "" {
+		if ttl, err := strconv.ParseInt(v, 10, 64); err == nil {
+			cfg.DHT.Bootstrap.Register.TTL = ttl
+		}
+	}
 }
 
 // ValidateConfig performs structural validation of the loaded configuration.
@@ -179,6 +282,17 @@ func (cfg *Config) ValidateConfig() error {
 		if !b.SRV && b.Port <= 0 {
 			errs = append(errs, "bootstrap.port must be > 0 when using A/AAAA (srv=false)")
 		}
+		if b.Register.Enabled {
+			if b.Register.HostedZoneID == "" {
+				errs = append(errs, "bootstrap.register.hostedZoneId is required when register.enabled=true")
+			}
+			if b.Register.DomainSuffix == "" {
+				errs = append(errs, "bootstrap.register.domainSuffix is required when register.enabled=true")
+			}
+			if b.Register.TTL <= 0 {
+				errs = append(errs, "bootstrap.register.ttl must be > 0 when register.enabled=true")
+			}
+		}
 	case "static":
 		for _, p := range b.Peers {
 			if _, _, err := net.SplitHostPort(p); err != nil {
@@ -186,7 +300,7 @@ func (cfg *Config) ValidateConfig() error {
 			}
 		}
 	case "init":
-		// primo nodo → nessun vincolo extra
+		// primo nodo nessun vincolo extra
 	default:
 		errs = append(errs, fmt.Sprintf("invalid bootstrap.mode: %s (must be dns, static or init)", b.Mode))
 	}
@@ -202,6 +316,9 @@ func (cfg *Config) ValidateConfig() error {
 		case "stdout", "jaeger", "otlp":
 		default:
 			errs = append(errs, fmt.Sprintf("invalid telemetry.tracing.exporter: %s", cfg.Telemetry.Tracing.Exporter))
+		}
+		if cfg.Telemetry.Tracing.Endpoint == "" {
+			errs = append(errs, "telemetry.tracing.endpoint is required")
 		}
 	}
 
@@ -256,6 +373,12 @@ func (cfg *Config) LogConfig(lgr logger.Logger) {
 		logger.F("dht.bootstrap.port", cfg.DHT.Bootstrap.Port),
 		logger.F("dht.bootstrap.peers", cfg.DHT.Bootstrap.Peers),
 
+		// register
+		logger.F("dht.bootstrap.register.enabled", cfg.DHT.Bootstrap.Register.Enabled),
+		logger.F("dht.bootstrap.register.hostedZoneId", cfg.DHT.Bootstrap.Register.HostedZoneID),
+		logger.F("dht.bootstrap.register.domainSuffix", cfg.DHT.Bootstrap.Register.DomainSuffix),
+		logger.F("dht.bootstrap.register.ttl", cfg.DHT.Bootstrap.Register.TTL),
+
 		// Node
 		logger.F("node.id", cfg.Node.Id),
 		logger.F("node.host", cfg.Node.Host),
@@ -264,5 +387,6 @@ func (cfg *Config) LogConfig(lgr logger.Logger) {
 		// Telemetry
 		logger.F("telemetry.tracing.enabled", cfg.Telemetry.Tracing.Enabled),
 		logger.F("telemetry.tracing.exporter", cfg.Telemetry.Tracing.Exporter),
+		logger.F("telemetry.tracing.endpoint", cfg.Telemetry.Tracing.Endpoint),
 	)
 }

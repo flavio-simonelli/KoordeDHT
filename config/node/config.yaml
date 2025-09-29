@@ -22,6 +22,12 @@ dht:
     port: 35761                 # Bootstrap port (used only when srv = false)
     peers: []                   # Static peer list (used only when mode = static)
 
+    register:
+      enabled: true                    # Se true, il nodo si registra in Route53
+      hostedZoneId: "Z1234567890"      # ID della hosted zone
+      domainSuffix: "nodes.koordedht.local" # Dove creare i record dei nodi
+      ttl: 30                          # TTL per i record
+
   deBruijn:
     degree: 2              # Degree of the de Bruijn graph (2 = minimal, log n = optimal; must be a power of 2 for binary string representation)
     fixInterval: 10s       # Periodic refresh interval for de Bruijn pointers
@@ -42,4 +48,5 @@ node:
 telemetry:
   tracing:
     enabled: true          # Enable or disable distributed tracing (true | false)
-    exporter: jaeger       # Tracing exporter to use (currently only Jaeger is supported)
+    exporter: otlp       # Tracing exporter to use (otlp | jaeger )
+    endpoint: "" # Exporter endpoint (OTLP or Jaeger)

@@ -46,7 +46,7 @@ func InitTracer(cfg config.TelemetryConfig, serviceName string, nodeId domain.ID
 		)
 	case "jaeger":
 		exp, err := jaeger.New(
-			jaeger.WithCollectorEndpoint(jaeger.WithEndpoint("http://localhost:14268/api/traces")),
+			jaeger.WithCollectorEndpoint(jaeger.WithEndpoint(cfg.Tracing.Endpoint)),
 		)
 		if err != nil {
 			log.Fatalf("failed to initialize Jaeger exporter: %v", err)
@@ -56,11 +56,10 @@ func InitTracer(cfg config.TelemetryConfig, serviceName string, nodeId domain.ID
 			sdktrace.WithResource(res),
 		)
 	case "otlp":
-		// Usa Jaeger o Tempo come backend OTLP
 		exp, err := otlptracegrpc.New(
 			context.Background(),
-			otlptracegrpc.WithInsecure(),                 // se non usi TLS
-			otlptracegrpc.WithEndpoint("localhost:4317"), // porta OTLP
+			otlptracegrpc.WithInsecure(),
+			otlptracegrpc.WithEndpoint(cfg.Tracing.Endpoint), // porta OTLP
 		)
 		if err != nil {
 			log.Fatalf("failed to initialize OTLP exporter: %v", err)

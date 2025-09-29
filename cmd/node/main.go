@@ -36,6 +36,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to load configuration from %q: %v", *configPath, err)
 	}
+	cfg.ApplyEnvOverrides()
 	// Validate configuration
 	if err := cfg.ValidateConfig(); err != nil {
 		log.Fatalf("invalid configuration: %v", err)
