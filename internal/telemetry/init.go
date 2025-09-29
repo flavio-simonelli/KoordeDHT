@@ -10,6 +10,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/jaeger"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -54,7 +55,20 @@ func InitTracer(cfg config.TelemetryConfig, serviceName string, nodeId domain.ID
 			sdktrace.WithBatcher(exp),
 			sdktrace.WithResource(res),
 		)
-	// TODO: aggiungere "otlp", "zipkin", ecc.
+	case "otlp":
+		// Usa Jaeger o Tempo come backend OTLP
+		exp, err := otlptracegrpc.New(
+			context.Background(),
+			otlptracegrpc.WithInsecure(),                 // se non usi TLS
+			otlptracegrpc.WithEndpoint("localhost:4317"), // porta OTLP
+		)
+		if err != nil {
+			log.Fatalf("failed to initialize OTLP exporter: %v", err)
+		}
+		tp = sdktrace.NewTracerProvider(
+			sdktrace.WithBatcher(exp),
+			sdktrace.WithResource(res),
+		)
 	default:
 		panic(fmt.Sprintf("unsupported exporter: %s", cfg.Tracing.Exporter))
 	}
