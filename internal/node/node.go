@@ -66,6 +66,9 @@ func (n *Node) Join(peers []string) error {
 		cancel()
 		conn.Close()
 		if lastErr == nil && succ != nil {
+			if succ.ID.Equal(self.ID) {
+				return fmt.Errorf("join: there is already a node with the same ID")
+			}
 			n.lgr.Info("join: candidate successor found",
 				logger.F("bootstrap", addr),
 				logger.FNode("successor", succ))
