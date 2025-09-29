@@ -56,11 +56,16 @@ type BootstrapConfig struct {
 	Peers   []string `yaml:"peers"`
 }
 
+type StorageConfig struct {
+	FixInterval time.Duration `yaml:"fixInterval"`
+}
+
 type DHTConfig struct {
 	IDBits         int                  `yaml:"idBits"`
 	Mode           string               `yaml:"mode"`
 	DeBruijn       DeBruijnConfig       `yaml:"deBruijn"`
 	FaultTolerance FaultToleranceConfig `yaml:"faultTolerance"`
+	Storage        StorageConfig        `yaml:"storage"`
 	Bootstrap      BootstrapConfig      `yaml:"bootstrap"`
 }
 
@@ -232,6 +237,10 @@ func (cfg *Config) LogConfig(lgr logger.Logger) {
 		logger.F("dht.deBruijn.backupSize", cfg.DHT.DeBruijn.BackupSize),
 		logger.F("dht.deBruijn.fixInterval", cfg.DHT.DeBruijn.FixInterval.String()),
 		logger.F("dht.deBruijn.fixIntervalMs", cfg.DHT.DeBruijn.FixInterval.Milliseconds()),
+
+		// storage
+		logger.F("dht.storage.fixInterval", cfg.DHT.Storage.FixInterval.String()),
+		logger.F("dht.storage.fixIntervalMs", cfg.DHT.Storage.FixInterval.Milliseconds()),
 
 		// fault tolerance
 		logger.F("dht.faultTolerance.successorListSize", cfg.DHT.FaultTolerance.SuccessorListSize),

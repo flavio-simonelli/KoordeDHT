@@ -8,6 +8,8 @@ import (
 	"KoordeDHT/internal/storage"
 	"context"
 	"fmt"
+
+	"google.golang.org/grpc"
 )
 
 type Node struct {
@@ -142,12 +144,27 @@ func (n *Node) CreateNewDHT() {
 }
 
 // Leave gracefully removes the current node from the DHT.
-// It notifies the successor and transfers all stored resources.
+// The procedure notifies the successor about departure and attempts
+// to transfer all resources currently stored at this node.
+//
+// Behavior:
+//   - If this is the only node in the ring, the leave is a no-op.
+//   - Otherwise:
+//     1. Notify the successor of the departure.
+//     2. Attempt to transfer all resources to the immediate successor.
+//     3. If some resources cannot be transferred, resolve their
+//     responsible node via FindSuccessor and retry individually.
+//   - Logs INFO on successful transfers, WARN/ERROR on failures.
+//
+// Returns:
+//   - nil if the leave was completed successfully (resources either
+//     transferred or retried).
+//   - error if resource transfer ultimately fails for some keys.
 func (n *Node) Leave() error {
 	self := n.rt.Self()
 	succ := n.rt.FirstSuccessor()
 
-	// Caso singolo nodo nell’anello
+	// Case: single node in the ring
 	if succ == nil || succ.ID.Equal(self.ID) {
 		n.lgr.Warn("leave: single node in DHT, no need to notify others", logger.FNode("self", self))
 		return nil
@@ -158,7 +175,7 @@ func (n *Node) Leave() error {
 		return fmt.Errorf("leave: failed to get client for successor %s: %w", succ.Addr, err)
 	}
 
-	// 1. Notifica al successore che sto lasciando
+	// Notify successor of departure (best-effort)
 	{
 		ctx, cancel := context.WithTimeout(context.Background(), n.cp.FailureTimeout())
 		if err := client.Leave(ctx, cli, self); err != nil {
@@ -168,16 +185,62 @@ func (n *Node) Leave() error {
 		cancel()
 	}
 
-	// 2. Trasferimento risorse al successore
+	// Attempt bulk transfer to successor
 	data := n.s.All()
 	if len(data) > 0 {
 		ctx, cancel := context.WithTimeout(context.Background(), n.cp.FailureTimeout())
-		if _, err := client.StoreRemote(ctx, cli, data); err != nil {
-			cancel()
-			return fmt.Errorf("leave: failed to transfer %d resources to successor %s: %w", len(data), succ.Addr, err)
-		}
+		failed, err := client.StoreRemote(ctx, cli, data)
 		cancel()
-		n.lgr.Info("leave: transferred resources to successor", logger.F("count", len(data)), logger.FNode("successor", succ))
+		if err != nil {
+			n.lgr.Warn("Leave: bulk transfer to successor failed, retrying individually",
+				logger.F("total", len(data)), logger.F("err", err))
+			failed = data // treat all as failed
+		}
+
+		// Retry individually for any failed resources
+		for _, res := range failed {
+			// Find the correct successor for this resource
+			ctx, cancel := context.WithTimeout(context.Background(), n.cp.FailureTimeout())
+			correctSucc, err := client.FindSuccessorStart(ctx, cli, n.Space(), res.Key)
+			cancel()
+			if err != nil {
+				n.lgr.Warn("Leave: failed to find responsible node for resource",
+					logger.F("key", res.RawKey), logger.F("err", err))
+				continue
+			}
+			if correctSucc == nil {
+				n.lgr.Warn("Leave: no responsible node found for resource",
+					logger.F("key", res.RawKey))
+				continue
+			}
+			if correctSucc.ID.Equal(self.ID) {
+				continue // the successor not keeps the resource, skip
+			}
+			cli2, err := n.cp.GetFromPool(correctSucc.Addr)
+			var econn2 *grpc.ClientConn
+			if err != nil {
+				cli2, econn2, err = n.cp.DialEphemeral(correctSucc.Addr)
+				if err != nil {
+					n.lgr.Warn("Leave: failed to connect to responsible node",
+						logger.F("key", res.RawKey), logger.FNode("responsible", correctSucc), logger.F("err", err))
+					continue
+				}
+				defer econn2.Close()
+			}
+
+			sres := []domain.Resource{res}
+			ctx, cancel = context.WithTimeout(context.Background(), n.cp.FailureTimeout())
+			_, err = client.StoreRemote(ctx, cli2, sres)
+			cancel()
+			if err != nil {
+				n.lgr.Warn("Leave: failed to transfer resource during retry",
+					logger.F("key", res.RawKey), logger.FNode("responsible", correctSucc), logger.F("err", err))
+				continue
+			}
+
+			n.lgr.Info("Leave: resource transferred successfully during retry",
+				logger.F("key", res.RawKey), logger.FNode("responsible", correctSucc))
+		}
 	}
 
 	n.lgr.Info("leave: node has gracefully left the DHT", logger.FNode("self", self))
@@ -190,7 +253,8 @@ func (n *Node) Stop() {
 	if n == nil {
 		return
 	}
-	// Example: close client pool, timers, background workers...
+	n.Leave()
+
 	if n.cp != nil {
 		n.Leave()
 		n.cp.Close()

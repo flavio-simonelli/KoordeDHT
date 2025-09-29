@@ -26,6 +26,9 @@ dht:
     degree: 2              # Degree of the de Bruijn graph (2 = minimal, log n = optimal; must be a power of 2 for binary string representation)
     fixInterval: 10s       # Periodic refresh interval for de Bruijn pointers
 
+  storage:
+    fixInterval: 15s      # Periodic refresh interval for stored key-value pairs
+
   faultTolerance:
     successorListSize: 4   # Number of successors to maintain (≈ log n for fault tolerance)
     stabilizationInterval: 5s  # Periodic interval for successor stabilization

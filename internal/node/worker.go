@@ -6,6 +6,8 @@ import (
 	"KoordeDHT/internal/logger"
 	"context"
 	"time"
+
+	"google.golang.org/grpc"
 )
 
 // StartStabilizers runs periodic maintenance tasks for Koorde.
@@ -14,7 +16,7 @@ import (
 //   - De Bruijn pointer maintenance at deBruijnInterval
 //
 // Both loops stop when ctx is canceled.
-func (n *Node) StartStabilizers(ctx context.Context, chordInterval, deBruijnInterval time.Duration) {
+func (n *Node) StartStabilizers(ctx context.Context, chordInterval, deBruijnInterval, storageInterval time.Duration) {
 	// Chord-style stabilizers
 	go func() {
 		ticker := time.NewTicker(chordInterval)
@@ -48,6 +50,22 @@ func (n *Node) StartStabilizers(ctx context.Context, chordInterval, deBruijnInte
 			}
 		}
 	}()
+
+	// Storage maintenance
+	go func() {
+		ticker := time.NewTicker(storageInterval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				n.lgr.Info("storage maintenance stopped")
+				return
+			case <-ticker.C:
+				n.resourceRepair(ctx)
+			}
+		}
+	}()
 }
 
 // printStorageStats logs the current state of the local storage.
@@ -60,8 +78,86 @@ func (n *Node) printClientPoolStats() {
 	n.cp.DebugLog()
 }
 
+// printRoutingTable logs the current state of the routing table.
 func (n *Node) printRoutingTable() {
 	n.rt.DebugLog()
+}
+
+// resourceRepair performs one maintenance pass to ensure that all resources
+// stored locally still belong to this node's primary ownership interval.
+//
+// Ownership (no replication):
+//   - This node (self) owns keys in (pred, self].
+//   - Any local resource whose key ∉ (pred, self] should be transferred
+//     to the node that is currently responsible for it.
+//
+// Strategy:
+//   - Fast check using the predecessor interval when available.
+//   - Robust confirmation via a fresh FindSuccessor lookup before transferring,
+//     so we do not rely solely on potentially stale predecessor information.
+//
+// Logging:
+//   - WARN for lookup/transfer/delete failures.
+//   - INFO for successful transfers.
+//   - Keep logs minimal; this runs periodically.
+func (n *Node) resourceRepair(ctx context.Context) {
+	self := n.rt.Self()
+	pred := n.rt.GetPredecessor()
+	if pred == nil {
+		// Without a successor, we cannot determine our responsibility interval.
+		n.lgr.Warn("ResourceRepair: skipping pass, successor is nil")
+		return
+	}
+
+	resources := n.s.Between(self.ID, pred.ID)
+	if len(resources) == 0 {
+		// No resources to check
+		return
+	}
+
+	for _, res := range resources {
+
+		// find current responsible node
+		resp, err := n.FindSuccessorInit(ctx, res.Key)
+		if err != nil || resp == nil {
+			n.lgr.Warn("ResourceRepair: failed to find successor",
+				logger.F("key", res.RawKey), logger.F("err", err))
+			continue
+		}
+		if resp.ID.Equal(self.ID) {
+			// still responsible
+			continue
+		}
+
+		// transfer resource
+		sres := []domain.Resource{res}
+		cli, err := n.cp.GetFromPool(resp.Addr)
+		var econn *grpc.ClientConn
+		if err != nil {
+			cli, econn, err = n.cp.DialEphemeral(resp.Addr)
+			if err != nil {
+				n.lgr.Warn("ResourceRepair: failed to connect to responsible node",
+					logger.F("key", res.RawKey), logger.FNode("responsible", resp), logger.F("err", err))
+				continue
+			}
+			defer econn.Close()
+		}
+
+		if _, err := client.StoreRemote(ctx, cli, sres); err != nil {
+			n.lgr.Warn("ResourceRepair: failed to transfer resource",
+				logger.F("key", res.RawKey), logger.FNode("responsible", resp), logger.F("err", err))
+			continue
+		}
+
+		// delete local copy only if transfer succeeded
+		if err := n.s.Delete(res.Key); err != nil {
+			n.lgr.Warn("ResourceRepair: failed to delete resource after transfer",
+				logger.F("key", res.RawKey), logger.F("err", err))
+		} else {
+			n.lgr.Info("ResourceRepair: resource transferred successfully",
+				logger.F("key", res.RawKey), logger.FNode("responsible", resp))
+		}
+	}
 }
 
 // stabilizeSuccessor verifies that the current successor is alive and valid.

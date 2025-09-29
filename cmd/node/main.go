@@ -183,7 +183,7 @@ func main() {
 	defer stop()
 
 	// Start periodic stabilization workers (run until ctx is canceled)
-	n.StartStabilizers(ctx, cfg.DHT.FaultTolerance.StabilizationInterval, cfg.DHT.DeBruijn.FixInterval)
+	n.StartStabilizers(ctx, cfg.DHT.FaultTolerance.StabilizationInterval, cfg.DHT.DeBruijn.FixInterval, cfg.DHT.Storage.FixInterval)
 	lgr.Debug("Stabilization workers started")
 
 	select {
