@@ -1,5 +1,5 @@
 logger:
-  active: false             # Enable or disable logging (true | false)
+  active: true             # Enable or disable logging (true | false)
   level: "info"            # Minimum log level: debug | info | warn | error
   encoding: "console"      # Log output format: console (human-readable) | json
   mode: "stdout"           # Log destination: stdout | file

@@ -15,4 +15,5 @@ FROM gcr.io/distroless/base-debian12
 COPY --from=builder /koorde /usr/local/bin/koorde
 COPY config/node/config.yaml /etc/koorde/config.yaml
 
-ENTRYPOINT ["/usr/local/bin/koorde"]
+ENTRYPOINT ["/usr/local/bin/koorde", "-config", "/etc/koorde/config.yaml"]
+
