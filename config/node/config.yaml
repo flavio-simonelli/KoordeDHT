@@ -25,7 +25,6 @@ dht:
   deBruijn:
     degree: 2              # Degree of the de Bruijn graph (2 = minimal, log n = optimal; must be a power of 2 for binary string representation)
     fixInterval: 10s       # Periodic refresh interval for de Bruijn pointers
-    failureTimeout: 3s     # Timeout for gRPC calls during de Bruijn pointer stabilization
 
   faultTolerance:
     successorListSize: 4   # Number of successors to maintain (≈ log n for fault tolerance)
