@@ -89,7 +89,7 @@ func main() {
 		ID:   id,
 		Addr: addr,
 	}
-	lgr.Debug("generated node ID", logger.F("id", id.ToBinaryString(true)))
+	lgr.Debug("generated node ID", logger.F("id", id.ToHexString(true)))
 	lgr = lgr.Named("node").WithNode(domainNode)
 	lgr.Info("New Node initializing")
 

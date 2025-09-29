@@ -28,7 +28,7 @@ func (z ZapAdapter) Named(name string) logger.Logger {
 func (z ZapAdapter) WithNode(n domain.Node) logger.Logger {
 	return ZapAdapter{L: z.L.With(
 		zap.Any("self", map[string]any{
-			"id":   n.ID.ToBinaryString(true),
+			"id":   n.ID.ToHexString(true),
 			"addr": n.Addr,
 		}),
 	)}
