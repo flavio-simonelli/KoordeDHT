@@ -86,75 +86,15 @@ func (n *Node) FindSuccessorInit(ctx context.Context, target domain.ID) (*domain
 		return succ, nil
 	}
 	// start de Bruijn routing
-	Bruijn := n.rt.DeBruijnList()
-	if Bruijn != nil && len(Bruijn) > 0 {
-		// calculate digit and kshift
-		digit, kshift, err := n.rt.Space().NextDigitBaseK(target)
-		if err != nil {
-			n.lgr.Error("FindSuccessorInit: failed to compute next digit and kshift",
-				logger.F("target", target), logger.F("err", err))
-			return nil, status.Error(codes.Internal, "failed to compute next digit and kshift")
-		}
-		// compute currentI = k * ID + digit
-		currentI, err := n.rt.Space().MulKMod(self.ID)
-		if err != nil {
-			n.lgr.Error("FindSuccessorInit: failed to compute currentI during MulKMod",
-				logger.F("target", target), logger.F("err", err))
-			return nil, status.Error(codes.Internal, "failed to compute currentI")
-		}
-		currentI, err = n.rt.Space().AddMod(currentI, n.rt.Space().FromUint64(digit))
-		if err != nil {
-			n.lgr.Error("FindSuccessorInit: failed to compute currentI during AddMod",
-				logger.F("target", target), logger.F("err", err))
-			return nil, status.Error(codes.Internal, "failed to compute currentI")
-		}
-		// find the closest preceding node to currentI
-		index := n.findNextHop(Bruijn, currentI)
-		for i := index; i >= 0; i-- {
-			d := Bruijn[i]
-			if d == nil {
-				continue
-			}
-			n.lgr.Info("FindSuccessorStep: forwarding to de Bruijn node",
-				logger.F("target", target), logger.FNode("nextHop", d))
-			var res *domain.Node
-			var err error
-			if d.ID.Equal(self.ID) {
-				res, err = n.FindSuccessorStep(ctx, target, currentI, kshift)
-			} else {
-				cli, err := n.cp.GetFromPool(d.Addr)
-				if err != nil {
-					n.lgr.Warn("FindSuccessorInit: failed to get connection from pool",
-						logger.F("tryIdx", i), logger.F("addr", d.Addr), logger.F("err", err))
-					continue
-				}
-				res, err = client.FindSuccessorStep(ctx, cli, n.Space(), target, currentI, kshift)
-			}
-			if err == nil && res != nil {
-				return res, nil
-			} else {
-				// se il contesto è già scaduto/cancellato = stop immediato
-				if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) || ctx.Err() != nil {
-					n.lgr.Error("FindSuccessorInit: lookup interrotto per timeout/cancel",
-						logger.F("tryIdx", i), logger.F("addr", d.Addr), logger.F("err", err))
-					return nil, ctx.Err()
-				}
-				// altrimenti logghiamo il problema e proviamo il precedente
-				n.lgr.Warn("FindSuccessorInit: de Bruijn nodo errore",
-					logger.F("tryIdx", i), logger.F("addr", d.Addr), logger.F("err", err))
-			}
-		}
-	}
-	// if all the nodes in the de Bruijn list not response, fallback to successor
-	n.lgr.Warn("FindSuccessorInit: no de Bruijn responded or present, falling back to successor",
-		logger.F("target", target), logger.FNode("successor", succ))
-	cli, err := n.cp.GetFromPool(succ.Addr)
+	// calculate initial currentI and kshift
+	currentI, kshift, err := n.rt.Space().BestImaginarySimple(self.ID, succ.ID, target)
 	if err != nil {
-		n.lgr.Error("FindSuccessorInit: failed to get connection from pool for successor",
-			logger.F("addr", succ.Addr), logger.F("err", err))
-		return nil, status.Error(codes.Internal, "failed to get connection to successor")
+		n.lgr.Error("FindSuccessorInit: failed to compute initial currentI and kshift",
+			logger.F("target", target.ToHexString(true)), logger.F("err", err))
+		return nil, status.Error(codes.Internal, "failed to compute initial currentI and kshift")
 	}
-	return client.FindSuccessorStart(ctx, cli, n.Space(), target)
+	return n.FindSuccessorStep(ctx, target, currentI, kshift)
+
 }
 
 // FindSuccessorStep questa funzione è quella che viene chiamata dal server se riceve una richiesta di FindSuccessor in modalità STEP

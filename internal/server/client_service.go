@@ -5,6 +5,7 @@ import (
 	"KoordeDHT/internal/ctxutil"
 	"KoordeDHT/internal/domain"
 	"KoordeDHT/internal/node"
+	"KoordeDHT/internal/telemetry"
 	"context"
 	"errors"
 
@@ -242,7 +243,7 @@ func (s *clientService) Lookup(
 
 	// Enrich tracing span
 	if span := trace.SpanFromContext(ctx); span != nil {
-		span.SetAttributes(idAttributes("client.lookup.target", id)...)
+		span.SetAttributes(telemetry.IdAttributes("client.lookup.target", id)...)
 	}
 
 	// Perform lookup

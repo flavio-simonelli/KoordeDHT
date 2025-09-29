@@ -5,6 +5,7 @@ import (
 	"KoordeDHT/internal/ctxutil"
 	"KoordeDHT/internal/domain"
 	"KoordeDHT/internal/node"
+	"KoordeDHT/internal/telemetry"
 	"context"
 	"errors"
 	"fmt"
@@ -41,15 +42,6 @@ func NewDHTService(n *node.Node) dhtv1.DHTServer {
 	return &dhtService{node: n}
 }
 
-// TODO: capire dove mettere questa funzione e cosa fare con ste metriche
-func idAttributes(prefix string, id domain.ID) []attribute.KeyValue {
-	return []attribute.KeyValue{
-		attribute.String(prefix+".dec", id.ToBigInt().String()),
-		attribute.String(prefix+".hex", id.ToHexString(true)),
-		attribute.String(prefix+".bin", id.ToBinaryString(true)), // se String() è binario
-	}
-}
-
 // FindSuccessor handles a request to locate the successor of a given target ID.
 // Depending on the mode, the request is treated as either:
 //   - Initial: the first hop of a lookup
@@ -78,7 +70,7 @@ func (s *dhtService) FindSuccessor(ctx context.Context, req *dhtv1.FindSuccessor
 			span.SetAttributes(
 				attribute.String("dht.findsucc.mode", "init"),
 			)
-			span.SetAttributes(idAttributes("dht.findsucc.target", target)...)
+			span.SetAttributes(telemetry.IdAttributes("dht.findsucc.target", target)...)
 
 		case *dhtv1.FindSuccessorRequest_Step:
 			target := domain.ID(req.TargetId)
@@ -86,9 +78,9 @@ func (s *dhtService) FindSuccessor(ctx context.Context, req *dhtv1.FindSuccessor
 			kshift := domain.ID(mode.Step.KShift)
 
 			span.SetAttributes(attribute.String("dht.findsucc.mode", "step"))
-			span.SetAttributes(idAttributes("dht.findsucc.target", target)...)
-			span.SetAttributes(idAttributes("dht.findsucc.currentI", currentI)...)
-			span.SetAttributes(idAttributes("dht.findsucc.kshift", kshift)...)
+			span.SetAttributes(telemetry.IdAttributes("dht.findsucc.target", target)...)
+			span.SetAttributes(telemetry.IdAttributes("dht.findsucc.currentI", currentI)...)
+			span.SetAttributes(telemetry.IdAttributes("dht.findsucc.kshift", kshift)...)
 
 		default:
 			span.SetAttributes(attribute.String("dht.findsucc.mode", "invalid"))

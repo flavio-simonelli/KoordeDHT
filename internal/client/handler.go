@@ -4,10 +4,13 @@ import (
 	pb "KoordeDHT/internal/api/dht/v1"
 	"KoordeDHT/internal/ctxutil"
 	"KoordeDHT/internal/domain"
+	"KoordeDHT/internal/telemetry"
 	"context"
 	"errors"
 	"fmt"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -69,6 +72,13 @@ func FindSuccessorStep(ctx context.Context, client pb.DHTClient, sp *domain.Spac
 	// Check for canceled/expired context
 	if err := ctxutil.CheckContext(ctx); err != nil {
 		return nil, err
+	}
+	// Enrich tracing span (if present)
+	if span := trace.SpanFromContext(ctx); span != nil {
+		span.SetAttributes(attribute.String("dht.findsucc.mode", "step"))
+		span.SetAttributes(telemetry.IdAttributes("dht.findsucc.target", target)...)
+		span.SetAttributes(telemetry.IdAttributes("dht.findsucc.currentI", currentI)...)
+		span.SetAttributes(telemetry.IdAttributes("dht.findsucc.kshift", kshift)...)
 	}
 	// Build the request in "Step" mode (subsequent hop of the lookup)
 	req := &pb.FindSuccessorRequest{

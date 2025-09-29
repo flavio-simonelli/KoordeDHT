@@ -481,3 +481,105 @@ func (sp Space) NextDigitBaseK(x ID) (digit uint64, rest ID, err error) {
 
 	return digit, rest, nil
 }
+
+// subMod computes (a - b) mod 2^Bits, where a and b are big-endian IDs.
+// The result has the same length as the inputs.
+func (sp Space) subMod(a, b ID) ID {
+	if len(a) != sp.ByteLen || len(b) != sp.ByteLen {
+		panic("invalid ID length")
+	}
+	res := make(ID, sp.ByteLen)
+	borrow := 0
+
+	// big-endian order: start from the least significant byte
+	for i := sp.ByteLen - 1; i >= 0; i-- {
+		ai := int(a[i])
+		bi := int(b[i]) + borrow
+		if ai < bi {
+			ai += 256
+			borrow = 1
+		} else {
+			borrow = 0
+		}
+		res[i] = byte(ai - bi)
+	}
+
+	// Se c’è ancora borrow alla fine, significa che a < b,
+	// quindi il risultato è già "mod 2^Bits".
+	// Non serve fare altro.
+
+	// Maschera eventuali bit inutilizzati nel byte più significativo
+	if sp.Bits%8 != 0 {
+		mask := byte(0xFF >> (8 - (sp.Bits % 8)))
+		res[0] &= mask
+	}
+
+	return res
+}
+
+// freeBits returns floor(log2(len)) where len is a big-endian byte slice.
+func freeBits(lenBytes []byte) int {
+	for i, b := range lenBytes {
+		if b != 0 {
+			// Calcola posizione del MSB nel primo byte non nullo
+			leadingZeros := bits.LeadingZeros8(b)
+			bitPos := (len(lenBytes)-i)*8 - leadingZeros - 1
+			return bitPos
+		}
+	}
+	return 0 // len = 0
+}
+
+// BestImaginarySimple selects the initial imaginary ID (currentI) and
+// the shifted target (kshift) based only on the number of "free bits"
+// available in the interval (self, succ].
+// Algorithm:
+//  1. Compute the distance len = (succ - self) mod 2^Bits.
+//  2. freeBits = floor(log2(len)) gives the number of LSBs that can
+//     vary freely in the interval.
+//  3. digitBits = log2(GraphGrade) gives the number of bits consumed
+//     per hop in the base-k de Bruijn graph (k = 2^digitBits).
+//  4. freeDigits = freeBits / digitBits is the number of digits of
+//     the target that can be preloaded for free.
+//  5. currentI = (self + 1) with last freeBits set to the corresponding
+//     most significant bits of target (if freeBits > 0).
+//  6. kshift = (target << (freeDigits * digitBits)) mod 2^Bits.
+//
+// Returns:
+//   - currentI: the chosen initial imaginary ID.
+//   - kshift: the shifted target ID for routing.
+//   - error: if self or succ are invalid IDs.
+func (sp Space) BestImaginarySimple(self, succ, target ID) (currentI, kshift ID, err error) {
+	// 1–4: prepare parameters
+	dist := sp.subMod(succ, self)
+	fb := freeBits(dist)
+	digitBits := bits.TrailingZeros(uint(sp.GraphGrade))
+	freeDigits := fb / digitBits
+
+	// 5. currentI = self + 1
+	currentI, err = sp.AddMod(self, sp.FromUint64(1))
+	if err != nil {
+		return nil, nil, fmt.Errorf("BestImaginarySimple: invalid self ID: %w", err)
+	}
+	// initialize kshift = target
+	kshift = target
+
+	for i := 0; i < freeDigits; i++ {
+		digit, next, err := sp.NextDigitBaseK(kshift)
+		if err != nil {
+			return nil, nil, fmt.Errorf("BestImaginarySimple: invalid target ID: %w", err)
+		}
+		kshift = next
+
+		currentI, err = sp.MulKMod(currentI)
+		if err != nil {
+			return nil, nil, fmt.Errorf("BestImaginarySimple: MulKMod failed: %w", err)
+		}
+		currentI, err = sp.AddMod(currentI, sp.FromUint64(digit))
+		if err != nil {
+			return nil, nil, fmt.Errorf("BestImaginarySimple: AddMod failed: %w", err)
+		}
+	}
+
+	return currentI, kshift, nil
+}
