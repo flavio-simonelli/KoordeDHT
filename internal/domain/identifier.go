@@ -102,6 +102,11 @@ func NewSpace(b int, degree int, succListSize int) (Space, error) {
 // graph calculations).
 type ID []byte
 
+// Zero returns the all-zero identifier for this space.
+func (sp Space) Zero() ID {
+	return make(ID, sp.ByteLen)
+}
+
 // NewIdFromString derives a new identifier (ID) from the given string,
 // within the current identifier space.
 //
@@ -561,25 +566,91 @@ func (sp Space) BestImaginarySimple(self, succ, target ID) (currentI, kshift ID,
 	if err != nil {
 		return nil, nil, fmt.Errorf("BestImaginarySimple: invalid self ID: %w", err)
 	}
-	// initialize kshift = target
-	kshift = target
 
-	for i := 0; i < freeDigits; i++ {
-		digit, next, err := sp.NextDigitBaseK(kshift)
+	// If we have free digits, build preload from target
+	if freeDigits > 0 {
+		preload, shifted, err := sp.BuildPreloadFromTarget(target, freeDigits)
 		if err != nil {
-			return nil, nil, fmt.Errorf("BestImaginarySimple: invalid target ID: %w", err)
+			return nil, nil, fmt.Errorf("BestImaginarySimple: BuildPreloadFromTarget failed: %w", err)
 		}
-		kshift = next
-
-		currentI, err = sp.MulKMod(currentI)
+		kshift = shifted
+		// turn 0 the freeDigits LSBs of currentI
+		currentI, err = sp.ClearLowDigits(currentI, freeDigits, digitBits)
 		if err != nil {
-			return nil, nil, fmt.Errorf("BestImaginarySimple: MulKMod failed: %w", err)
+			return nil, nil, fmt.Errorf("BestImaginarySimple: ClearLowDigits failed: %w", err)
 		}
-		currentI, err = sp.AddMod(currentI, sp.FromUint64(digit))
+		// add preload to currentI
+		currentI, err = sp.AddMod(currentI, preload)
 		if err != nil {
 			return nil, nil, fmt.Errorf("BestImaginarySimple: AddMod failed: %w", err)
 		}
+	} else {
+		// no free digits: kshift = target
+		kshift = target
 	}
 
 	return currentI, kshift, nil
+}
+
+// BuildPreloadFromTarget constructs an ID whose low freeDigits digits
+// match the high-order digits of target. Returns also the shifted target (kshift).
+func (sp Space) BuildPreloadFromTarget(target ID, freeDigits int) (ID, ID, error) {
+	preload := sp.Zero()
+	kshift := target
+	var err error
+
+	for i := 0; i < freeDigits; i++ {
+		var digit uint64
+		digit, kshift, err = sp.NextDigitBaseK(kshift)
+		if err != nil {
+			return nil, nil, fmt.Errorf("BuildPreloadFromTarget: invalid target: %w", err)
+		}
+		preload, err = sp.MulKMod(preload)
+		if err != nil {
+			return nil, nil, fmt.Errorf("BuildPreloadFromTarget: MulKMod failed: %w", err)
+		}
+		preload, err = sp.AddMod(preload, sp.FromUint64(digit))
+		if err != nil {
+			return nil, nil, fmt.Errorf("BuildPreloadFromTarget: AddMod failed: %w", err)
+		}
+	}
+	return preload, kshift, nil
+}
+
+// ClearLowDigits clears the low freeDigits digits (base-k) of an ID.
+func (sp Space) ClearLowDigits(id ID, freeDigits, digitBits int) (ID, error) {
+	if freeDigits <= 0 {
+		return id, nil
+	}
+	bitsToClear := freeDigits * digitBits
+	if bitsToClear > sp.Bits {
+		return nil, fmt.Errorf("ClearLowDigits: cannot clear %d bits in %d-bit space", bitsToClear, sp.Bits)
+	}
+	mask := sp.Zero()
+	var err error
+	for i := 0; i < bitsToClear; i++ {
+		mask = ShiftLeft(mask)
+		mask, err = sp.AddMod(mask, sp.FromUint64(1))
+		if err != nil {
+			return nil, fmt.Errorf("ClearLowDigits: AddMod failed: %w", err)
+		}
+	}
+	// XOR with mask to get bitsToClear LSBs set to 0
+	out := make(ID, sp.ByteLen)
+	for i := 0; i < sp.ByteLen; i++ {
+		out[i] = id[i] &^ mask[i] // AND NOT
+	}
+	return out, nil
+}
+
+// ShiftLeft sposta lo slice (big-endian) di 1 bit a sinistra.
+func ShiftLeft(a []byte) []byte {
+	res := make([]byte, len(a))
+	carry := byte(0)
+	for i := len(a) - 1; i >= 0; i-- {
+		nextCarry := (a[i] & 0x80) >> 7 // bit più alto
+		res[i] = (a[i] << 1) | carry
+		carry = nextCarry
+	}
+	return res
 }
