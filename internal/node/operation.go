@@ -64,19 +64,13 @@ func (n *Node) findNextHop(list []*domain.Node, currentI domain.ID) int {
 		if curr == nil {
 			continue
 		}
-
 		// Find the next non-nil node in circular fashion
 		j := (i + 1) % len(list)
-		for list[j] == nil && j != i {
+		for list[j] == nil {
 			n.lgr.Warn("findNextHop: skipping nil node in list",
 				logger.F("index", j))
 			j = (j + 1) % len(list)
 		}
-		if j == i {
-			// All other entries are nil
-			return i
-		}
-
 		next := list[j]
 		if currentI.Between(curr.ID, next.ID) {
 			return i
@@ -118,7 +112,7 @@ func (n *Node) FindSuccessorInit(ctx context.Context, target domain.ID) (*domain
 		return nil, status.Error(codes.Internal, "node not initialized (routing table not initialized)")
 	}
 	if target.Between(self.ID, succ.ID) {
-		n.lgr.Info("EndLookup: target in (self, successor], returning successor",
+		n.lgr.Debug("EndLookup: target in (self, successor], returning successor",
 			logger.F("target", target.ToHexString(true)), logger.FNode("successor", succ))
 		return succ, nil
 	}
@@ -167,7 +161,7 @@ func (n *Node) FindSuccessorStep(ctx context.Context, target, currentI, kshift d
 		return nil, status.Error(codes.Internal, "routing table not initialized")
 	}
 	if target.Between(self.ID, succ.ID) {
-		n.lgr.Info("EndLookup: target in (self, successor], returning successor",
+		n.lgr.Debug("EndLookup: target in (self, successor], returning successor",
 			logger.F("target", target.ToHexString(true)), logger.FNode("successor", succ))
 		return succ, nil
 	}
@@ -204,7 +198,7 @@ func (n *Node) FindSuccessorStep(ctx context.Context, target, currentI, kshift d
 				if d == nil {
 					continue
 				}
-				n.lgr.Info("FindSuccessorStep: forwarding to de Bruijn node",
+				n.lgr.Debug("FindSuccessorStep: forwarding to de Bruijn node",
 					logger.F("target", target.ToHexString(true)), logger.FNode("nextHop", d))
 				var res *domain.Node
 				var err error
@@ -247,7 +241,7 @@ func (n *Node) FindSuccessorStep(ctx context.Context, target, currentI, kshift d
 	}
 
 	// Default: forward to successor
-	n.lgr.Info("FindSuccessorStep: forwarding to successor",
+	n.lgr.Debug("FindSuccessorStep: forwarding to successor",
 		logger.F("target", target.ToHexString(true)), logger.FNode("nextHop", succ))
 	cli, err := n.cp.GetFromPool(succ.Addr)
 	if err != nil {
