@@ -24,13 +24,18 @@ func InitTracer(cfg config.TelemetryConfig, serviceName string, nodeId domain.ID
 		return func(context.Context) error { return nil }
 	}
 
+	attrs := append(
+		[]attribute.KeyValue{
+			semconv.ServiceNameKey.String(serviceName),
+		},
+		IdAttributes("dht.node.id", nodeId)...,
+	)
+
 	res, err := resource.New(
 		context.Background(),
-		resource.WithAttributes(
-			semconv.ServiceNameKey.String(serviceName),
-			attribute.String("dht.node.id", nodeId.ToHexString(true)),
-		),
+		resource.WithAttributes(attrs...),
 	)
+
 	if err != nil {
 		log.Fatalf("failed to create resource: %v", err)
 	}

@@ -13,6 +13,7 @@ import (
 	"KoordeDHT/internal/server"
 	"KoordeDHT/internal/storage"
 	"KoordeDHT/internal/telemetry"
+	"KoordeDHT/internal/telemetry/lookuptrace"
 	"context"
 	"flag"
 	"log"
@@ -22,7 +23,6 @@ import (
 	"syscall"
 	"time"
 
-	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 )
 
@@ -136,10 +136,13 @@ func main() {
 	var grpcOpts []grpc.ServerOption
 	if cfg.Telemetry.Tracing.Enabled {
 		grpcOpts = append(grpcOpts,
-			grpc.StatsHandler(otelgrpc.NewServerHandler()),
+			grpc.ChainUnaryInterceptor(
+				lookuptrace.ServerInterceptor(),
+			),
 		)
-		lgr.Debug("gRPC tracing enabled")
+		lgr.Debug("gRPC tracing enabled (lookup-only)")
 	}
+
 	s, err := server.New(
 		lis,
 		n,

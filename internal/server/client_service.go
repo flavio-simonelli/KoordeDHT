@@ -6,6 +6,7 @@ import (
 	"KoordeDHT/internal/domain"
 	"KoordeDHT/internal/node"
 	"KoordeDHT/internal/telemetry"
+	"KoordeDHT/internal/telemetry/lookuptrace"
 	"context"
 	"errors"
 
@@ -223,10 +224,7 @@ func (s *clientService) GetRoutingTable(ctx context.Context, _ *emptypb.Empty) (
 //   - codes.InvalidArgument if the request is malformed or the ID is invalid
 //   - codes.NotFound if no successor can be determined
 //   - codes.Internal if the lookup fails due to internal errors
-func (s *clientService) Lookup(
-	ctx context.Context,
-	req *clientv1.LookupRequest,
-) (*clientv1.LookupResponse, error) {
+func (s *clientService) Lookup(ctx context.Context, req *clientv1.LookupRequest) (*clientv1.LookupResponse, error) {
 	// Validate context
 	if err := ctxutil.CheckContext(ctx); err != nil {
 		return nil, err
@@ -240,6 +238,9 @@ func (s *clientService) Lookup(
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid ID")
 	}
+
+	// Add lookup tracing to context
+	ctx = lookuptrace.WithLookup(ctx)
 
 	// Enrich tracing span
 	if span := trace.SpanFromContext(ctx); span != nil {
