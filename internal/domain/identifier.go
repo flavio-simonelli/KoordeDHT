@@ -536,59 +536,86 @@ func freeBits(lenBytes []byte) int {
 }
 
 // BestImaginarySimple selects the initial imaginary ID (currentI) and
-// the shifted target (kshift) based only on the number of "free bits"
-// available in the interval (self, succ].
-// Algorithm:
-//  1. Compute the distance len = (succ - self) mod 2^Bits.
-//  2. freeBits = floor(log2(len)) gives the number of LSBs that can
-//     vary freely in the interval.
-//  3. digitBits = log2(GraphGrade) gives the number of bits consumed
-//     per hop in the base-k de Bruijn graph (k = 2^digitBits).
-//  4. freeDigits = freeBits / digitBits is the number of digits of
-//     the target that can be preloaded for free.
-//  5. currentI = (self + 1) with last freeBits set to the corresponding
-//     most significant bits of target (if freeBits > 0).
-//  6. kshift = (target << (freeDigits * digitBits)) mod 2^Bits.
+// the shifted target (kshift) for a successor lookup.
+//
+// It tries to preload as many digits of the target as possible without
+// leaving the interval (self, succ]. If no candidate is found at the
+// maximum preload, the algorithm falls back by reducing the number of
+// preloaded digits. As a last resort, if no preload is possible,
+// currentI = self+1 and kshift = target.
 //
 // Returns:
-//   - currentI: the chosen initial imaginary ID.
-//   - kshift: the shifted target ID for routing.
-//   - error: if self or succ are invalid IDs.
+//   - currentI: the chosen imaginary starting ID
+//   - kshift: the shifted target for continued routing
+//   - error: if arithmetic operations fail
 func (sp Space) BestImaginarySimple(self, succ, target ID) (currentI, kshift ID, err error) {
-	// 1–4: prepare parameters
+	// Step 1: interval length
 	dist := sp.subMod(succ, self)
-	fb := freeBits(dist)
-	digitBits := bits.TrailingZeros(uint(sp.GraphGrade))
-	freeDigits := fb / digitBits
-
-	// 5. currentI = self + 1
-	currentI, err = sp.AddMod(self, sp.FromUint64(1))
-	if err != nil {
-		return nil, nil, fmt.Errorf("BestImaginarySimple: invalid self ID: %w", err)
+	if dist.Equal(sp.Zero()) {
+		return nil, nil, fmt.Errorf("BestImaginarySimple: zero interval (self == succ)")
 	}
 
-	// If we have free digits, build preload from target
-	if freeDigits > 0 {
+	// Step 2: free bits
+	fb := freeBits(dist)
+
+	// Step 3: digit size (GraphGrade must be power of two)
+	if sp.GraphGrade == 0 || (sp.GraphGrade&(sp.GraphGrade-1)) != 0 {
+		return nil, nil, fmt.Errorf("BestImaginarySimple: GraphGrade %d not power of 2", sp.GraphGrade)
+	}
+	digitBits := bits.TrailingZeros(uint(sp.GraphGrade))
+
+	// Step 4: maximum free digits
+	maxFreeDigits := fb / digitBits
+
+	// Base = self + 1
+	base, err := sp.AddMod(self, sp.FromUint64(1))
+	if err != nil {
+		return nil, nil, fmt.Errorf("BestImaginarySimple: AddMod failed: %w", err)
+	}
+
+	// Try with decreasing number of freeDigits
+	for freeDigits := maxFreeDigits; freeDigits > 0; freeDigits-- {
+		usedBits := freeDigits * digitBits
+
+		// Build preload and shifted target
 		preload, shifted, err := sp.BuildPreloadFromTarget(target, freeDigits)
 		if err != nil {
 			return nil, nil, fmt.Errorf("BestImaginarySimple: BuildPreloadFromTarget failed: %w", err)
 		}
 		kshift = shifted
-		// turn 0 the freeDigits LSBs of currentI
-		currentI, err = sp.ClearLowDigits(currentI, freeDigits, digitBits)
-		if err != nil {
-			return nil, nil, fmt.Errorf("BestImaginarySimple: ClearLowDigits failed: %w", err)
+
+		// Mask for low usedBits
+		mask := sp.FromUint64((1 << usedBits) - 1)
+
+		// Residues mod 2^usedBits
+		baseResidue := make(ID, sp.ByteLen)
+		preloadResidue := make(ID, sp.ByteLen)
+		for i := 0; i < sp.ByteLen; i++ {
+			baseResidue[i] = base[i] & mask[i]
+			preloadResidue[i] = preload[i] & mask[i]
 		}
-		// add preload to currentI
-		currentI, err = sp.AddMod(currentI, preload)
+
+		// delta = (preloadResidue - baseResidue) mod 2^usedBits
+		delta := sp.subMod(preloadResidue, baseResidue)
+		for i := 0; i < sp.ByteLen; i++ {
+			delta[i] &= mask[i]
+		}
+
+		// currentI = base + delta
+		currentI, err = sp.AddMod(base, delta)
 		if err != nil {
 			return nil, nil, fmt.Errorf("BestImaginarySimple: AddMod failed: %w", err)
 		}
-	} else {
-		// no free digits: kshift = target
-		kshift = target
+
+		// Check membership
+		if currentI.Between(self, succ) {
+			return currentI, kshift, nil
+		}
 	}
 
+	// Fallback: no preload possible
+	currentI = base
+	kshift = target
 	return currentI, kshift, nil
 }
 
@@ -615,42 +642,4 @@ func (sp Space) BuildPreloadFromTarget(target ID, freeDigits int) (ID, ID, error
 		}
 	}
 	return preload, kshift, nil
-}
-
-// ClearLowDigits clears the low freeDigits digits (base-k) of an ID.
-func (sp Space) ClearLowDigits(id ID, freeDigits, digitBits int) (ID, error) {
-	if freeDigits <= 0 {
-		return id, nil
-	}
-	bitsToClear := freeDigits * digitBits
-	if bitsToClear > sp.Bits {
-		return nil, fmt.Errorf("ClearLowDigits: cannot clear %d bits in %d-bit space", bitsToClear, sp.Bits)
-	}
-	mask := sp.Zero()
-	var err error
-	for i := 0; i < bitsToClear; i++ {
-		mask = ShiftLeft(mask)
-		mask, err = sp.AddMod(mask, sp.FromUint64(1))
-		if err != nil {
-			return nil, fmt.Errorf("ClearLowDigits: AddMod failed: %w", err)
-		}
-	}
-	// XOR with mask to get bitsToClear LSBs set to 0
-	out := make(ID, sp.ByteLen)
-	for i := 0; i < sp.ByteLen; i++ {
-		out[i] = id[i] &^ mask[i] // AND NOT
-	}
-	return out, nil
-}
-
-// ShiftLeft sposta lo slice (big-endian) di 1 bit a sinistra.
-func ShiftLeft(a []byte) []byte {
-	res := make([]byte, len(a))
-	carry := byte(0)
-	for i := len(a) - 1; i >= 0; i-- {
-		nextCarry := (a[i] & 0x80) >> 7 // bit più alto
-		res[i] = (a[i] << 1) | carry
-		carry = nextCarry
-	}
-	return res
 }
