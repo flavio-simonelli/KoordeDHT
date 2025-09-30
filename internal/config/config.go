@@ -271,6 +271,12 @@ func (cfg *Config) ValidateConfig() error {
 	if cfg.DHT.FaultTolerance.FailureTimeout <= 0 {
 		errs = append(errs, "dht.faultTolerance.failureTimeout must be > 0")
 	}
+	if cfg.DHT.DeBruijn.Degree > cfg.DHT.FaultTolerance.SuccessorListSize {
+		errs = append(errs, "dht.deBruijn.degree must be <= dht.faultTolerance.successorListSize")
+	}
+	if cfg.DHT.IDBits%cfg.DHT.DeBruijn.Degree != 0 {
+		errs = append(errs, "dht.idBits must be multiple of dht.deBruijn.degree")
+	}
 
 	// --- Bootstrap ---
 	b := cfg.DHT.Bootstrap
