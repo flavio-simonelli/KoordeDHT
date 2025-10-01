@@ -54,7 +54,6 @@ func (n *Node) Space() *domain.Space {
 // Returns:
 //   - The index i of the predecessor node (list[i]) if found.
 //   - -1 if no valid interval is found (e.g., list empty, all nil).
-/*
 func (n *Node) findNextHop(list []*domain.Node, currentI domain.ID) int {
 	if len(list) == 0 {
 		return -1
@@ -79,14 +78,6 @@ func (n *Node) findNextHop(list []*domain.Node, currentI domain.ID) int {
 	}
 
 	return -1
-}
-*/
-
-func (n *Node) findNextHop(list []*domain.Node, currentI domain.ID) int {
-	if len(list) == 0 {
-		return -1
-	}
-	return 0
 }
 
 // FindSuccessorInit starts a successor lookup from this node.
