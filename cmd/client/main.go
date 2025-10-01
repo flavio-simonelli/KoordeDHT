@@ -1,17 +1,16 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"flag"
 	"fmt"
 	"log"
-	"os"
 	"strings"
 	"time"
 
 	clientv1 "KoordeDHT/internal/api/client/v1"
 
+	"github.com/peterh/liner"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
@@ -19,10 +18,9 @@ import (
 )
 
 func connect(addr string) (clientv1.ClientAPIClient, *grpc.ClientConn, error) {
-	conn, err := grpc.Dial(
+	conn, err := grpc.NewClient(
 		addr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithBlock(),
 	)
 	if err != nil {
 		return nil, nil, err
@@ -31,12 +29,10 @@ func connect(addr string) (clientv1.ClientAPIClient, *grpc.ClientConn, error) {
 }
 
 func main() {
-	// Flags iniziali
 	addr := flag.String("addr", "127.0.0.1:5000", "Address of the Koorde node (entry point)")
 	timeout := flag.Duration("timeout", 5*time.Second, "Request timeout")
 	flag.Parse()
 
-	// Connessione iniziale
 	client, conn, err := connect(*addr)
 	if err != nil {
 		log.Fatalf("Failed to connect to node at %s: %v", *addr, err)
@@ -44,30 +40,38 @@ func main() {
 	defer conn.Close()
 
 	currentAddr := *addr
-	reader := bufio.NewScanner(os.Stdin)
-
 	fmt.Printf("Koorde interactive client. Connected to %s\n", currentAddr)
+
+	// setup liner for readline support
+	line := liner.NewLiner()
+	defer line.Close()
+	line.SetCtrlCAborts(true)
+
+	// prompt help
 	fmt.Println("Available commands: put/get/delete/getstore/getrt/lookup/use/exit")
 
 	for {
-		fmt.Printf("koorde[%s]> ", currentAddr)
-		if !reader.Scan() {
+		input, err := line.Prompt(fmt.Sprintf("koorde[%s]> ", currentAddr))
+		if err != nil {
+			if err == liner.ErrPromptAborted {
+				fmt.Println("Aborted")
+				continue
+			}
 			break
 		}
-		line := strings.TrimSpace(reader.Text())
-		if line == "" {
+
+		line.AppendHistory(input) // salva in cronologia
+
+		args := strings.Fields(strings.TrimSpace(input))
+		if len(args) == 0 {
 			continue
 		}
-
-		args := strings.Fields(line)
 		cmd := args[0]
 
-		// Context per ogni comando
 		ctx, cancel := context.WithTimeout(context.Background(), *timeout)
 		start := time.Now()
 
 		switch cmd {
-
 		case "put":
 			if len(args) < 3 {
 				fmt.Println("Usage: put <key> <value>")
@@ -75,10 +79,9 @@ func main() {
 				continue
 			}
 			key, value := args[1], args[2]
-			req := &clientv1.PutRequest{
+			_, err := client.Put(ctx, &clientv1.PutRequest{
 				Resource: &clientv1.Resource{Key: key, Value: value},
-			}
-			_, err := client.Put(ctx, req)
+			})
 			if err != nil {
 				log.Printf("Put failed: %v\n", err)
 			} else {
@@ -92,8 +95,7 @@ func main() {
 				continue
 			}
 			key := args[1]
-			req := &clientv1.GetRequest{Key: key}
-			resp, err := client.Get(ctx, req)
+			resp, err := client.Get(ctx, &clientv1.GetRequest{Key: key})
 			if err != nil {
 				if s, ok := status.FromError(err); ok && s.Code().String() == "NotFound" {
 					fmt.Printf("Key not found: %s | latency=%s\n", key, time.Since(start))
@@ -111,8 +113,7 @@ func main() {
 				continue
 			}
 			key := args[1]
-			req := &clientv1.DeleteRequest{Key: key}
-			_, err := client.Delete(ctx, req)
+			_, err := client.Delete(ctx, &clientv1.DeleteRequest{Key: key})
 			if err != nil {
 				if s, ok := status.FromError(err); ok && s.Code().String() == "NotFound" {
 					fmt.Printf("Key not found: %s | latency=%s\n", key, time.Since(start))
@@ -172,8 +173,7 @@ func main() {
 				continue
 			}
 			id := args[1]
-			req := &clientv1.LookupRequest{Id: id}
-			resp, err := client.Lookup(ctx, req)
+			resp, err := client.Lookup(ctx, &clientv1.LookupRequest{Id: id})
 			if err != nil {
 				log.Printf("Lookup failed: %v | latency=%s\n", err, time.Since(start))
 			} else {
@@ -207,7 +207,6 @@ func main() {
 
 		default:
 			fmt.Printf("Unknown command: %s\n", cmd)
-			fmt.Println("Available: put/get/delete/getstore/getrt/lookup/use/exit")
 		}
 
 		cancel()
