@@ -139,6 +139,11 @@ func LoadConfig(path string) (*Config, error) {
 //     TRACE_ENABLED        -> cfg.Telemetry.Tracing.Enabled
 //     TRACE_EXPORTER       -> cfg.Telemetry.Tracing.Exporter
 //     TRACE_ENDPOINT       -> cfg.Telemetry.Tracing.Endpoint
+//     LOGGER_ENABLED      -> cfg.Logger.Active
+//     LOGGER_LEVEL        -> cfg.Logger.Level
+//     LOGGER_ENCODING     -> cfg.Logger.Encoding
+//     LOGGER_MODE         -> cfg.Logger.Mode
+//     LOGGER_FILE_PATH    -> cfg.Logger.File.Path
 //
 // Type conversions:
 //   - Integer fields (e.g., NODE_PORT, BOOTSTRAP_PORT) are parsed using strconv.Atoi;
@@ -206,6 +211,22 @@ func (cfg *Config) ApplyEnvOverrides() {
 		if ttl, err := strconv.ParseInt(v, 10, 64); err == nil {
 			cfg.DHT.Bootstrap.Register.TTL = ttl
 		}
+	}
+	if v := os.Getenv("LOGGER_ENABLED"); v != "" {
+		v = strings.ToLower(v)
+		cfg.Logger.Active = v == "true" || v == "1" || v == "yes"
+	}
+	if v := os.Getenv("LOGGER_LEVEL"); v != "" {
+		cfg.Logger.Level = v
+	}
+	if v := os.Getenv("LOGGER_ENCODING"); v != "" {
+		cfg.Logger.Encoding = v
+	}
+	if v := os.Getenv("LOGGER_MODE"); v != "" {
+		cfg.Logger.Mode = v
+	}
+	if v := os.Getenv("LOGGER_FILE_PATH"); v != "" {
+		cfg.Logger.File.Path = v
 	}
 }
 
