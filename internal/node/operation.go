@@ -54,6 +54,7 @@ func (n *Node) Space() *domain.Space {
 // Returns:
 //   - The index i of the predecessor node (list[i]) if found.
 //   - -1 if no valid interval is found (e.g., list empty, all nil).
+/*
 func (n *Node) findNextHop(list []*domain.Node, currentI domain.ID) int {
 	if len(list) == 0 {
 		return -1
@@ -78,6 +79,14 @@ func (n *Node) findNextHop(list []*domain.Node, currentI domain.ID) int {
 	}
 
 	return -1
+}
+*/
+
+func (n *Node) findNextHop(list []*domain.Node, currentI domain.ID) int {
+	if len(list) == 0 {
+		return -1
+	}
+	return 0
 }
 
 // FindSuccessorInit starts a successor lookup from this node.
@@ -168,27 +177,35 @@ func (n *Node) FindSuccessorStep(ctx context.Context, target, currentI, kshift d
 
 	// currentI is in (self, successor]: try de Bruijn routing
 	if currentI.Between(self.ID, succ.ID) {
+
+		// Compute next digit and shifted target
+		nextDigit, nextKshift, err := n.rt.Space().NextDigitBaseK(kshift)
+		if err != nil {
+			n.lgr.Error("FindSuccessorStep: failed to compute next digit and kshift",
+				logger.F("target", target.ToHexString(true)), logger.F("err", err))
+			return nil, status.Error(codes.Internal, "failed to compute next digit and kshift")
+		}
+		// Compute next imaginary node
+		nextI, err := n.rt.Space().MulKMod(currentI)
+		if err != nil {
+			n.lgr.Error("FindSuccessorStep: failed to compute nextI (MulKMod)",
+				logger.F("target", target.ToHexString(true)), logger.F("err", err))
+			return nil, status.Error(codes.Internal, "failed to compute nextI")
+		}
+		nextI, err = n.rt.Space().AddMod(nextI, n.rt.Space().FromUint64(nextDigit))
+		if err != nil {
+			n.lgr.Error("FindSuccessorStep: failed to compute nextI (AddMod)",
+				logger.F("target", target.ToHexString(true)), logger.F("err", err))
+			return nil, status.Error(codes.Internal, "failed to compute nextI")
+		}
+
 		Bruijn := n.rt.DeBruijnList() // get de Bruijn list
 		if Bruijn != nil && len(Bruijn) > 0 {
-			// Compute next digit and shifted target
-			nextDigit, nextKshift, err := n.rt.Space().NextDigitBaseK(kshift)
-			if err != nil {
-				n.lgr.Error("FindSuccessorStep: failed to compute next digit and kshift",
-					logger.F("target", target.ToHexString(true)), logger.F("err", err))
-				return nil, status.Error(codes.Internal, "failed to compute next digit and kshift")
-			}
-			// Compute next imaginary node
-			nextI, err := n.rt.Space().MulKMod(currentI)
-			if err != nil {
-				n.lgr.Error("FindSuccessorStep: failed to compute nextI (MulKMod)",
-					logger.F("target", target.ToHexString(true)), logger.F("err", err))
-				return nil, status.Error(codes.Internal, "failed to compute nextI")
-			}
-			nextI, err = n.rt.Space().AddMod(nextI, n.rt.Space().FromUint64(nextDigit))
-			if err != nil {
-				n.lgr.Error("FindSuccessorStep: failed to compute nextI (AddMod)",
-					logger.F("target", target.ToHexString(true)), logger.F("err", err))
-				return nil, status.Error(codes.Internal, "failed to compute nextI")
+
+			if nextI.Equal(currentI) {
+				n.lgr.Error("FindSuccessorStep: nextI equals currentI, potential infinite loop",
+					logger.F("target", target.ToHexString(true)), logger.F("currentI", currentI.ToHexString(true)), logger.F("nextI", nextI.ToHexString(true)), logger.F("kshift", kshift.ToHexString(true)), logger.F("nextKshift", nextKshift.ToHexString(true)))
+				return nil, status.Error(codes.Internal, "nextI equals currentI, potential infinite loop")
 			}
 
 			// Select de Bruijn next hop
@@ -237,7 +254,7 @@ func (n *Node) FindSuccessorStep(ctx context.Context, target, currentI, kshift d
 				logger.F("addr", succ.Addr), logger.F("err", err))
 			return nil, status.Error(codes.Internal, "failed to get connection to successor")
 		}
-		return client.FindSuccessorStart(ctx, cli, n.Space(), target)
+		return client.FindSuccessorStep(ctx, cli, n.Space(), target, nextI, nextKshift)
 	}
 
 	// Default: forward to successor
