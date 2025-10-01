@@ -60,7 +60,7 @@ func main() {
 	cfg.LogConfig(lgr) // log loaded configuration at DEBUG level
 
 	// Initialize listener (to determine server address and port)
-	lis, err := server.Listen(cfg.DHT.Mode, cfg.Node.Host, cfg.Node.Port)
+	lis, advertised, err := server.Listen(cfg.DHT.Mode, cfg.Node.Bind, cfg.Node.Host, cfg.Node.Port)
 	if err != nil {
 		lgr.Error("Fatal: failed to initialize listener", logger.F("err", err))
 		os.Exit(1)
@@ -90,7 +90,7 @@ func main() {
 	}
 	domainNode := domain.Node{
 		ID:   id,
-		Addr: addr,
+		Addr: advertised,
 	}
 	lgr.Debug("generated node ID", logger.F("id", id.ToHexString(true)))
 	lgr = lgr.Named("node").WithNode(domainNode)

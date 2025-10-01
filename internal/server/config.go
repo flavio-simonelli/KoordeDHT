@@ -74,32 +74,49 @@ func isPrivateIP(ip net.IP) bool {
 	return false
 }
 
-// Listen creates a TCP listener bound to host:port, selecting
-// a default host IP if none is provided.
+// Listen creates a TCP listener bound to bind:port,
+// and returns the advertised address (host:port) to share with peers.
 //
 // Parameters:
-//   - mode: "private" or "public", used to decide IP selection.
-//   - host: optional IP address; if empty, pickIP(mode) is used.
-//   - port: TCP port; if 0, a random free port is chosen.
-func Listen(mode, host string, port int) (net.Listener, error) {
+//   - mode: "private" | "public" (usato solo se host è vuoto)
+//   - bind: indirizzo su cui fare Listen (es. "0.0.0.0")
+//   - host: indirizzo/hostname pubblicizzato (se vuoto → calcolato con mode)
+//   - port: porta TCP
+func Listen(mode, bind, host string, port int) (net.Listener, string, error) {
+	// 1. Bind address
+	if bind == "" {
+		bind = "0.0.0.0"
+	}
+	bindAddr := fmt.Sprintf("%s:%d", bind, port)
+
+	ln, err := net.Listen("tcp", bindAddr)
+	if err != nil {
+		return nil, "", err
+	}
+
+	actualPort := ln.Addr().(*net.TCPAddr).Port
+
+	// 2. Advertised host
 	if host == "" {
 		ip, err := pickIP(mode)
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
 		host = ip.String()
 	} else {
+		// se host è un IP, validato
 		ip := net.ParseIP(host)
-		if ip == nil {
-			return nil, fmt.Errorf("invalid IP address: %s", host)
+		if ip != nil {
+			if mode == "private" && !isPrivateIP(ip) {
+				return nil, "", fmt.Errorf("host %s is not private but mode=private", host)
+			}
+			if mode == "public" && isPrivateIP(ip) {
+				return nil, "", fmt.Errorf("host %s is private but mode=public", host)
+			}
 		}
-		if mode == "private" && !isPrivateIP(ip) {
-			return nil, fmt.Errorf("host %s is not private but mode=private", host)
-		}
-		if mode == "public" && isPrivateIP(ip) {
-			return nil, fmt.Errorf("host %s is private but mode=public", host)
-		}
+		// se host NON è un IP (es. "node7"), lo accettiamo come hostname advertised
 	}
-	addr := fmt.Sprintf("%s:%d", host, port)
-	return net.Listen("tcp", addr)
+
+	advertised := fmt.Sprintf("%s:%d", host, actualPort)
+	return ln, advertised, nil
 }

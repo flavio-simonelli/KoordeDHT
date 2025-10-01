@@ -81,6 +81,7 @@ type DHTConfig struct {
 
 type NodeConfig struct {
 	Id   string `yaml:"id"`
+	Bind string `yaml:"bind"`
 	Host string `yaml:"host"`
 	Port int    `yaml:"port"`
 }
@@ -125,6 +126,7 @@ func LoadConfig(path string) (*Config, error) {
 //     its value overrides the value loaded from the YAML configuration file.
 //   - Supported overrides include:
 //     NODE_ID              -> cfg.Node.Id
+//     NODE_BIND            -> cfg.Node.Bind
 //     NODE_HOST            -> cfg.Node.Host
 //     NODE_PORT            -> cfg.Node.Port
 //     BOOTSTRAP_MODE       -> cfg.DHT.Bootstrap.Mode
@@ -159,6 +161,11 @@ func LoadConfig(path string) (*Config, error) {
 func (cfg *Config) ApplyEnvOverrides() {
 	if v := os.Getenv("NODE_ID"); v != "" {
 		cfg.Node.Id = v
+	}
+	if v := os.Getenv("NODE_BIND"); v != "" {
+		cfg.Node.Bind = v
+	} else {
+		cfg.Node.Bind = "0.0.0.0" // default
 	}
 	if v := os.Getenv("NODE_HOST"); v != "" {
 		cfg.Node.Host = v
@@ -408,7 +415,7 @@ func (cfg *Config) LogConfig(lgr logger.Logger) {
 
 		// Node
 		logger.F("node.id", cfg.Node.Id),
-		logger.F("node.host", cfg.Node.Host),
+		logger.F("node.host", cfg.Node.Bind),
 		logger.F("node.port", cfg.Node.Port),
 
 		// Telemetry
