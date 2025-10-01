@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"flag"
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	clientv1 "KoordeDHT/internal/api/client/v1"
@@ -16,168 +18,198 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
+func connect(addr string) (clientv1.ClientAPIClient, *grpc.ClientConn, error) {
+	conn, err := grpc.Dial(
+		addr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock(),
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	return clientv1.NewClientAPIClient(conn), conn, nil
+}
+
 func main() {
-	// CLI flags
+	// Flags iniziali
 	addr := flag.String("addr", "127.0.0.1:5000", "Address of the Koorde node (entry point)")
 	timeout := flag.Duration("timeout", 5*time.Second, "Request timeout")
 	flag.Parse()
 
-	// At least one command required
-	if flag.NArg() < 1 {
-		fmt.Println("Usage: koorde-client [--addr ip:port] put|get|delete|getstore|getrt|lookup <args>")
-		os.Exit(1)
-	}
-	cmd := flag.Arg(0)
-
-	// Setup gRPC connection
-	conn, err := grpc.NewClient(
-		*addr,
-		grpc.WithTransportCredentials(insecure.NewCredentials()), // plaintext, no TLS
-	)
+	// Connessione iniziale
+	client, conn, err := connect(*addr)
 	if err != nil {
 		log.Fatalf("Failed to connect to node at %s: %v", *addr, err)
 	}
-	defer func(conn *grpc.ClientConn) {
-		_ = conn.Close()
-	}(conn)
+	defer conn.Close()
 
-	client := clientv1.NewClientAPIClient(conn)
+	currentAddr := *addr
+	reader := bufio.NewScanner(os.Stdin)
 
-	// Create context with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
-	defer cancel()
+	fmt.Printf("Koorde interactive client. Connected to %s\n", currentAddr)
+	fmt.Println("Available commands: put/get/delete/getstore/getrt/lookup/use/exit")
 
-	// Dispatch commands
-	switch cmd {
-
-	case "put":
-		if flag.NArg() < 3 {
-			fmt.Println("Usage: koorde-client put <key> <value>")
-			os.Exit(1)
+	for {
+		fmt.Printf("koorde[%s]> ", currentAddr)
+		if !reader.Scan() {
+			break
 		}
-		key := flag.Arg(1)
-		value := flag.Arg(2)
-		req := &clientv1.PutRequest{
-			Resource: &clientv1.Resource{Key: key, Value: value},
+		line := strings.TrimSpace(reader.Text())
+		if line == "" {
+			continue
 		}
 
+		args := strings.Fields(line)
+		cmd := args[0]
+
+		// Context per ogni comando
+		ctx, cancel := context.WithTimeout(context.Background(), *timeout)
 		start := time.Now()
-		_, err := client.Put(ctx, req)
-		elapsed := time.Since(start)
 
-		if err != nil {
-			log.Fatalf("Put failed: %v", err)
-		}
-		fmt.Printf("Put succeeded (key=%s, value=%s) | latency=%s\n", key, value, elapsed)
+		switch cmd {
 
-	case "get":
-		if flag.NArg() < 2 {
-			fmt.Println("Usage: koorde-client get <key>")
-			os.Exit(1)
-		}
-		key := flag.Arg(1)
-		req := &clientv1.GetRequest{Key: key}
-
-		start := time.Now()
-		resp, err := client.Get(ctx, req)
-		elapsed := time.Since(start)
-
-		if err != nil {
-			if s, ok := status.FromError(err); ok && s.Code().String() == "NotFound" {
-				fmt.Printf("Key not found: %s | latency=%s\n", key, elapsed)
-				os.Exit(1)
+		case "put":
+			if len(args) < 3 {
+				fmt.Println("Usage: put <key> <value>")
+				cancel()
+				continue
 			}
-			log.Fatalf("Get failed: %v", err)
-		}
-		fmt.Printf("Get succeeded (key=%s, value=%s) | latency=%s\n", key, resp.Value, elapsed)
-
-	case "delete":
-		if flag.NArg() < 2 {
-			fmt.Println("Usage: koorde-client delete <key>")
-			os.Exit(1)
-		}
-		key := flag.Arg(1)
-		req := &clientv1.DeleteRequest{Key: key}
-
-		start := time.Now()
-		_, err := client.Delete(ctx, req)
-		elapsed := time.Since(start)
-
-		if err != nil {
-			if s, ok := status.FromError(err); ok && s.Code().String() == "NotFound" {
-				fmt.Printf("Key not found: %s | latency=%s\n", key, elapsed)
-				os.Exit(1)
+			key, value := args[1], args[2]
+			req := &clientv1.PutRequest{
+				Resource: &clientv1.Resource{Key: key, Value: value},
 			}
-			log.Fatalf("Delete failed: %v", err)
-		}
-		fmt.Printf("Delete succeeded (key=%s) | latency=%s\n", key, elapsed)
-
-	case "getstore":
-		// Streaming request
-		stream, err := client.GetStore(ctx, &emptypb.Empty{})
-		if err != nil {
-			log.Fatalf("GetStore failed: %v", err)
-		}
-
-		fmt.Println("Stored resources on node:")
-		for {
-			resp, err := stream.Recv()
+			_, err := client.Put(ctx, req)
 			if err != nil {
-				break // EOF or error
+				log.Printf("Put failed: %v\n", err)
+			} else {
+				fmt.Printf("Put succeeded (key=%s, value=%s) | latency=%s\n", key, value, time.Since(start))
 			}
-			if resp.GetItem() != nil {
-				fmt.Printf("  - id=%s | key=%s | value=%s\n",
-					resp.Id,
-					resp.Item.Key,
-					resp.Item.Value,
-				)
+
+		case "get":
+			if len(args) < 2 {
+				fmt.Println("Usage: get <key>")
+				cancel()
+				continue
 			}
+			key := args[1]
+			req := &clientv1.GetRequest{Key: key}
+			resp, err := client.Get(ctx, req)
+			if err != nil {
+				if s, ok := status.FromError(err); ok && s.Code().String() == "NotFound" {
+					fmt.Printf("Key not found: %s | latency=%s\n", key, time.Since(start))
+				} else {
+					log.Printf("Get failed: %v\n", err)
+				}
+			} else {
+				fmt.Printf("Get succeeded (key=%s, value=%s) | latency=%s\n", key, resp.Value, time.Since(start))
+			}
+
+		case "delete":
+			if len(args) < 2 {
+				fmt.Println("Usage: delete <key>")
+				cancel()
+				continue
+			}
+			key := args[1]
+			req := &clientv1.DeleteRequest{Key: key}
+			_, err := client.Delete(ctx, req)
+			if err != nil {
+				if s, ok := status.FromError(err); ok && s.Code().String() == "NotFound" {
+					fmt.Printf("Key not found: %s | latency=%s\n", key, time.Since(start))
+				} else {
+					log.Printf("Delete failed: %v\n", err)
+				}
+			} else {
+				fmt.Printf("Delete succeeded (key=%s) | latency=%s\n", key, time.Since(start))
+			}
+
+		case "getstore":
+			stream, err := client.GetStore(ctx, &emptypb.Empty{})
+			if err != nil {
+				log.Printf("GetStore failed: %v\n", err)
+				cancel()
+				continue
+			}
+			fmt.Println("Stored resources on node:")
+			for {
+				resp, err := stream.Recv()
+				if err != nil {
+					break
+				}
+				if resp.GetItem() != nil {
+					fmt.Printf("  - id=%s | key=%s | value=%s\n",
+						resp.Id, resp.Item.Key, resp.Item.Value)
+				}
+			}
+
+		case "getrt":
+			resp, err := client.GetRoutingTable(ctx, &emptypb.Empty{})
+			if err != nil {
+				log.Printf("GetRoutingTable failed: %v\n", err)
+				cancel()
+				continue
+			}
+			fmt.Println("Routing table:")
+			if resp.Self != nil {
+				fmt.Printf("  Self: %s (%s)\n", resp.Self.Id, resp.Self.Addr)
+			}
+			if resp.Predecessor != nil {
+				fmt.Printf("  Predecessor: %s (%s)\n", resp.Predecessor.Id, resp.Predecessor.Addr)
+			}
+			fmt.Println("  Successors:")
+			for i, s := range resp.Successors {
+				fmt.Printf("    [%d] %s (%s)\n", i, s.Id, s.Addr)
+			}
+			fmt.Println("  DeBruijn List:")
+			for i, d := range resp.DeBruijnList {
+				fmt.Printf("    [%d] %s (%s)\n", i, d.Id, d.Addr)
+			}
+
+		case "lookup":
+			if len(args) < 2 {
+				fmt.Println("Usage: lookup <id>")
+				cancel()
+				continue
+			}
+			id := args[1]
+			req := &clientv1.LookupRequest{Id: id}
+			resp, err := client.Lookup(ctx, req)
+			if err != nil {
+				log.Printf("Lookup failed: %v | latency=%s\n", err, time.Since(start))
+			} else {
+				fmt.Printf("Lookup result: %s (%s) | latency=%s\n",
+					resp.Successor.Id, resp.Successor.Addr, time.Since(start))
+			}
+
+		case "use":
+			if len(args) < 2 {
+				fmt.Println("Usage: use <addr>")
+				cancel()
+				continue
+			}
+			newAddr := args[1]
+			newClient, newConn, err := connect(newAddr)
+			if err != nil {
+				log.Printf("Failed to connect to %s: %v\n", newAddr, err)
+				cancel()
+				continue
+			}
+			conn.Close()
+			client = newClient
+			conn = newConn
+			currentAddr = newAddr
+			fmt.Printf("Switched connection to %s\n", currentAddr)
+
+		case "exit", "quit":
+			fmt.Println("Bye!")
+			cancel()
+			return
+
+		default:
+			fmt.Printf("Unknown command: %s\n", cmd)
+			fmt.Println("Available: put/get/delete/getstore/getrt/lookup/use/exit")
 		}
 
-	case "getrt":
-		// Routing table request
-		resp, err := client.GetRoutingTable(ctx, &emptypb.Empty{})
-		if err != nil {
-			log.Fatalf("GetRoutingTable failed: %v", err)
-		}
-
-		fmt.Println("Routing table:")
-
-		if resp.Self != nil {
-			fmt.Printf("  Self: %s (%s)\n", resp.Self.Id, resp.Self.Addr)
-		} else {
-			fmt.Println("  Self: nil")
-		}
-
-		if resp.Predecessor != nil {
-			fmt.Printf("  Predecessor: %s (%s)\n", resp.Predecessor.Id, resp.Predecessor.Addr)
-		} else {
-			fmt.Println("  Predecessor: nil")
-		}
-
-		fmt.Println("  Successors:")
-		for i, s := range resp.Successors {
-			fmt.Printf("    [%d] %s (%s)\n", i, s.Id, s.Addr)
-		}
-
-		fmt.Println("  DeBruijn List:")
-		for i, d := range resp.DeBruijnList {
-			fmt.Printf("    [%d] %s (%s)\n", i, d.Id, d.Addr)
-		}
-
-	case "lookup":
-		if flag.NArg() < 2 {
-			fmt.Println("Usage: koorde-client lookup <id>")
-			os.Exit(1)
-		}
-		id := flag.Arg(1)
-		req := &clientv1.LookupRequest{Id: id}
-
-		resp, err := client.Lookup(ctx, req)
-		if err != nil {
-			log.Fatalf("Lookup failed: %v", err)
-		}
-
-		fmt.Printf("Lookup result: %s (%s)\n", resp.Successor.Id, resp.Successor.Addr)
+		cancel()
 	}
 }
