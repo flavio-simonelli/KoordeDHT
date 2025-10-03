@@ -20,6 +20,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -67,7 +68,7 @@ func main() {
 	}
 	defer func() { _ = lis.Close() }() // close listener on shutdown
 	addr := lis.Addr().String()
-	lgr.Debug("create listener", logger.F("addr", addr))
+	lgr.Info("create listener", logger.F("addr", addr))
 
 	// Initialize the identifier space
 	space, err := domain.NewSpace(cfg.DHT.IDBits, cfg.DHT.DeBruijn.Degree, cfg.DHT.FaultTolerance.SuccessorListSize)
@@ -161,7 +162,7 @@ func main() {
 	lgr.Debug("server started")
 
 	// Join an existing DHT or create a new one
-	peers, err := bootstrap.ResolveBootstrap(cfg.DHT.Bootstrap)
+	peers, err := bootstrap.ResolveBootstrap(cfg.DHT.Bootstrap, lgr.Named("resolver"))
 	if err != nil {
 		lgr.Error("failed to resolve bootstrap peers", logger.F("err", err))
 		// cleanup before exit
@@ -186,37 +187,70 @@ func main() {
 
 	// Register node in DNS
 	if cfg.DHT.Bootstrap.Register.Enabled {
-		host := lis.Addr().(*net.TCPAddr).IP.String() //TODO: potrebbe dare problemi con loopback (se usato)
-		port := lis.Addr().(*net.TCPAddr).Port
-		r53Client, err := register.NewClient(context.Background())
+		host, portStr, err := net.SplitHostPort(advertised)
 		if err != nil {
-			lgr.Error("failed to init route53 client", logger.F("err", err))
+			lgr.Error("failed to parse advertised address", logger.F("err", err))
+			s.Stop()
+			n.Stop()
+			os.Exit(1)
+		}
+		port, err := strconv.Atoi(portStr)
+		if err != nil {
+			lgr.Error("failed to parse advertised port", logger.F("err", err))
 			s.Stop()
 			n.Stop()
 			os.Exit(1)
 		}
 
-		if err := register.RegisterNode(
-			context.Background(),
-			r53Client,
-			cfg.DHT.Bootstrap.Register,
-			n.Self().ID.ToHexString(true),
-			host,
-			port,
-		); err != nil {
-			lgr.Error("failed to register node in Route53", logger.F("err", err))
+		registrar, err := register.NewRegistrar(context.Background(), cfg.DHT.Bootstrap.Register)
+		if err != nil {
+			lgr.Error("failed to init registrar", logger.F("err", err))
+			s.Stop()
+			n.Stop()
+			os.Exit(1)
 		}
+
+		nodeID := n.Self().ID.ToHexString(true)
+
+		if err := registrar.RegisterNode(context.Background(), nodeID, host, port); err != nil {
+			lgr.Error("failed to register node", logger.F("err", err))
+		} else {
+			lgr.Info("node registered in bootstrap service",
+				logger.F("id", nodeID),
+				logger.F("host", host),
+				logger.F("port", port),
+				logger.F("type", cfg.DHT.Bootstrap.Register.Type))
+		}
+
+		// context per rinnovo
+		renewCtx, renewCancel := context.WithCancel(context.Background())
+
+		if cfg.DHT.Bootstrap.Register.Type == "coredns" {
+			go func(ctx context.Context) {
+				ticker := time.NewTicker(time.Duration(cfg.DHT.Bootstrap.Register.TTL/2) * time.Second)
+				defer ticker.Stop()
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case <-ticker.C:
+						if err := registrar.RenewNode(context.Background(), nodeID, host, port); err != nil {
+							lgr.Warn("failed to renew node registration", logger.F("err", err))
+						}
+					}
+				}
+			}(renewCtx)
+		}
+
+		// Cleanup alla chiusura
 		defer func() {
-			// Deregister node on shutdown
-			if err := register.DeregisterNode(
-				context.Background(),
-				r53Client,
-				cfg.DHT.Bootstrap.Register,
-				n.Self().ID.ToHexString(true),
-				host,
-				port,
-			); err != nil {
-				lgr.Warn("failed to deregister node from Route53", logger.F("err", err))
+			renewCancel() // stop renewal goroutine
+			// Deregister node
+			if err := registrar.DeregisterNode(context.Background(), nodeID, host, port); err != nil {
+				lgr.Warn("failed to deregister node", logger.F("err", err))
+			}
+			if err := registrar.Close(); err != nil {
+				lgr.Warn("failed to close registrar", logger.F("err", err))
 			}
 		}()
 	}

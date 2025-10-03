@@ -1,26 +1,46 @@
+// register/route53.go
 package register
 
 import (
-	koordeConfig "KoordeDHT/internal/config"
 	"context"
 	"fmt"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/route53/types"
 )
 
-// RegisterNode creates or updates an SRV record in Route53 for the given node.
-func RegisterNode(ctx context.Context, client *route53.Client, cfg koordeConfig.RegisterConfig, nodeID string, targetHost string, port int) error {
-	domain := strings.TrimSuffix(cfg.DomainSuffix, ".")
-	recordName := fmt.Sprintf("%s.%s.", nodeID, domain)
+type Route53Registrar struct {
+	Client       *route53.Client
+	HostedZoneID string
+	DomainSuffix string
+	TTL          int64
+}
+
+// NewRoute53Registrar loads AWS config and returns a registrar.
+func NewRoute53Registrar(ctx context.Context, hostedZoneID, domainSuffix string, ttl int64) (*Route53Registrar, error) {
+	awsCfg, err := config.LoadDefaultConfig(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &Route53Registrar{
+		Client:       route53.NewFromConfig(awsCfg),
+		HostedZoneID: hostedZoneID,
+		DomainSuffix: strings.TrimSuffix(domainSuffix, "."),
+		TTL:          ttl,
+	}, nil
+}
+
+func (r *Route53Registrar) RegisterNode(ctx context.Context, nodeID, targetHost string, port int) error {
+	recordName := fmt.Sprintf("%s.%s.", nodeID, r.DomainSuffix)
 	if strings.HasSuffix(targetHost, ".") {
 		targetHost = targetHost[:len(targetHost)-1]
 	}
 
 	input := &route53.ChangeResourceRecordSetsInput{
-		HostedZoneId: aws.String(cfg.HostedZoneID),
+		HostedZoneId: aws.String(r.HostedZoneID),
 		ChangeBatch: &types.ChangeBatch{
 			Changes: []types.Change{
 				{
@@ -28,10 +48,9 @@ func RegisterNode(ctx context.Context, client *route53.Client, cfg koordeConfig.
 					ResourceRecordSet: &types.ResourceRecordSet{
 						Name: aws.String(recordName),
 						Type: types.RRTypeSrv,
-						TTL:  aws.Int64(cfg.TTL),
+						TTL:  aws.Int64(r.TTL),
 						ResourceRecords: []types.ResourceRecord{
 							{
-								// Format: priority weight port target
 								Value: aws.String(fmt.Sprintf("0 0 %d %s.", port, targetHost)),
 							},
 						},
@@ -40,21 +59,18 @@ func RegisterNode(ctx context.Context, client *route53.Client, cfg koordeConfig.
 			},
 		},
 	}
-
-	_, err := client.ChangeResourceRecordSets(ctx, input)
+	_, err := r.Client.ChangeResourceRecordSets(ctx, input)
 	return err
 }
 
-// DeregisterNode removes the SRV record for the given node from Route53.
-func DeregisterNode(ctx context.Context, client *route53.Client, cfg koordeConfig.RegisterConfig, nodeID string, targetHost string, port int) error {
-	domain := strings.TrimSuffix(cfg.DomainSuffix, ".")
-	recordName := fmt.Sprintf("%s.%s.", nodeID, domain)
+func (r *Route53Registrar) DeregisterNode(ctx context.Context, nodeID, targetHost string, port int) error {
+	recordName := fmt.Sprintf("%s.%s.", nodeID, r.DomainSuffix)
 	if strings.HasSuffix(targetHost, ".") {
 		targetHost = targetHost[:len(targetHost)-1]
 	}
 
 	input := &route53.ChangeResourceRecordSetsInput{
-		HostedZoneId: aws.String(cfg.HostedZoneID),
+		HostedZoneId: aws.String(r.HostedZoneID),
 		ChangeBatch: &types.ChangeBatch{
 			Changes: []types.Change{
 				{
@@ -62,7 +78,7 @@ func DeregisterNode(ctx context.Context, client *route53.Client, cfg koordeConfi
 					ResourceRecordSet: &types.ResourceRecordSet{
 						Name: aws.String(recordName),
 						Type: types.RRTypeSrv,
-						TTL:  aws.Int64(cfg.TTL),
+						TTL:  aws.Int64(r.TTL),
 						ResourceRecords: []types.ResourceRecord{
 							{
 								Value: aws.String(fmt.Sprintf("0 0 %d %s.", port, targetHost)),
@@ -73,7 +89,16 @@ func DeregisterNode(ctx context.Context, client *route53.Client, cfg koordeConfi
 			},
 		},
 	}
-
-	_, err := client.ChangeResourceRecordSets(ctx, input)
+	_, err := r.Client.ChangeResourceRecordSets(ctx, input)
 	return err
+}
+
+func (r *Route53Registrar) RenewNode(ctx context.Context, nodeID, targetHost string, port int) error {
+	// Route53 non ha bisogno di rinnovo, basta Upsert
+	return nil
+}
+
+func (r *Route53Registrar) Close() error {
+	// Non c'è nulla da chiudere
+	return nil
 }

@@ -51,15 +51,28 @@ type FaultToleranceConfig struct {
 }
 
 type RegisterConfig struct {
-	Enabled      bool   `yaml:"enabled"`
-	HostedZoneID string `yaml:"hostedZoneId"`
-	DomainSuffix string `yaml:"domainSuffix"`
-	TTL          int64  `yaml:"ttl"`
+	Enabled bool   `yaml:"enabled"`
+	Type    string `yaml:"type"`
+	TTL     int64  `yaml:"ttl"`
+
+	Route53 struct {
+		HostedZoneID string `yaml:"hostedZoneId"`
+		DomainSuffix string `yaml:"domainSuffix"`
+	} `yaml:"route53"`
+
+	CoreDNS struct {
+		EtcdEndpoints []string `yaml:"etcdEndpoints"`
+		BasePath      string   `yaml:"basePath"`
+		Domain        string   `yaml:"domain"`
+	} `yaml:"coredns"`
 }
 
 type BootstrapConfig struct {
 	Mode     string         `yaml:"mode"`
 	DNSName  string         `yaml:"dnsName"`
+	Service  string         `yaml:"service"`
+	Proto    string         `yaml:"proto"`
+	Resolver string         `yaml:"resolver"`
 	SRV      bool           `yaml:"srv"`
 	Port     int            `yaml:"port"`
 	Peers    []string       `yaml:"peers"`
@@ -168,7 +181,15 @@ func (cfg *Config) ApplyEnvOverrides() {
 		cfg.Node.Bind = "0.0.0.0" // default
 	}
 	if v := os.Getenv("NODE_HOST"); v != "" {
-		cfg.Node.Host = v
+		if v == "LOCALDOCKER" {
+			if hn, err := os.Hostname(); err == nil {
+				cfg.Node.Host = hn
+			} else {
+				cfg.Node.Host = "localhost"
+			}
+		} else {
+			cfg.Node.Host = v
+		}
 	}
 	if v := os.Getenv("NODE_PORT"); v != "" {
 		if port, err := strconv.Atoi(v); err == nil {
@@ -181,6 +202,15 @@ func (cfg *Config) ApplyEnvOverrides() {
 	}
 	if v := os.Getenv("BOOTSTRAP_DNSNAME"); v != "" {
 		cfg.DHT.Bootstrap.DNSName = v
+	}
+	if v := os.Getenv("BOOTSTRAP_SERVICE"); v != "" {
+		cfg.DHT.Bootstrap.Service = v
+	}
+	if v := os.Getenv("BOOTSTRAP_PROTO"); v != "" {
+		cfg.DHT.Bootstrap.Proto = v
+	}
+	if v := os.Getenv("BOOTSTRAP_RESOLVER"); v != "" {
+		cfg.DHT.Bootstrap.Resolver = v
 	}
 	if v := os.Getenv("BOOTSTRAP_SRV"); v != "" {
 		v = strings.ToLower(v)
@@ -208,12 +238,35 @@ func (cfg *Config) ApplyEnvOverrides() {
 		v = strings.ToLower(v)
 		cfg.DHT.Bootstrap.Register.Enabled = v == "true" || v == "1" || v == "yes"
 	}
+	// Route53 overrides
 	if v := os.Getenv("REGISTER_ZONE_ID"); v != "" {
-		cfg.DHT.Bootstrap.Register.HostedZoneID = v
+		cfg.DHT.Bootstrap.Register.Route53.HostedZoneID = v
 	}
 	if v := os.Getenv("REGISTER_SUFFIX"); v != "" {
-		cfg.DHT.Bootstrap.Register.DomainSuffix = v
+		cfg.DHT.Bootstrap.Register.Route53.DomainSuffix = v
 	}
+
+	// CoreDNS overrides
+	if v := os.Getenv("REGISTER_ETCD_ENDPOINTS"); v != "" {
+		cfg.DHT.Bootstrap.Register.CoreDNS.EtcdEndpoints = strings.Split(v, ",")
+	}
+	if v := os.Getenv("REGISTER_ETCD_BASEPATH"); v != "" {
+		cfg.DHT.Bootstrap.Register.CoreDNS.BasePath = v
+	}
+	if v := os.Getenv("REGISTER_ETCD_DOMAIN"); v != "" {
+		cfg.DHT.Bootstrap.Register.CoreDNS.Domain = v
+	}
+
+	// Common overrides
+	if v := os.Getenv("REGISTER_TYPE"); v != "" {
+		cfg.DHT.Bootstrap.Register.Type = v
+	}
+	if v := os.Getenv("REGISTER_TTL"); v != "" {
+		if ttl, err := strconv.ParseInt(v, 10, 64); err == nil {
+			cfg.DHT.Bootstrap.Register.TTL = ttl
+		}
+	}
+
 	if v := os.Getenv("REGISTER_TTL"); v != "" {
 		if ttl, err := strconv.ParseInt(v, 10, 64); err == nil {
 			cfg.DHT.Bootstrap.Register.TTL = ttl
@@ -308,6 +361,14 @@ func (cfg *Config) ValidateConfig() error {
 
 	// --- Bootstrap ---
 	b := cfg.DHT.Bootstrap
+	if b.SRV {
+		if b.Service == "" {
+			errs = append(errs, "bootstrap.service is required when srv=true")
+		}
+		if b.Proto == "" {
+			errs = append(errs, "bootstrap.proto is required when srv=true")
+		}
+	}
 	switch b.Mode {
 	case "dns":
 		if b.DNSName == "" {
@@ -317,24 +378,41 @@ func (cfg *Config) ValidateConfig() error {
 			errs = append(errs, "bootstrap.port must be > 0 when using A/AAAA (srv=false)")
 		}
 		if b.Register.Enabled {
-			if b.Register.HostedZoneID == "" {
-				errs = append(errs, "bootstrap.register.hostedZoneId is required when register.enabled=true")
-			}
-			if b.Register.DomainSuffix == "" {
-				errs = append(errs, "bootstrap.register.domainSuffix is required when register.enabled=true")
-			}
 			if b.Register.TTL <= 0 {
 				errs = append(errs, "bootstrap.register.ttl must be > 0 when register.enabled=true")
 			}
+
+			switch b.Register.Type {
+			case "route53":
+				if b.Register.Route53.HostedZoneID == "" {
+					errs = append(errs, "bootstrap.register.route53.hostedZoneId is required when register.type=route53")
+				}
+				if b.Register.Route53.DomainSuffix == "" {
+					errs = append(errs, "bootstrap.register.route53.domainSuffix is required when register.type=route53")
+				}
+
+			case "coredns":
+				if len(b.Register.CoreDNS.EtcdEndpoints) == 0 {
+					errs = append(errs, "bootstrap.register.coredns.etcdEndpoints is required when register.type=coredns")
+				}
+				if b.Register.CoreDNS.BasePath == "" {
+					errs = append(errs, "bootstrap.register.coredns.basePath is required when register.type=coredns")
+				}
+				if cfg.DHT.Bootstrap.Register.Type == "coredns" && cfg.DHT.Bootstrap.Register.CoreDNS.Domain == "" {
+					errs = append(errs, "bootstrap.register.coredns.domain is required when using CoreDNS")
+				}
+
+			default:
+				errs = append(errs, fmt.Sprintf("invalid bootstrap.register.type: %s (must be route53 or coredns)", b.Register.Type))
+			}
 		}
+
 	case "static":
 		for _, p := range b.Peers {
 			if _, _, err := net.SplitHostPort(p); err != nil {
 				errs = append(errs, fmt.Sprintf("invalid peer address %q in bootstrap.peers: %v", p, err))
 			}
 		}
-	case "init":
-		// primo nodo nessun vincolo extra
 	default:
 		errs = append(errs, fmt.Sprintf("invalid bootstrap.mode: %s (must be dns, static or init)", b.Mode))
 	}
@@ -409,8 +487,12 @@ func (cfg *Config) LogConfig(lgr logger.Logger) {
 
 		// register
 		logger.F("dht.bootstrap.register.enabled", cfg.DHT.Bootstrap.Register.Enabled),
-		logger.F("dht.bootstrap.register.hostedZoneId", cfg.DHT.Bootstrap.Register.HostedZoneID),
-		logger.F("dht.bootstrap.register.domainSuffix", cfg.DHT.Bootstrap.Register.DomainSuffix),
+		logger.F("dht.bootstrap.register.type", cfg.DHT.Bootstrap.Register.Type),
+		logger.F("dht.bootstrap.register.route53.hostedZoneId", cfg.DHT.Bootstrap.Register.Route53.HostedZoneID),
+		logger.F("dht.bootstrap.register.route53.domainSuffix", cfg.DHT.Bootstrap.Register.Route53.DomainSuffix),
+		logger.F("dht.bootstrap.register.coredns.etcdEndpoints", cfg.DHT.Bootstrap.Register.CoreDNS.EtcdEndpoints),
+		logger.F("dht.bootstrap.register.coredns.basePath", cfg.DHT.Bootstrap.Register.CoreDNS.BasePath),
+		logger.F("dht.bootstrap.register.coredns.domain", cfg.DHT.Bootstrap.Register.CoreDNS.Domain),
 		logger.F("dht.bootstrap.register.ttl", cfg.DHT.Bootstrap.Register.TTL),
 
 		// Node
