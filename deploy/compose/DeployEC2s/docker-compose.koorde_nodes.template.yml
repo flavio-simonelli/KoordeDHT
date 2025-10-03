@@ -1,0 +1,18 @@
+networks:
+  koordenet:
+    driver: bridge
+
+services:
+    node-$ID:
+      image: flaviosimonelli/koorde-node-${VERSION}:latest
+      container_name: koorde-node-$ID
+      restart: unless-stopped
+      ports:
+        - "${HOST_PORT}:${CONTAINER_PORT}"
+      environment:
+        - NODE_HOST=$NODE_HOST
+        - NODE_PORT=$NODE_PORT
+      env_file:
+        - ./common-node.env
+      networks:
+        - koordenet
