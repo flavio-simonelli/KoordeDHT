@@ -27,7 +27,7 @@ func TestMulKMod(t *testing.T) {
 			bits:       32,
 			graphGrade: 4,
 			aHex:       "71c8502c",
-			wantHex:    "c72140b0", // corretto risultato di (0x71c8502c * 4) mod 2^32
+			wantHex:    "c72140b0", // (0x71c8502c * 4) mod 2^32
 		},
 		{
 			name:       "8-bit *3 overflow",

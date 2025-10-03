@@ -1,0 +1,139 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Koorde DHT Cluster on EC2 with Docker and Compose"
+
+Parameters:
+  InstanceType:
+    Type: String
+    Default: t2.micro
+    Description: EC2 Instance Type
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Name of an existing EC2 KeyPair for SSH access
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC where to deploy instances
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Subnet where to deploy instances
+
+  S3Bucket:
+    Type: String
+    Description: S3 bucket containing init.sh and other scripts
+  S3Prefix:
+    Type: String
+    Default: scripts
+    Description: Prefix (folder) inside S3 bucket
+
+  Nodes:
+    Type: Number
+    Default: 3
+    Description: Number of Koorde nodes to launch
+  BasePort:
+    Type: Number
+    Default: 4000
+    Description: Base port for first node (others increment by 1)
+  MaxPort:
+    Type: Number
+    Default: 4002
+    Description: Last port (BasePort + Nodes - 1)
+  Version:
+    Type: String
+    Default: strong
+    AllowedValues: [ minimal, medium, strong ]
+    Description: Koorde node image version
+  Mode:
+    Type: String
+    Default: private
+    AllowedValues: [ public, private ]
+    Description: Which IP the node should advertise (public or private)
+  Route53ZoneId:
+    Type: String
+    Description: Route53 Hosted Zone ID for node registration
+  Route53Suffix:
+    Type: String
+    Description: Route53 suffix for node registration (e.g. dht.local)
+
+Resources:
+  KoordeSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable SSH and koorde ports
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: !Ref BasePort
+          ToPort: !Ref MaxPort
+          CidrIp: 0.0.0.0/0
+
+  KoordeInstanceProfile:
+      Type: AWS::IAM::InstanceProfile
+      Properties:
+          Roles:
+          - LabRole
+
+  KoordeNode:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      ImageId: ami-052064a798f08f0d3 # Amazon Linux 2023 kernel-6.1 AMI
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeviceIndex: 0
+          GroupSet:
+            - !Ref KoordeSecurityGroup
+          SubnetId: !Ref SubnetId
+      IamInstanceProfile: !Ref KoordeInstanceProfile
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euo pipefail
+          
+          dnf update -y
+          
+          # Check AWS CLI version
+          if ! command -v aws &>/dev/null; then
+            echo "[INFO] AWS CLI not found. Installing AWS CLI v2..."
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip"
+            dnf install -y unzip
+            unzip /tmp/awscliv2.zip -d /tmp
+            sudo /tmp/aws/install
+          elif ! aws --version | grep -q "aws-cli/2"; then
+            echo "[INFO] AWS CLI v1 detected. Upgrading to AWS CLI v2..."
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip"
+            dnf install -y unzip
+            unzip /tmp/awscliv2.zip -d /tmp
+            sudo /tmp/aws/install --update
+          else
+            echo "[INFO] AWS CLI v2 already installed: $(aws --version)"
+          fi
+          
+          # Export bootstrap parameters
+          export NODES=${Nodes}
+          export BASE_PORT=${BasePort}
+          export VERSION=${Version}
+          export MODE=${Mode}
+          export ROUTE53_ZONE_ID=${Route53ZoneId}
+          export ROUTE53_SUFFIX=${Route53Suffix}
+          export S3_BUCKET=${S3Bucket}
+          export S3_PREFIX=${S3Prefix}
+          
+          # Run your init script
+          aws s3 cp s3://${S3Bucket}/${S3Prefix}/init.sh /opt/init.sh
+          chmod +x /opt/init.sh
+          bash /opt/init.sh
+
+Outputs:
+  InstanceId:
+    Description: ID della istanza EC2
+    Value: !Ref KoordeNode
+  InstancePrivateIP:
+    Description: IP privato della istanza EC2
+    Value: !GetAtt KoordeNode.PrivateIp
+  InstancePublicIP:
+    Description: IP pubblico della istanza EC2
+    Value: !GetAtt KoordeNode.PublicIp

@@ -2,7 +2,6 @@ package main
 
 import (
 	"KoordeDHT/internal/bootstrap"
-	"KoordeDHT/internal/bootstrap/register"
 	"KoordeDHT/internal/client"
 	"KoordeDHT/internal/config"
 	"KoordeDHT/internal/domain"
@@ -17,7 +16,6 @@ import (
 	"context"
 	"flag"
 	"log"
-	"net"
 	"os"
 	"os/signal"
 	"syscall"
@@ -160,8 +158,31 @@ func main() {
 	go func() { serveErr <- s.Start() }()
 	lgr.Debug("server started")
 
+	// resolve host and port for bootstrap
+	var register bootstrap.Bootstrap
+	if cfg.DHT.Bootstrap.Mode == "route53" {
+		register, err = bootstrap.NewRoute53Bootstrap(cfg.DHT.Bootstrap.Route53)
+		if err != nil {
+			lgr.Error("failed to initialize Route53 bootstrap", logger.F("err", err))
+			// cleanup before exit
+			s.Stop()
+			n.Stop()
+			os.Exit(1)
+		}
+	} else if cfg.DHT.Bootstrap.Mode == "static" {
+		register = bootstrap.NewStaticBootstrap(cfg.DHT.Bootstrap.Peers)
+	} else {
+		lgr.Error("unsupported bootstrap mode", logger.F("mode", cfg.DHT.Bootstrap.Mode))
+		// cleanup before exit
+		s.Stop()
+		n.Stop()
+		os.Exit(1)
+	}
+
 	// Join an existing DHT or create a new one
-	peers, err := bootstrap.ResolveBootstrap(cfg.DHT.Bootstrap)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	peers, err := register.Discover(ctx)
+	cancel()
 	if err != nil {
 		lgr.Error("failed to resolve bootstrap peers", logger.F("err", err))
 		// cleanup before exit
@@ -169,7 +190,7 @@ func main() {
 		n.Stop()
 		os.Exit(1)
 	}
-	lgr.Debug("resolved bootstrap peers", logger.F("peers", peers))
+	lgr.Info("resolved bootstrap peers", logger.F("peers", peers))
 	if len(peers) != 0 {
 		if err := n.Join(peers); err != nil {
 			lgr.Error("failed to join DHT", logger.F("err", err))
@@ -184,39 +205,21 @@ func main() {
 		lgr.Debug("new DHT created")
 	}
 
-	// Register node in DNS
-	if cfg.DHT.Bootstrap.Register.Enabled {
-		host := lis.Addr().(*net.TCPAddr).IP.String() //TODO: potrebbe dare problemi con loopback (se usato)
-		port := lis.Addr().(*net.TCPAddr).Port
-		r53Client, err := register.NewClient(context.Background())
-		if err != nil {
-			lgr.Error("failed to init route53 client", logger.F("err", err))
-			s.Stop()
-			n.Stop()
-			os.Exit(1)
-		}
-
-		if err := register.RegisterNode(
-			context.Background(),
-			r53Client,
-			cfg.DHT.Bootstrap.Register,
-			n.Self().ID.ToHexString(true),
-			host,
-			port,
-		); err != nil {
-			lgr.Error("failed to register node in Route53", logger.F("err", err))
-		}
+	// Register node
+	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
+	err = register.Register(ctx, &domainNode)
+	cancel()
+	if err != nil {
+		lgr.Error("failed to register DHT", logger.F("err", err))
+	} else {
+		lgr.Info("node registered successfully")
 		defer func() {
 			// Deregister node on shutdown
-			if err := register.DeregisterNode(
-				context.Background(),
-				r53Client,
-				cfg.DHT.Bootstrap.Register,
-				n.Self().ID.ToHexString(true),
-				host,
-				port,
-			); err != nil {
-				lgr.Warn("failed to deregister node from Route53", logger.F("err", err))
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			err := register.Deregister(ctx, &domainNode)
+			cancel()
+			if err != nil {
+				lgr.Warn("failed to deregister node", logger.F("err", err))
 			}
 		}()
 	}

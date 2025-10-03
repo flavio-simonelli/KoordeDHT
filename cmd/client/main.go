@@ -29,7 +29,7 @@ func connect(addr string) (clientv1.ClientAPIClient, *grpc.ClientConn, error) {
 }
 
 func main() {
-	addr := flag.String("addr", "127.0.0.1:5000", "Address of the Koorde node (entry point)")
+	addr := flag.String("addr", "bootstrap:4000", "Address of the Koorde node (entry point)")
 	timeout := flag.Duration("timeout", 5*time.Second, "Request timeout")
 	flag.Parse()
 

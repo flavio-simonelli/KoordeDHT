@@ -5,28 +5,24 @@ logger:
   mode: "stdout"           # Log destination: stdout | file
 
   file:                    # File logging settings (used only if mode = file)
-    path: "logs/app.log"   # Path to the log file
-    maxSize: 5             # Maximum size (in MB) per log file before rotation
-    maxBackups: 3          # Number of rotated log files to retain
-    maxAge: 1              # Maximum age (in days) to retain old log files
-    compress: true         # Compress old log files when rotating
+    path: ""   # Path to the log file
+    maxSize:              # Maximum size (in MB) per log file before rotation
+    maxBackups:           # Number of rotated log files to retain
+    maxAge:               # Maximum age (in days) to retain old log files
+    compress:          # Compress old log files when rotating
 
 dht:
   idBits: 64                # Identifier space size (keyspace = 2^idBits)
   mode: "private"          # Network mode: public (real network) | private (local/isolated)
 
   bootstrap:
-    mode: "static"              # Bootstrap strategy: dns | static
-    dnsName: "" # DNS name used when mode = dns
-    srv: true                  # Use DNS SRV records if true, otherwise A/AAAA records
-    port: 35761                 # Bootstrap port (used only when srv = false)
-    peers: ["192.168.1.102:42195"]                   # Static peer list (used only when mode = static)
+    mode: "static"              # Modalità: static | route53
+    peers: []                   # Lista di peer (se mode=static)
 
-    register:
-      enabled: false                    # Se true, il nodo si registra in Route53
-      hostedZoneId: ""      # ID della hosted zone
-      domainSuffix: "" # Dove creare i record dei nodi
-      ttl: 30                          # TTL per i record
+    route53:
+      hostedZoneId: ""           # ID della hosted zone Route53
+      domainSuffix: ""           # Suffisso dominio per i record SRV (es. "koorde.dht")
+      ttl:                     # TTL dei record SRV
 
   deBruijn:
     degree: 8              # Degree of the de Bruijn graph (2 = minimal, log n = optimal; must be a power of 2 for binary string representation)
@@ -49,5 +45,5 @@ node:
 telemetry:
   tracing:
     enabled: false          # Enable or disable distributed tracing (true | false)
-    exporter: otlp       # Tracing exporter to use (otlp | jaeger )
-    endpoint: "" # Exporter endpoint (OTLP or Jaeger)
+    exporter:        # Tracing exporter to use (otlp | jaeger )
+    endpoint:  # Exporter endpoint (OTLP or Jaeger)

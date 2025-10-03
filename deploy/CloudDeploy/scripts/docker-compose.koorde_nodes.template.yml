@@ -1,0 +1,14 @@
+image: flaviosimonelli/koorde-node-${VERSION}:latest
+container_name: koorde-node-$ID
+restart: unless-stopped
+ports:
+  - "${NODE_PORT}:${NODE_PORT}"
+environment:
+  - NODE_HOST=${NODE_HOST}
+  - NODE_PORT=${NODE_PORT}
+  - ROUTE53_ZONE_ID=${ROUTE53_ZONE_ID}
+  - ROUTE53_SUFFIX=${ROUTE53_SUFFIX}
+env_file:
+  - ./common_node.env
+networks:
+  - koordenet

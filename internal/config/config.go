@@ -50,20 +50,16 @@ type FaultToleranceConfig struct {
 	FailureTimeout        time.Duration `yaml:"failureTimeout"`
 }
 
-type RegisterConfig struct {
-	Enabled      bool   `yaml:"enabled"`
+type Route53Config struct {
 	HostedZoneID string `yaml:"hostedZoneId"`
 	DomainSuffix string `yaml:"domainSuffix"`
 	TTL          int64  `yaml:"ttl"`
 }
 
 type BootstrapConfig struct {
-	Mode     string         `yaml:"mode"`
-	DNSName  string         `yaml:"dnsName"`
-	SRV      bool           `yaml:"srv"`
-	Port     int            `yaml:"port"`
-	Peers    []string       `yaml:"peers"`
-	Register RegisterConfig `yaml:"register"`
+	Mode    string        `yaml:"mode"`
+	Peers   []string      `yaml:"peers"`
+	Route53 Route53Config `yaml:"route53"`
 }
 
 type StorageConfig struct {
@@ -124,37 +120,39 @@ func LoadConfig(path string) (*Config, error) {
 //     commonly node-specific or deployment-dependent.
 //   - For each supported field, if a corresponding environment variable is set,
 //     its value overrides the value loaded from the YAML configuration file.
-//   - Supported overrides include:
-//     NODE_ID              -> cfg.Node.Id
-//     NODE_BIND            -> cfg.Node.Bind
-//     NODE_HOST            -> cfg.Node.Host
-//     NODE_PORT            -> cfg.Node.Port
-//     BOOTSTRAP_MODE       -> cfg.DHT.Bootstrap.Mode
-//     BOOTSTRAP_DNSNAME    -> cfg.DHT.Bootstrap.DNSName
-//     BOOTSTRAP_SRV        -> cfg.DHT.Bootstrap.SRV
-//     BOOTSTRAP_PORT       -> cfg.DHT.Bootstrap.Port
-//     BOOTSTRAP_PEERS      -> cfg.DHT.Bootstrap.Peers (comma-separated list)
-//     REGISTER_ENABLED     -> cfg.DHT.Bootstrap.Register.Enabled
-//     REGISTER_ZONE_ID     -> cfg.DHT.Bootstrap.Register.HostedZoneID
-//     REGISTER_SUFFIX      -> cfg.DHT.Bootstrap.Register.DomainSuffix
-//     REGISTER_TTL         -> cfg.DHT.Bootstrap.Register.TTL
-//     TRACE_ENABLED        -> cfg.Telemetry.Tracing.Enabled
-//     TRACE_EXPORTER       -> cfg.Telemetry.Tracing.Exporter
-//     TRACE_ENDPOINT       -> cfg.Telemetry.Tracing.Endpoint
-//     LOGGER_ENABLED      -> cfg.Logger.Active
-//     LOGGER_LEVEL        -> cfg.Logger.Level
-//     LOGGER_ENCODING     -> cfg.Logger.Encoding
-//     LOGGER_MODE         -> cfg.Logger.Mode
-//     LOGGER_FILE_PATH    -> cfg.Logger.File.Path
+//
+// Supported overrides include:
+//
+//	NODE_ID             -> cfg.Node.Id
+//	NODE_BIND           -> cfg.Node.Bind
+//	NODE_HOST           -> cfg.Node.Host
+//	NODE_PORT           -> cfg.Node.Port
+//
+//	BOOTSTRAP_MODE      -> cfg.DHT.Bootstrap.Mode ("static" or "route53")
+//	BOOTSTRAP_PEERS     -> cfg.DHT.Bootstrap.Peers (comma-separated list, used only in mode=static)
+//
+//	ROUTE53_ZONE_ID     -> cfg.DHT.Bootstrap.Route53.HostedZoneID
+//	ROUTE53_SUFFIX      -> cfg.DHT.Bootstrap.Route53.DomainSuffix
+//	ROUTE53_TTL         -> cfg.DHT.Bootstrap.Route53.TTL
+//
+//	TRACE_ENABLED       -> cfg.Telemetry.Tracing.Enabled
+//	TRACE_EXPORTER      -> cfg.Telemetry.Tracing.Exporter
+//	TRACE_ENDPOINT      -> cfg.Telemetry.Tracing.Endpoint
+//
+//	LOGGER_ENABLED      -> cfg.Logger.Active
+//	LOGGER_LEVEL        -> cfg.Logger.Level
+//	LOGGER_ENCODING     -> cfg.Logger.Encoding
+//	LOGGER_MODE         -> cfg.Logger.Mode
+//	LOGGER_FILE_PATH    -> cfg.Logger.File.Path
 //
 // Type conversions:
-//   - Integer fields (e.g., NODE_PORT, BOOTSTRAP_PORT) are parsed using strconv.Atoi;
+//   - Integer fields (e.g., NODE_PORT, ROUTE53_TTL) are parsed using strconv.Atoi / ParseInt;
 //     invalid values are ignored.
-//   - Boolean field BOOTSTRAP_SRV accepts "true", "1", or "yes" (case-insensitive)
-//     as true; any other non-empty value is treated as false.
+//   - Boolean fields (e.g., TRACE_ENABLED, LOGGER_ENABLED) accept "true", "1", or "yes"
+//     (case-insensitive) as true; any other non-empty value is treated as false.
 //   - Lists such as BOOTSTRAP_PEERS are parsed by splitting the string on commas.
 //
-// Usage:
+// Usage example:
 //
 //	cfg, _ := LoadConfig("config.yaml")
 //	cfg.ApplyEnvOverrides()
@@ -179,18 +177,6 @@ func (cfg *Config) ApplyEnvOverrides() {
 	if v := os.Getenv("BOOTSTRAP_MODE"); v != "" {
 		cfg.DHT.Bootstrap.Mode = v
 	}
-	if v := os.Getenv("BOOTSTRAP_DNSNAME"); v != "" {
-		cfg.DHT.Bootstrap.DNSName = v
-	}
-	if v := os.Getenv("BOOTSTRAP_SRV"); v != "" {
-		v = strings.ToLower(v)
-		cfg.DHT.Bootstrap.SRV = v == "true" || v == "1" || v == "yes"
-	}
-	if v := os.Getenv("BOOTSTRAP_PORT"); v != "" {
-		if port, err := strconv.Atoi(v); err == nil {
-			cfg.DHT.Bootstrap.Port = port
-		}
-	}
 	if v := os.Getenv("BOOTSTRAP_PEERS"); v != "" {
 		cfg.DHT.Bootstrap.Peers = strings.Split(v, ",")
 	}
@@ -204,19 +190,15 @@ func (cfg *Config) ApplyEnvOverrides() {
 	if v := os.Getenv("TRACE_ENDPOINT"); v != "" {
 		cfg.Telemetry.Tracing.Endpoint = v
 	}
-	if v := os.Getenv("REGISTER_ENABLED"); v != "" {
-		v = strings.ToLower(v)
-		cfg.DHT.Bootstrap.Register.Enabled = v == "true" || v == "1" || v == "yes"
+	if v := os.Getenv("ROUTE53_ZONE_ID"); v != "" {
+		cfg.DHT.Bootstrap.Route53.HostedZoneID = v
 	}
-	if v := os.Getenv("REGISTER_ZONE_ID"); v != "" {
-		cfg.DHT.Bootstrap.Register.HostedZoneID = v
+	if v := os.Getenv("ROUTE53_SUFFIX"); v != "" {
+		cfg.DHT.Bootstrap.Route53.DomainSuffix = v
 	}
-	if v := os.Getenv("REGISTER_SUFFIX"); v != "" {
-		cfg.DHT.Bootstrap.Register.DomainSuffix = v
-	}
-	if v := os.Getenv("REGISTER_TTL"); v != "" {
+	if v := os.Getenv("ROUTE53_TTL"); v != "" {
 		if ttl, err := strconv.ParseInt(v, 10, 64); err == nil {
-			cfg.DHT.Bootstrap.Register.TTL = ttl
+			cfg.DHT.Bootstrap.Route53.TTL = ttl
 		}
 	}
 	if v := os.Getenv("LOGGER_ENABLED"); v != "" {
@@ -309,23 +291,15 @@ func (cfg *Config) ValidateConfig() error {
 	// --- Bootstrap ---
 	b := cfg.DHT.Bootstrap
 	switch b.Mode {
-	case "dns":
-		if b.DNSName == "" {
-			errs = append(errs, "bootstrap.dnsName is required in mode=dns")
+	case "route53":
+		if b.Route53.HostedZoneID == "" {
+			errs = append(errs, "bootstrap.route53.hostedZoneId is required in mode=route53")
 		}
-		if !b.SRV && b.Port <= 0 {
-			errs = append(errs, "bootstrap.port must be > 0 when using A/AAAA (srv=false)")
+		if b.Route53.DomainSuffix == "" {
+			errs = append(errs, "bootstrap.route53.domainSuffix is required in mode=route53")
 		}
-		if b.Register.Enabled {
-			if b.Register.HostedZoneID == "" {
-				errs = append(errs, "bootstrap.register.hostedZoneId is required when register.enabled=true")
-			}
-			if b.Register.DomainSuffix == "" {
-				errs = append(errs, "bootstrap.register.domainSuffix is required when register.enabled=true")
-			}
-			if b.Register.TTL <= 0 {
-				errs = append(errs, "bootstrap.register.ttl must be > 0 when register.enabled=true")
-			}
+		if b.Route53.TTL <= 0 {
+			errs = append(errs, "bootstrap.route53.ttl must be > 0 in mode=route53")
 		}
 	case "static":
 		for _, p := range b.Peers {
@@ -333,8 +307,6 @@ func (cfg *Config) ValidateConfig() error {
 				errs = append(errs, fmt.Sprintf("invalid peer address %q in bootstrap.peers: %v", p, err))
 			}
 		}
-	case "init":
-		// primo nodo nessun vincolo extra
 	default:
 		errs = append(errs, fmt.Sprintf("invalid bootstrap.mode: %s (must be dns, static or init)", b.Mode))
 	}
@@ -367,7 +339,7 @@ func (cfg *Config) ValidateConfig() error {
 // This is useful for debugging startup issues and verifying
 // that the configuration file has been parsed correctly.
 func (cfg *Config) LogConfig(lgr logger.Logger) {
-	lgr.Debug("Loaded configuration",
+	lgr.Info("Loaded configuration",
 		// Logger
 		logger.F("logger.active", cfg.Logger.Active),
 		logger.F("logger.level", cfg.Logger.Level),
@@ -402,16 +374,12 @@ func (cfg *Config) LogConfig(lgr logger.Logger) {
 
 		// bootstrap
 		logger.F("dht.bootstrap.mode", cfg.DHT.Bootstrap.Mode),
-		logger.F("dht.bootstrap.dnsName", cfg.DHT.Bootstrap.DNSName),
-		logger.F("dht.bootstrap.srv", cfg.DHT.Bootstrap.SRV),
-		logger.F("dht.bootstrap.port", cfg.DHT.Bootstrap.Port),
 		logger.F("dht.bootstrap.peers", cfg.DHT.Bootstrap.Peers),
 
-		// register
-		logger.F("dht.bootstrap.register.enabled", cfg.DHT.Bootstrap.Register.Enabled),
-		logger.F("dht.bootstrap.register.hostedZoneId", cfg.DHT.Bootstrap.Register.HostedZoneID),
-		logger.F("dht.bootstrap.register.domainSuffix", cfg.DHT.Bootstrap.Register.DomainSuffix),
-		logger.F("dht.bootstrap.register.ttl", cfg.DHT.Bootstrap.Register.TTL),
+		// route53
+		logger.F("dht.bootstrap.register.hostedZoneId", cfg.DHT.Bootstrap.Route53.HostedZoneID),
+		logger.F("dht.bootstrap.register.domainSuffix", cfg.DHT.Bootstrap.Route53.DomainSuffix),
+		logger.F("dht.bootstrap.register.ttl", cfg.DHT.Bootstrap.Route53.TTL),
 
 		// Node
 		logger.F("node.id", cfg.Node.Id),

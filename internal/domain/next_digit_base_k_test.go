@@ -62,11 +62,19 @@ func TestNextDigitBaseK(t *testing.T) {
 		},
 		{
 			name:       "12-bit, base 8 (r=3, non byte-aligned)",
-			bits:       32,
-			graphGrade: 4,
-			aHex:       "c72140b0", // 0000 1111 0000 (solo 12 bit validi)
-			wantDigit:  3,          // primi 3 bit = 000
-			wantRest:   "1c8502c0", // shift left 3 → 0001 1110 0000
+			bits:       12,
+			graphGrade: 8,
+			aHex:       "00f0", // 0000 0000 1111 0000 (solo 12 bit validi)
+			wantDigit:  0,      // primi 3 bit = 000
+			wantRest:   "0780", // shift left 3 → 0000 0111 1000 0000
+		},
+		{
+			name:       "12-bit, base 8 (r=3, non byte-aligned)",
+			bits:       12,
+			graphGrade: 8,
+			aHex:       "0780", // 0000 0111 1000 0000 (solo 12 bit validi)
+			wantDigit:  3,      // primi 3 bit = 000
+			wantRest:   "0c00", // shift left 3 → 0000 1100 0000 0000
 		},
 		{
 			name:       "20-bit, base 16 (r=4, non byte-aligned)",
