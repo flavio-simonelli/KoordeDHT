@@ -6,8 +6,10 @@ ports:
 environment:
   - NODE_HOST=${NODE_HOST}
   - NODE_PORT=${NODE_PORT}
+  - DHT_MODE=${DHT_MODE}
   - ROUTE53_ZONE_ID=${ROUTE53_ZONE_ID}
   - ROUTE53_SUFFIX=${ROUTE53_SUFFIX}
+  - ROUTE53_REGION=${ROUTE53_REGION}
 env_file:
   - ./common_node.env
 networks:

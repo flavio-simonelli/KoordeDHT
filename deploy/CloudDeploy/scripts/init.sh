@@ -32,20 +32,12 @@ usage() {
   echo "  MODE                 IP mode for node advertising (public | private)"
   echo "  ROUTE53_ZONE_ID     Route53 Hosted Zone ID"
   echo "  ROUTE53_SUFFIX      Route53 suffix for node registration (e.g. dht.local)"
+  echo "  ROUTE53_REGION     AWS region for Route53 (default: us-east-1)"
   echo "  S3_BUCKET            S3 bucket containing Koorde deployment scripts"
   echo
   echo "Optional variables:"
   echo "  S3_PREFIX            Folder inside the S3 bucket where scripts are stored"
   echo "                       Default: scripts"
-  echo
-  echo "Example:"
-  echo "  NODES=5 BASE_PORT=5000 VERSION=medium MODE=public \\"
-  echo "  ROUTE53_ZONE_ID=Z123456 ROUTE53_SUFFIX=dht.local \\"
-  echo "  S3_BUCKET=my-koorde-bucket ./bootstrap.sh"
-  echo
-  echo "NOTE: All parameters are required except S3_PREFIX (default: scripts)."
-  echo "      This script must run on EC2 with AWS CLI v2 installed and IAM Role"
-  echo "      permissions to read from S3 (and optionally Route53)."
   exit 1
 }
 
@@ -63,6 +55,7 @@ VERSION=${VERSION:-strong}   # Docker image version (minimal|medium|strong)
 MODE=${MODE:-private}        # IP mode: private or public
 ROUTE53_ZONE_ID=${ROUTE53_ZONE_ID:-""}   # Route53 Hosted Zone ID
 ROUTE53_SUFFIX=${ROUTE53_SUFFIX:-""}     # DNS suffix for registration
+ROUTE53_REGION=${ROUTE53_REGION:-"us-east-1"} # AWS region for Route53
 
 S3_BUCKET=${S3_BUCKET:-"koorde-deploy"}   # S3 bucket containing scripts
 S3_PREFIX=${S3_PREFIX:-"scripts"}         # Prefix/folder inside bucket
@@ -91,7 +84,8 @@ bash "$WORKDIR/gen-compose.sh" \
   --version "$VERSION" \
   --mode "$MODE" \
   --zone-id "$ROUTE53_ZONE_ID" \
-  --suffix "$ROUTE53_SUFFIX"
+  --suffix "$ROUTE53_SUFFIX" \
+  --region "$ROUTE53_REGION" \
 
 # Deploy Koorde cluster with Docker Compose
 TARGET_COMPOSE="/home/ec2-user/docker-compose.yml"

@@ -52,6 +52,10 @@ Parameters:
   Route53Suffix:
     Type: String
     Description: Route53 suffix for node registration (e.g. dht.local)
+  Route53Region:
+    Type: String
+    Default: us-east-1
+    Description: AWS region for Route53 operations
 
 Resources:
   KoordeSecurityGroup:
@@ -119,6 +123,7 @@ Resources:
           export MODE=${Mode}
           export ROUTE53_ZONE_ID=${Route53ZoneId}
           export ROUTE53_SUFFIX=${Route53Suffix}
+          export ROUTE53_REGION=${Route53Region}
           export S3_BUCKET=${S3Bucket}
           export S3_PREFIX=${S3Prefix}
           

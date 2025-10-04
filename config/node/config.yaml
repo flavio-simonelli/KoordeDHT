@@ -23,6 +23,7 @@ dht:
       hostedZoneId: ""           # ID della hosted zone Route53
       domainSuffix: ""           # Suffisso dominio per i record SRV (es. "koorde.dht")
       ttl:                     # TTL dei record SRV
+      region: ""                 # Regione AWS per le query Route53 (es. "us-east-1")
 
   deBruijn:
     degree: 8              # Degree of the de Bruijn graph (2 = minimal, log n = optimal; must be a power of 2 for binary string representation)

@@ -28,6 +28,7 @@ usage() {
   echo "  --mode              Use EC2 public or private IP (default: private)."
   echo "  --zone-id           Route53 Hosted Zone ID for registration."
   echo "  --suffix            DNS suffix for node registration (e.g. dht.local)."
+  echo "  --region            AWS region (default: us-east-1)."
   exit 1
 }
 
@@ -38,6 +39,7 @@ VERSION=""
 MODE="private"
 ROUTE53_ZONE_ID=""
 ROUTE53_SUFFIX=""
+ROUTE53_REGION="us-east-1"
 
 # Parse CLI arguments
 while [[ $# -gt 0 ]]; do
@@ -48,12 +50,13 @@ while [[ $# -gt 0 ]]; do
     --mode) MODE="$2"; shift 2 ;;
     --zone-id) ROUTE53_ZONE_ID="$2"; shift 2 ;;
     --suffix) ROUTE53_SUFFIX="$2"; shift 2 ;;
+    --region) ROUTE53_REGION="$2"; shift 2 ;;
     *) usage ;;
   esac
 done
 
 # Parameter validation
-if [[ -z "$NODES" || -z "$BASE_PORT" || -z "$VERSION" || -z "$ROUTE53_ZONE_ID" || -z "$ROUTE53_SUFFIX" ]]; then
+if [[ -z "$NODES" || -z "$BASE_PORT" || -z "$VERSION" || -z "$ROUTE53_ZONE_ID" || -z "$ROUTE53_SUFFIX" || -z "$ROUTE53_REGION" ]]; then
   echo "[ERROR]: Missing required parameters"
   usage
 fi
@@ -93,8 +96,9 @@ else
 fi
 
 # File paths
-TEMPLATE="docker-compose.koorde_nodes.template.yml"
-OUT="docker-compose.koorde_nodes.generated.yml"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TEMPLATE="$SCRIPT_DIR/docker-compose.koorde_nodes.template.yml"
+OUT="$SCRIPT_DIR/docker-compose.koorde_nodes.generated.yml"
 
 # Write docker-compose header
 cat > "$OUT" <<EOF
@@ -118,8 +122,10 @@ for i in $(seq 1 "$NODES"); do
     -e "s/\${VERSION}/$VERSION/g" \
     -e "s/\${NODE_HOST}/$NODE_HOST/g" \
     -e "s/\${NODE_PORT}/$NODE_PORT/g" \
+    -e "s/\${DHT_MODE}/$MODE/g" \
     -e "s/\${ROUTE53_ZONE_ID}/$ROUTE53_ZONE_ID/g" \
     -e "s/\${ROUTE53_SUFFIX}/$ROUTE53_SUFFIX/g" \
+    -e "s/\${ROUTE53_REGION}/$ROUTE53_REGION/g" \
     "$TEMPLATE" | sed 's/^/    /' >> "$OUT"
 
   echo "" >> "$OUT"

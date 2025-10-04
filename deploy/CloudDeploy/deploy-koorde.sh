@@ -20,6 +20,7 @@ usage() {
   echo "  --mode              Node host mode (public|private)"
   echo "  --zone-id           Route53 Hosted Zone ID"
   echo "  --suffix            DNS suffix (e.g. dht.local)"
+  echo "  --region          AWS region for Route53 (default: us-east-1)"
   echo "  --s3-bucket         S3 bucket containing scripts"
   echo "  --s3-prefix         S3 prefix/folder (e.g. scripts)"
   echo "  --key-name          EC2 KeyPair name"
@@ -33,7 +34,7 @@ usage() {
 # Parse arguments
 # -----------------------------------------------------------------------------
 INSTANCES="" NODES="" BASE_PORT="" VERSION="" MODE="" ROUTE53_ZONE_ID="" ROUTE53_SUFFIX=""
-S3_BUCKET="" S3_PREFIX="" KEY_NAME="" INSTANCE_TYPE="" VPC_ID="" SUBNET_ID=""
+S3_BUCKET="" S3_PREFIX="" KEY_NAME="" INSTANCE_TYPE="" VPC_ID="" SUBNET_ID="" ROUTE53_REGION=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -44,6 +45,7 @@ while [[ $# -gt 0 ]]; do
     --mode) MODE="$2"; shift 2 ;;
     --zone-id) ROUTE53_ZONE_ID="$2"; shift 2 ;;
     --suffix) ROUTE53_SUFFIX="$2"; shift 2 ;;
+    --region) ROUTE53_REGION="$2"; shift 2 ;;
     --s3-bucket) S3_BUCKET="$2"; shift 2 ;;
     --s3-prefix) S3_PREFIX="$2"; shift 2 ;;
     --key-name) KEY_NAME="$2"; shift 2 ;;
@@ -57,7 +59,7 @@ done
 # -----------------------------------------------------------------------------
 # Validation
 # -----------------------------------------------------------------------------
-if [[ -z "$INSTANCES" || -z "$NODES" || -z "$BASE_PORT" || -z "$VERSION" || -z "$MODE" || -z "$ROUTE53_ZONE_ID" || -z "$ROUTE53_SUFFIX" || -z "$S3_BUCKET" || -z "$S3_PREFIX" || -z "$KEY_NAME" || -z "$INSTANCE_TYPE" || -z "$VPC_ID" || -z "$SUBNET_ID" ]]; then
+if [[ -z "$INSTANCES" || -z "$NODES" || -z "$BASE_PORT" || -z "$VERSION" || -z "$MODE" || -z "$ROUTE53_ZONE_ID" || -z "$ROUTE53_SUFFIX" || -z "$ROUTE53_REGION" || -z "$S3_BUCKET" || -z "$S3_PREFIX" || -z "$KEY_NAME" || -z "$INSTANCE_TYPE" || -z "$VPC_ID" || -z "$SUBNET_ID" ]]; then
   echo "[ERROR] Missing required parameters"
   usage
 fi
@@ -118,7 +120,8 @@ for i in $(seq 1 "$INSTANCES"); do
       ParameterKey=Version,ParameterValue=$VERSION \
       ParameterKey=Mode,ParameterValue=$MODE \
       ParameterKey=Route53ZoneId,ParameterValue=$ROUTE53_ZONE_ID \
-      ParameterKey=Route53Suffix,ParameterValue=$ROUTE53_SUFFIX
+      ParameterKey=Route53Suffix,ParameterValue=$ROUTE53_SUFFIX \
+      ParameterKey=Route53Region,ParameterValue=$ROUTE53_REGION
 done
 
 echo "[SUCCESS] Launched $INSTANCES EC2 instances, each running $NODES Koorde containers."

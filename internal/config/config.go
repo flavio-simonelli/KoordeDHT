@@ -54,6 +54,7 @@ type Route53Config struct {
 	HostedZoneID string `yaml:"hostedZoneId"`
 	DomainSuffix string `yaml:"domainSuffix"`
 	TTL          int64  `yaml:"ttl"`
+	Region       string `yaml:"region"`
 }
 
 type BootstrapConfig struct {
@@ -123,27 +124,28 @@ func LoadConfig(path string) (*Config, error) {
 //
 // Supported overrides include:
 //
-//	NODE_ID             -> cfg.Node.Id
-//	NODE_BIND           -> cfg.Node.Bind
-//	NODE_HOST           -> cfg.Node.Host
-//	NODE_PORT           -> cfg.Node.Port
+//		NODE_ID             -> cfg.Node.Id
+//		NODE_BIND           -> cfg.Node.Bind
+//		NODE_HOST           -> cfg.Node.Host
+//		NODE_PORT           -> cfg.Node.Port
 //
-//	BOOTSTRAP_MODE      -> cfg.DHT.Bootstrap.Mode ("static" or "route53")
-//	BOOTSTRAP_PEERS     -> cfg.DHT.Bootstrap.Peers (comma-separated list, used only in mode=static)
+//		BOOTSTRAP_MODE      -> cfg.DHT.Bootstrap.Mode ("static" or "route53")
+//		BOOTSTRAP_PEERS     -> cfg.DHT.Bootstrap.Peers (comma-separated list, used only in mode=static)
 //
-//	ROUTE53_ZONE_ID     -> cfg.DHT.Bootstrap.Route53.HostedZoneID
-//	ROUTE53_SUFFIX      -> cfg.DHT.Bootstrap.Route53.DomainSuffix
-//	ROUTE53_TTL         -> cfg.DHT.Bootstrap.Route53.TTL
+//		ROUTE53_ZONE_ID     -> cfg.DHT.Bootstrap.Route53.HostedZoneID
+//		ROUTE53_SUFFIX      -> cfg.DHT.Bootstrap.Route53.DomainSuffix
+//		ROUTE53_TTL         -> cfg.DHT.Bootstrap.Route53.TTL
+//	 	ROUTE53_REGION 		-> cfg.DHT.Bootstrap.Route53.Region
 //
-//	TRACE_ENABLED       -> cfg.Telemetry.Tracing.Enabled
-//	TRACE_EXPORTER      -> cfg.Telemetry.Tracing.Exporter
-//	TRACE_ENDPOINT      -> cfg.Telemetry.Tracing.Endpoint
+//		TRACE_ENABLED       -> cfg.Telemetry.Tracing.Enabled
+//		TRACE_EXPORTER      -> cfg.Telemetry.Tracing.Exporter
+//		TRACE_ENDPOINT      -> cfg.Telemetry.Tracing.Endpoint
 //
-//	LOGGER_ENABLED      -> cfg.Logger.Active
-//	LOGGER_LEVEL        -> cfg.Logger.Level
-//	LOGGER_ENCODING     -> cfg.Logger.Encoding
-//	LOGGER_MODE         -> cfg.Logger.Mode
-//	LOGGER_FILE_PATH    -> cfg.Logger.File.Path
+//		LOGGER_ENABLED      -> cfg.Logger.Active
+//		LOGGER_LEVEL        -> cfg.Logger.Level
+//		LOGGER_ENCODING     -> cfg.Logger.Encoding
+//		LOGGER_MODE         -> cfg.Logger.Mode
+//		LOGGER_FILE_PATH    -> cfg.Logger.File.Path
 //
 // Type conversions:
 //   - Integer fields (e.g., NODE_PORT, ROUTE53_TTL) are parsed using strconv.Atoi / ParseInt;
@@ -173,7 +175,9 @@ func (cfg *Config) ApplyEnvOverrides() {
 			cfg.Node.Port = port
 		}
 	}
-
+	if v := os.Getenv("DHT_MODE"); v != "" {
+		cfg.DHT.Mode = v
+	}
 	if v := os.Getenv("BOOTSTRAP_MODE"); v != "" {
 		cfg.DHT.Bootstrap.Mode = v
 	}
@@ -200,6 +204,9 @@ func (cfg *Config) ApplyEnvOverrides() {
 		if ttl, err := strconv.ParseInt(v, 10, 64); err == nil {
 			cfg.DHT.Bootstrap.Route53.TTL = ttl
 		}
+	}
+	if v := os.Getenv("ROUTE53_REGION"); v != "" {
+		cfg.DHT.Bootstrap.Route53.Region = v
 	}
 	if v := os.Getenv("LOGGER_ENABLED"); v != "" {
 		v = strings.ToLower(v)
@@ -301,6 +308,9 @@ func (cfg *Config) ValidateConfig() error {
 		if b.Route53.TTL <= 0 {
 			errs = append(errs, "bootstrap.route53.ttl must be > 0 in mode=route53")
 		}
+		if b.Route53.Region == "" {
+			errs = append(errs, "bootstrap.route53.region is required in mode=route53")
+		}
 	case "static":
 		for _, p := range b.Peers {
 			if _, _, err := net.SplitHostPort(p); err != nil {
@@ -380,6 +390,7 @@ func (cfg *Config) LogConfig(lgr logger.Logger) {
 		logger.F("dht.bootstrap.register.hostedZoneId", cfg.DHT.Bootstrap.Route53.HostedZoneID),
 		logger.F("dht.bootstrap.register.domainSuffix", cfg.DHT.Bootstrap.Route53.DomainSuffix),
 		logger.F("dht.bootstrap.register.ttl", cfg.DHT.Bootstrap.Route53.TTL),
+		logger.F("dht.bootstrap.register.region", cfg.DHT.Bootstrap.Route53.Region),
 
 		// Node
 		logger.F("node.id", cfg.Node.Id),

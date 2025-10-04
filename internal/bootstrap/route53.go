@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 	"time"
 
@@ -25,25 +26,22 @@ type Route53Bootstrap struct {
 func NewRoute53Bootstrap(cfg koordeConfig.Route53Config) (*Route53Bootstrap, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	client, err := newClient(ctx)
+
+	awsCfg, err := config.LoadDefaultConfig(ctx,
+		config.WithRegion(cfg.Region),
+	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
+
+	client := route53.NewFromConfig(awsCfg)
+
 	return &Route53Bootstrap{
 		client:       client,
 		hostedZoneID: cfg.HostedZoneID,
 		domainSuffix: strings.TrimSuffix(cfg.DomainSuffix, "."),
 		ttl:          cfg.TTL,
 	}, nil
-}
-
-// newClient creates a new Route53 client using the default AWS config.
-func newClient(ctx context.Context) (*route53.Client, error) {
-	awsCfg, err := config.LoadDefaultConfig(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return route53.NewFromConfig(awsCfg), nil
 }
 
 // Discover queries Route53 for SRV records in the specified hosted zone
@@ -98,7 +96,11 @@ func (r *Route53Bootstrap) Register(ctx context.Context, node *domain.Node) erro
 	// create the full record name
 	recordName := fmt.Sprintf("%s.%s.", node.ID.ToHexString(true), r.domainSuffix)
 	// Extract host and port from node.Addr
-	host, port, err := net.SplitHostPort(node.Addr)
+	host, strPort, err := net.SplitHostPort(node.Addr)
+	if err != nil {
+		return err
+	}
+	port, err := strconv.Atoi(strPort)
 	if err != nil {
 		return err
 	}
@@ -133,7 +135,11 @@ func (r *Route53Bootstrap) Deregister(ctx context.Context, node *domain.Node) er
 	// create the full record name
 	recordName := fmt.Sprintf("%s.%s.", node.ID.ToHexString(true), r.domainSuffix)
 	// Extract host and port from node.Addr
-	host, port, err := net.SplitHostPort(node.Addr)
+	host, strPort, err := net.SplitHostPort(node.Addr)
+	if err != nil {
+		return err
+	}
+	port, err := strconv.Atoi(strPort)
 	if err != nil {
 		return err
 	}
