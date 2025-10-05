@@ -66,7 +66,7 @@ func main() {
 	}
 	defer func() { _ = lis.Close() }() // close listener on shutdown
 	addr := lis.Addr().String()
-	lgr.Debug("create listener", logger.F("addr", addr))
+	lgr.Debug("create listener", logger.F("BindAddr", addr), logger.F("AdvertisedAddr", advertised))
 
 	// Initialize the identifier space
 	space, err := domain.NewSpace(cfg.DHT.IDBits, cfg.DHT.DeBruijn.Degree, cfg.DHT.FaultTolerance.SuccessorListSize)
@@ -79,7 +79,7 @@ func main() {
 	// Initialize the local node
 	var id domain.ID
 	if cfg.Node.Id == "" {
-		id = space.NewIdFromString(addr) // derive ID from address
+		id = space.NewIdFromString(advertised) // derive ID from address
 	} else {
 		id, err = space.FromHexString(cfg.Node.Id) // use configured ID
 		if err != nil {

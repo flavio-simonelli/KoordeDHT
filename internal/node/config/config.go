@@ -198,9 +198,11 @@ func (cfg *Config) ValidateConfig() error {
 			errs = append(errs, "bootstrap.route53.region is required in mode=route53")
 		}
 	case "static":
-		for _, p := range b.Peers {
-			if _, _, err := net.SplitHostPort(p); err != nil {
-				errs = append(errs, fmt.Sprintf("invalid peer address %q in bootstrap.peers: %v", p, err))
+		if len(b.Peers) != 0 {
+			for _, p := range b.Peers {
+				if _, _, err := net.SplitHostPort(p); err != nil {
+					errs = append(errs, fmt.Sprintf("invalid peer address %q in bootstrap.peers: %v", p, err))
+				}
 			}
 		}
 	default:
@@ -279,7 +281,8 @@ func (cfg *Config) LogConfig(lgr logger.Logger) {
 
 		// Node
 		logger.F("node.id", cfg.Node.Id),
-		logger.F("node.host", cfg.Node.Bind),
+		logger.F("node.host", cfg.Node.Host),
+		logger.F("node.bind", cfg.Node.Bind),
 		logger.F("node.port", cfg.Node.Port),
 
 		// Telemetry

@@ -2,10 +2,10 @@
 # KoordeDHT Client Tester Configuration
 # -----------------------------------------------------------------------------
 logger:
-  active:             # Enable or disable logging (true | false)
-  level: ""            # Minimum log level: debug | info | warn | error
-  encoding: ""      # Log output format: console (human-readable) | json
-  mode: ""           # Log destination: stdout | file
+  active: true            # Enable or disable logging (true | false)
+  level: "info"            # Minimum log level: debug | info | warn | error
+  encoding: "console"      # Log output format: console (human-readable) | json
+  mode: "stdout"           # Log destination: stdout | file
   file:
     path: ""   # Path to the log file
     maxSize:               # Maximum size (in MB) per log file before rotation
