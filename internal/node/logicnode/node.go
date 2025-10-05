@@ -1,11 +1,11 @@
-package node
+package logicnode
 
 import (
-	"KoordeDHT/internal/client"
 	"KoordeDHT/internal/domain"
 	"KoordeDHT/internal/logger"
-	"KoordeDHT/internal/routingtable"
-	"KoordeDHT/internal/storage"
+	client2 "KoordeDHT/internal/node/client"
+	"KoordeDHT/internal/node/routingtable"
+	"KoordeDHT/internal/node/storage"
 	"context"
 	"fmt"
 
@@ -16,10 +16,10 @@ type Node struct {
 	lgr logger.Logger
 	rt  *routingtable.RoutingTable
 	s   *storage.Storage
-	cp  *client.Pool
+	cp  *client2.Pool
 }
 
-func New(rout *routingtable.RoutingTable, clientpool *client.Pool, storage *storage.Storage, opts ...Option) *Node {
+func New(rout *routingtable.RoutingTable, clientpool *client2.Pool, storage *storage.Storage, opts ...Option) *Node {
 	n := &Node{
 		lgr: &logger.NopLogger{},
 		rt:  rout,
@@ -62,7 +62,7 @@ func (n *Node) Join(peers []string) error {
 			cancel()
 			continue
 		}
-		succ, lastErr = client.FindSuccessorStart(ctx, cli, n.Space(), self.ID)
+		succ, lastErr = client2.FindSuccessorStart(ctx, cli, n.Space(), self.ID)
 		cancel()
 		conn.Close()
 		if lastErr == nil && succ != nil {
@@ -93,7 +93,7 @@ func (n *Node) Join(peers []string) error {
 		cancel()
 		return fmt.Errorf("join: failed to dial successor %s: %w", succ.Addr, err)
 	}
-	pred, err := client.GetPredecessor(ctx, cli, n.Space())
+	pred, err := client2.GetPredecessor(ctx, cli, n.Space())
 	cancel()
 	if err != nil {
 		conn.Close()
@@ -105,7 +105,7 @@ func (n *Node) Join(peers []string) error {
 
 	// Notify successor that we may be its predecessor
 	ctx, cancel = context.WithTimeout(context.Background(), n.cp.FailureTimeout())
-	err = client.Notify(ctx, cli, self)
+	err = client2.Notify(ctx, cli, self)
 	cancel()
 	conn.Close()
 	if err != nil {
@@ -114,10 +114,16 @@ func (n *Node) Join(peers []string) error {
 
 	// Update local routing table (release old, set new)
 	if pred != nil {
-		_ = n.cp.AddRef(pred.Addr)
+		err = n.cp.AddRef(pred.Addr)
+		if err != nil {
+			n.lgr.Warn("join: failed to add ref to predecessor", logger.F("err", err))
+		}
 		n.rt.SetPredecessor(pred)
 	}
-	_ = n.cp.AddRef(succ.Addr)
+	err = n.cp.AddRef(succ.Addr)
+	if err != nil {
+		n.lgr.Warn("join: failed to add ref to successor", logger.F("err", err))
+	}
 	n.rt.SetSuccessor(0, succ)
 
 	// Initialize successor list using the new successor
@@ -181,7 +187,7 @@ func (n *Node) Leave() error {
 	// Notify successor of departure (best-effort)
 	{
 		ctx, cancel := context.WithTimeout(context.Background(), n.cp.FailureTimeout())
-		if err := client.Leave(ctx, cli, self); err != nil {
+		if err := client2.Leave(ctx, cli, self); err != nil {
 			n.lgr.Error("leave: failed to notify successor", logger.F("successor", succ.Addr), logger.F("err", err))
 			// Continue anyway with resource transfer
 		}
@@ -192,7 +198,7 @@ func (n *Node) Leave() error {
 	data := n.s.All()
 	if len(data) > 0 {
 		ctx, cancel := context.WithTimeout(context.Background(), n.cp.FailureTimeout())
-		failed, err := client.StoreRemote(ctx, cli, data)
+		failed, err := client2.StoreRemote(ctx, cli, data)
 		cancel()
 		if err != nil {
 			n.lgr.Warn("Leave: bulk transfer to successor failed, retrying individually",
@@ -204,7 +210,7 @@ func (n *Node) Leave() error {
 		for _, res := range failed {
 			// Find the correct successor for this resource
 			ctx, cancel := context.WithTimeout(context.Background(), n.cp.FailureTimeout())
-			correctSucc, err := client.FindSuccessorStart(ctx, cli, n.Space(), res.Key)
+			correctSucc, err := client2.FindSuccessorStart(ctx, cli, n.Space(), res.Key)
 			cancel()
 			if err != nil {
 				n.lgr.Warn("Leave: failed to find responsible node for resource",
@@ -233,7 +239,7 @@ func (n *Node) Leave() error {
 
 			sres := []domain.Resource{res}
 			ctx, cancel = context.WithTimeout(context.Background(), n.cp.FailureTimeout())
-			_, err = client.StoreRemote(ctx, cli2, sres)
+			_, err = client2.StoreRemote(ctx, cli2, sres)
 			cancel()
 			if err != nil {
 				n.lgr.Warn("Leave: failed to transfer resource during retry",

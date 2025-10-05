@@ -74,19 +74,17 @@ func isPrivateIP(ip net.IP) bool {
 	return false
 }
 
-// Listen creates a TCP listener bound to bind:port,
-// and returns the advertised address (host:port) to share with peers.
+// Listen starts a TCP listener on the given bind address and port,
+// and returns both the listener and the advertised address (host:port)
+// to be shared with peers.
 //
-// Parameters:
-//   - mode: "private" | "public" (usato solo se host è vuoto)
-//   - bind: indirizzo su cui fare Listen (es. "0.0.0.0")
-//   - host: indirizzo/hostname pubblicizzato (se vuoto → calcolato con mode)
-//   - port: porta TCP
+// If 'host' is empty, it is automatically selected based on 'mode':
+//   - "private": picks a private/local IPv4 address
+//   - "public":  picks a public IPv4 address
+//
+// The function validates that the advertised host matches the mode.
+// If 'port' is 0, a free port is chosen automatically.
 func Listen(mode, bind, host string, port int) (net.Listener, string, error) {
-	// 1. Bind address
-	if bind == "" {
-		bind = "0.0.0.0"
-	}
 	bindAddr := fmt.Sprintf("%s:%d", bind, port)
 
 	ln, err := net.Listen("tcp", bindAddr)
@@ -96,7 +94,6 @@ func Listen(mode, bind, host string, port int) (net.Listener, string, error) {
 
 	actualPort := ln.Addr().(*net.TCPAddr).Port
 
-	// 2. Advertised host
 	if host == "" {
 		ip, err := pickIP(mode)
 		if err != nil {
@@ -104,7 +101,6 @@ func Listen(mode, bind, host string, port int) (net.Listener, string, error) {
 		}
 		host = ip.String()
 	} else {
-		// se host è un IP, validato
 		ip := net.ParseIP(host)
 		if ip != nil {
 			if mode == "private" && !isPrivateIP(ip) {
@@ -114,7 +110,6 @@ func Listen(mode, bind, host string, port int) (net.Listener, string, error) {
 				return nil, "", fmt.Errorf("host %s is private but mode=public", host)
 			}
 		}
-		// se host NON è un IP (es. "node7"), lo accettiamo come hostname advertised
 	}
 
 	advertised := fmt.Sprintf("%s:%d", host, actualPort)

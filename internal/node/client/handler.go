@@ -2,9 +2,9 @@ package client
 
 import (
 	pb "KoordeDHT/internal/api/dht/v1"
-	"KoordeDHT/internal/ctxutil"
 	"KoordeDHT/internal/domain"
-	"KoordeDHT/internal/telemetry"
+	"KoordeDHT/internal/node/ctxutil"
+	"KoordeDHT/internal/node/telemetry"
 	"context"
 	"errors"
 	"fmt"
@@ -75,7 +75,7 @@ func FindSuccessorStep(ctx context.Context, client pb.DHTClient, sp *domain.Spac
 	}
 	// Enrich tracing span (if present)
 	if span := trace.SpanFromContext(ctx); span != nil {
-		span.SetAttributes(attribute.String("dht.findsucc.mode", "step"))
+		span.SetAttributes(attribute.String("dht.findsucc.mode", "step")) //TODO: make const
 		span.SetAttributes(telemetry.IdAttributes("dht.findsucc.target", target)...)
 		span.SetAttributes(telemetry.IdAttributes("dht.findsucc.currentI", currentI)...)
 		span.SetAttributes(telemetry.IdAttributes("dht.findsucc.kshift", kshift)...)
@@ -93,7 +93,7 @@ func FindSuccessorStep(ctx context.Context, client pb.DHTClient, sp *domain.Spac
 	// Perform the RPC
 	resp, err := client.FindSuccessor(ctx, req)
 	if err != nil {
-		if errors.Is(err, context.DeadlineExceeded) {
+		if st, ok := status.FromError(err); ok && st.Code() == codes.DeadlineExceeded {
 			return nil, ErrTimeout
 		}
 		return nil, fmt.Errorf("client: FindSuccessorStep RPC failed: %w", err)
@@ -113,6 +113,10 @@ func FindSuccessorStep(ctx context.Context, client pb.DHTClient, sp *domain.Spac
 //     ErrNoPredecessor if the remote node has no predecessor,
 //     or a wrapped RPC error otherwise.
 func GetPredecessor(ctx context.Context, client pb.DHTClient, sp *domain.Space) (*domain.Node, error) {
+	// Check for canceled/expired context
+	if err := ctxutil.CheckContext(ctx); err != nil {
+		return nil, err
+	}
 	// Perform the RPC
 	resp, err := client.GetPredecessor(ctx, &emptypb.Empty{})
 	if err != nil {
@@ -143,6 +147,10 @@ func GetPredecessor(ctx context.Context, client pb.DHTClient, sp *domain.Space) 
 //   - error: ErrTimeout if the RPC timed out,
 //     or a wrapped RPC error otherwise.
 func GetSuccessorList(ctx context.Context, client pb.DHTClient, sp *domain.Space) ([]*domain.Node, error) {
+	// Check for canceled/expired context
+	if err := ctxutil.CheckContext(ctx); err != nil {
+		return nil, err
+	}
 	// Perform the RPC
 	resp, err := client.GetSuccessorList(ctx, &emptypb.Empty{})
 	if err != nil {
@@ -157,7 +165,7 @@ func GetSuccessorList(ctx context.Context, client pb.DHTClient, sp *domain.Space
 	for i, n := range resp.Successors {
 		dn, err := domain.NodeFromProtoDHT(sp, n)
 		if err != nil {
-			return nil, fmt.Errorf("client: invalid node in successor list: %w", err)
+			return nil, status.Errorf(codes.Internal, "invalid node in successor list: %v", err)
 		}
 		nodes[i] = dn
 	}
@@ -176,6 +184,10 @@ func GetSuccessorList(ctx context.Context, client pb.DHTClient, sp *domain.Space
 //   - ErrTimeout if the RPC timed out
 //   - a wrapped RPC error otherwise
 func Notify(ctx context.Context, client pb.DHTClient, self *domain.Node) error {
+	// Check for canceled/expired context
+	if err := ctxutil.CheckContext(ctx); err != nil {
+		return err
+	}
 	// Build the request from the domain.Node
 	req := self.ToProtoDHT()
 
@@ -200,6 +212,10 @@ func Notify(ctx context.Context, client pb.DHTClient, self *domain.Node) error {
 //   - ErrTimeout if the RPC timed out
 //   - a wrapped RPC error otherwise
 func Ping(ctx context.Context, client pb.DHTClient) error {
+	// Check for canceled/expired context
+	if err := ctxutil.CheckContext(ctx); err != nil {
+		return err
+	}
 	// Perform the RPC
 	_, err := client.Ping(ctx, &emptypb.Empty{})
 	if err != nil {
@@ -224,6 +240,10 @@ func Ping(ctx context.Context, client pb.DHTClient) error {
 //   - An error if the stream could not be opened or if the final acknowledgment failed.
 //     (In such case, all resources are considered failed.)
 func StoreRemote(ctx context.Context, client pb.DHTClient, resources []domain.Resource) ([]domain.Resource, error) {
+	// Check for canceled/expired context
+	if err := ctxutil.CheckContext(ctx); err != nil {
+		return nil, err
+	}
 	// Open the client stream
 	stream, err := client.Store(ctx)
 	if err != nil {
@@ -246,8 +266,8 @@ func StoreRemote(ctx context.Context, client pb.DHTClient, resources []domain.Re
 	// Close and wait for server ack
 	_, err = stream.CloseAndRecv()
 	if err != nil {
-		if errors.Is(err, context.DeadlineExceeded) {
-			return resources, ErrTimeout
+		if st, ok := status.FromError(err); ok && st.Code() == codes.DeadlineExceeded {
+			return nil, ErrTimeout
 		}
 		return resources, fmt.Errorf("client: store stream failed: %w", err)
 	}
@@ -266,6 +286,11 @@ func StoreRemote(ctx context.Context, client pb.DHTClient, resources []domain.Re
 //   - error: ErrTimeout if the RPC timed out,
 //     or a wrapped RPC error otherwise.
 func RetrieveRemote(ctx context.Context, client pb.DHTClient, sp *domain.Space, key domain.ID) (*domain.Resource, error) {
+	// Check for canceled/expired context
+	if err := ctxutil.CheckContext(ctx); err != nil {
+		return nil, err
+	}
+
 	// Build the request with the key
 	req := &pb.RetrieveRequest{
 		Key: key,
@@ -300,6 +325,11 @@ func RetrieveRemote(ctx context.Context, client pb.DHTClient, sp *domain.Space, 
 //   - ErrTimeout if the RPC timed out
 //   - a wrapped RPC error otherwise
 func RemoveRemote(ctx context.Context, client pb.DHTClient, key domain.ID) error {
+	// Check for canceled/expired context
+	if err := ctxutil.CheckContext(ctx); err != nil {
+		return err
+	}
+
 	// Build the request with the key
 	req := &pb.RemoveRequest{
 		Key: key,
@@ -327,6 +357,11 @@ func RemoveRemote(ctx context.Context, client pb.DHTClient, key domain.ID) error
 //   - ErrTimeout if the RPC timed out
 //   - a wrapped RPC error otherwise
 func Leave(ctx context.Context, client pb.DHTClient, self *domain.Node) error {
+	// Check for canceled/expired context
+	if err := ctxutil.CheckContext(ctx); err != nil {
+		return err
+	}
+
 	// Build the request from the domain.Node
 	req := self.ToProtoDHT()
 

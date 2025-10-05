@@ -2,10 +2,10 @@ package server
 
 import (
 	dhtv1 "KoordeDHT/internal/api/dht/v1"
-	"KoordeDHT/internal/ctxutil"
 	"KoordeDHT/internal/domain"
-	"KoordeDHT/internal/node"
-	"KoordeDHT/internal/telemetry"
+	"KoordeDHT/internal/node/ctxutil"
+	"KoordeDHT/internal/node/logicnode"
+	"KoordeDHT/internal/node/telemetry"
 	"context"
 	"errors"
 	"fmt"
@@ -23,7 +23,7 @@ import (
 // with each other for lookups, stabilization, and resource management.
 type dhtService struct {
 	dhtv1.UnimplementedDHTServer
-	node *node.Node
+	node *logicnode.Node
 }
 
 // NewDHTService constructs a new DHT gRPC service bound to the given node.
@@ -35,7 +35,7 @@ type dhtService struct {
 //   - A dhtv1.DHTServer implementation suitable for gRPC registration
 //
 // Panics if the provided node is nil.
-func NewDHTService(n *node.Node) dhtv1.DHTServer {
+func NewDHTService(n *logicnode.Node) dhtv1.DHTServer {
 	if n == nil {
 		panic(errors.New("NewDHTService: node must not be nil"))
 	}
@@ -62,7 +62,7 @@ func (s *dhtService) FindSuccessor(ctx context.Context, req *dhtv1.FindSuccessor
 		return nil, err
 	}
 
-	// Enrich tracing span (if present)
+	// Enrich tracing span (if present) //TODO: move to interceptor
 	if span := trace.SpanFromContext(ctx); span != nil {
 		switch mode := req.Mode.(type) {
 		case *dhtv1.FindSuccessorRequest_Initial:
@@ -172,9 +172,10 @@ func (s *dhtService) GetSuccessorList(ctx context.Context, _ *emptypb.Empty) (*d
 	// Convert domain.Node slice to proto.Node slice
 	protoList := make([]*dhtv1.Node, 0, len(succList))
 	for _, n := range succList {
-		if n != nil { // defensive check: avoid nil pointer panic
-			protoList = append(protoList, n.ToProtoDHT())
+		if n == nil {
+			continue
 		}
+		protoList = append(protoList, n.ToProtoDHT())
 	}
 
 	return &dhtv1.SuccessorList{Successors: protoList}, nil
@@ -243,6 +244,12 @@ func (s *dhtService) Store(stream dhtv1.DHT_StoreServer) error {
 	ctx := stream.Context()
 
 	for {
+		// Validate context
+		if cerr := ctxutil.CheckContext(ctx); cerr != nil {
+			return cerr
+		}
+
+		// Receive next request from stream
 		req, err := stream.Recv()
 		if err == io.EOF {
 			// client has finished sending requests
@@ -250,11 +257,6 @@ func (s *dhtService) Store(stream dhtv1.DHT_StoreServer) error {
 		}
 		if err != nil {
 			return status.Errorf(codes.Internal, "failed to receive request: %v", err)
-		}
-
-		// Validate context
-		if cerr := ctxutil.CheckContext(ctx); cerr != nil {
-			return cerr
 		}
 
 		// Extract and validate resource
@@ -373,8 +375,8 @@ func (s *dhtService) Leave(
 	}
 
 	// Handle node departure
-	if herr := s.node.HandleLeave(nodeLeaving); herr != nil {
-		return nil, status.Errorf(codes.Internal, "failed to handle leave: %v", herr)
+	if err = s.node.HandleLeave(nodeLeaving); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to handle leave: %v", err)
 	}
 
 	return &emptypb.Empty{}, nil

@@ -1,10 +1,10 @@
-package node
+package logicnode
 
 import (
-	"KoordeDHT/internal/client"
-	"KoordeDHT/internal/ctxutil"
 	"KoordeDHT/internal/domain"
 	"KoordeDHT/internal/logger"
+	"KoordeDHT/internal/node/client"
+	"KoordeDHT/internal/node/ctxutil"
 	"context"
 	"errors"
 	"fmt"

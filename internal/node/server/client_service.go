@@ -2,11 +2,11 @@ package server
 
 import (
 	clientv1 "KoordeDHT/internal/api/client/v1"
-	"KoordeDHT/internal/ctxutil"
 	"KoordeDHT/internal/domain"
-	"KoordeDHT/internal/node"
-	"KoordeDHT/internal/telemetry"
-	"KoordeDHT/internal/telemetry/lookuptrace"
+	"KoordeDHT/internal/node/ctxutil"
+	"KoordeDHT/internal/node/logicnode"
+	"KoordeDHT/internal/node/telemetry"
+	"KoordeDHT/internal/node/telemetry/lookuptrace"
 	"context"
 	"errors"
 
@@ -23,8 +23,8 @@ import (
 // Unlike dhtService (which is used for node-to-node communication),
 // clientService is intended for end-user clients.
 type clientService struct {
-	clientv1.UnimplementedClientAPIServer            // forward compatibility with proto changes
-	node                                  *node.Node // reference to the local Koorde node
+	clientv1.UnimplementedClientAPIServer                 // forward compatibility with proto changes
+	node                                  *logicnode.Node // reference to the local Koorde node
 }
 
 // NewClientService constructs a new client-facing gRPC service bound to the given node.
@@ -36,7 +36,7 @@ type clientService struct {
 //   - A clientv1.ClientAPIServer implementation suitable for gRPC registration.
 //
 // Panics if the provided node is nil.
-func NewClientService(n *node.Node) clientv1.ClientAPIServer {
+func NewClientService(n *logicnode.Node) clientv1.ClientAPIServer {
 	if n == nil {
 		panic("NewClientService: node must not be nil")
 	}
@@ -239,7 +239,7 @@ func (s *clientService) Lookup(ctx context.Context, req *clientv1.LookupRequest)
 		return nil, status.Error(codes.InvalidArgument, "invalid ID")
 	}
 
-	// Add lookup tracing to context
+	// Add lookup tracing to context //TODO: make this good
 	ctx = lookuptrace.WithLookup(ctx)
 
 	// Enrich tracing span

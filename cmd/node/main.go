@@ -2,17 +2,16 @@ package main
 
 import (
 	"KoordeDHT/internal/bootstrap"
-	"KoordeDHT/internal/client"
-	"KoordeDHT/internal/config"
 	"KoordeDHT/internal/domain"
 	"KoordeDHT/internal/logger"
 	zapfactory "KoordeDHT/internal/logger/zap"
-	"KoordeDHT/internal/node"
-	"KoordeDHT/internal/routingtable"
-	"KoordeDHT/internal/server"
-	"KoordeDHT/internal/storage"
-	"KoordeDHT/internal/telemetry"
-	"KoordeDHT/internal/telemetry/lookuptrace"
+	client2 "KoordeDHT/internal/node/client"
+	"KoordeDHT/internal/node/config"
+	logicnode2 "KoordeDHT/internal/node/logicnode"
+	routingtable2 "KoordeDHT/internal/node/routingtable"
+	server2 "KoordeDHT/internal/node/server"
+	"KoordeDHT/internal/node/storage"
+	"KoordeDHT/internal/node/telemetry"
 	"context"
 	"flag"
 	"log"
@@ -21,6 +20,8 @@ import (
 	"syscall"
 	"time"
 
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.opentelemetry.io/otel"
 	"google.golang.org/grpc"
 )
 
@@ -36,7 +37,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to load configuration from %q: %v", *configPath, err)
 	}
-	cfg.ApplyEnvOverrides()
+
 	// Validate configuration
 	if err := cfg.ValidateConfig(); err != nil {
 		log.Fatalf("invalid configuration: %v", err)
@@ -58,7 +59,7 @@ func main() {
 	cfg.LogConfig(lgr) // log loaded configuration at DEBUG level
 
 	// Initialize listener (to determine server address and port)
-	lis, advertised, err := server.Listen(cfg.DHT.Mode, cfg.Node.Bind, cfg.Node.Host, cfg.Node.Port)
+	lis, advertised, err := server2.Listen(cfg.DHT.Mode, cfg.Node.Bind, cfg.Node.Host, cfg.Node.Port)
 	if err != nil {
 		lgr.Error("Fatal: failed to initialize listener", logger.F("err", err))
 		os.Exit(1)
@@ -99,19 +100,19 @@ func main() {
 	defer shutdown(context.Background())
 
 	// Initialize the routing table
-	rt := routingtable.New(
+	rt := routingtable2.New(
 		&domainNode,
 		space,
-		routingtable.WithLogger(lgr.Named("routingtable")),
+		routingtable2.WithLogger(lgr.Named("routingtable")),
 	)
 	lgr.Debug("initialized routing table")
 
 	// Initialize the client pool
-	cp := client.New(
+	cp := client2.New(
 		id,
 		addr,
 		cfg.DHT.FaultTolerance.FailureTimeout,
-		client.WithLogger(lgr.Named("clientpool")),
+		client2.WithLogger(lgr.Named("clientpool")),
 	)
 	lgr.Debug("initialized client pool")
 
@@ -122,11 +123,11 @@ func main() {
 	lgr.Debug("initialized in-memory storage")
 
 	// Initialize the node
-	n := node.New(
+	n := logicnode2.New(
 		rt,
 		cp,
 		store,
-		node.WithLogger(lgr),
+		logicnode2.WithLogger(lgr),
 	)
 	lgr.Debug("initialized new struct node")
 
@@ -134,18 +135,18 @@ func main() {
 	var grpcOpts []grpc.ServerOption
 	if cfg.Telemetry.Tracing.Enabled {
 		grpcOpts = append(grpcOpts,
-			grpc.ChainUnaryInterceptor(
-				lookuptrace.ServerInterceptor(),
-			),
+			grpc.StatsHandler(otelgrpc.NewServerHandler(
+				otelgrpc.WithTracerProvider(otel.GetTracerProvider()),
+				otelgrpc.WithPropagators(otel.GetTextMapPropagator()),
+			)),
 		)
-		lgr.Debug("gRPC tracing enabled (lookup-only)")
 	}
 
-	s, err := server.New(
+	s, err := server2.New(
 		lis,
 		n,
 		grpcOpts,
-		server.WithLogger(lgr.Named("server")),
+		server2.WithLogger(lgr.Named("server")),
 	)
 	if err != nil {
 		lgr.Error("failed to initialize gRPC server", logger.F("err", err))

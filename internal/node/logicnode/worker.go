@@ -1,9 +1,9 @@
-package node
+package logicnode
 
 import (
-	"KoordeDHT/internal/client"
 	"KoordeDHT/internal/domain"
 	"KoordeDHT/internal/logger"
+	"KoordeDHT/internal/node/client"
 	"context"
 	"time"
 
@@ -68,21 +68,6 @@ func (n *Node) StartStabilizers(ctx context.Context, chordInterval, deBruijnInte
 	}()
 }
 
-// printStorageStats logs the current state of the local storage.
-func (n *Node) printStorageStats() {
-	n.s.DebugLog()
-}
-
-// printClientPoolStats logs the current state of the client pool.
-func (n *Node) printClientPoolStats() {
-	n.cp.DebugLog()
-}
-
-// printRoutingTable logs the current state of the routing table.
-func (n *Node) printRoutingTable() {
-	n.rt.DebugLog()
-}
-
 // resourceRepair performs one maintenance pass to ensure that all resources
 // stored locally still belong to this node's primary ownership interval.
 //
@@ -105,7 +90,7 @@ func (n *Node) resourceRepair(ctx context.Context) {
 	pred := n.rt.GetPredecessor()
 	if pred == nil {
 		// Without a successor, we cannot determine our responsibility interval.
-		n.lgr.Warn("ResourceRepair: skipping pass, successor is nil")
+		n.lgr.Warn("ResourceRepair: skipping pass, predecessor is nil")
 		return
 	}
 

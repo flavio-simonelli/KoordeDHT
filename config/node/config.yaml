@@ -4,47 +4,47 @@ logger:
   encoding: "console"      # Log output format: console (human-readable) | json
   mode: "stdout"           # Log destination: stdout | file
 
-  file:                    # File logging settings (used only if mode = file)
-    path: ""   # Path to the log file
-    maxSize:              # Maximum size (in MB) per log file before rotation
-    maxBackups:           # Number of rotated log files to retain
-    maxAge:               # Maximum age (in days) to retain old log files
-    compress:          # Compress old log files when rotating
+  file:                    # File logging settings (used only if mode = "file")
+    path: ""               # Path to the log file
+    maxSize:               # Maximum file size (in MB) before rotation
+    maxBackups:            # Number of rotated log files to keep
+    maxAge:                # Maximum age (in days) to retain old log files
+    compress:              # Compress old log files on rotation (true | false)
 
 dht:
-  idBits: 64                # Identifier space size (keyspace = 2^idBits)
+  idBits: 64               # Identifier space size (keyspace = 2^idBits)
   mode: "private"          # Network mode: public (real network) | private (local/isolated)
 
   bootstrap:
-    mode: "static"              # Modalità: static | route53
-    peers: []                   # Lista di peer (se mode=static)
+    mode: "static"              # Bootstrap mode: static | route53
+    peers: []                   # List of peer addresses (used if mode = "static")
 
     route53:
-      hostedZoneId: ""           # ID della hosted zone Route53
-      domainSuffix: ""           # Suffisso dominio per i record SRV (es. "koorde.dht")
-      ttl:                     # TTL dei record SRV
-      region: ""                 # Regione AWS per le query Route53 (es. "us-east-1")
+      hostedZoneId: ""          # AWS Route53 hosted zone ID
+      domainSuffix: ""          # Domain suffix for SRV records (e.g., "koorde.dht")
+      ttl:                      # TTL for SRV records (in seconds)
+      region: ""                # AWS region for Route53 queries (e.g., "us-east-1")
 
   deBruijn:
-    degree: 8              # Degree of the de Bruijn graph (2 = minimal, log n = optimal; must be a power of 2 for binary string representation)
-    fixInterval: 10s       # Periodic refresh interval for de Bruijn pointers
+    degree: 8                   # Degree of the de Bruijn graph (2 = minimal, log n = optimal; must be a power of 2 for binary IDs)
+    fixInterval: 10s            # Periodic refresh interval for de Bruijn pointers
 
   storage:
-    fixInterval: 15s      # Periodic refresh interval for stored key-value pairs
+    fixInterval: 15s            # Periodic refresh interval for key-value storage maintenance
 
   faultTolerance:
-    successorListSize: 8   # Number of successors to maintain (≈ log n for fault tolerance)
-    stabilizationInterval: 5s  # Periodic interval for successor stabilization
-    failureTimeout: 3s     # Timeout for gRPC calls during stabilization; successors exceeding this timeout are marked as failed
+    successorListSize: 8        # Number of successors to maintain (≈ log n for fault tolerance)
+    stabilizationInterval: 5s   # Periodic interval for successor stabilization
+    failureTimeout: 3s          # Timeout for gRPC stabilization calls; nodes exceeding this timeout are marked as failed
 
 node:
-  id: ""                   # Node identifier in hexadecimal (empty = random ID)
-  bind: ""                 # Server host address for bind (empty = all interfaces, depending on DHT mode)
-  host: ""                # Public host address for advertising (empty = same as bind)
-  port: 0                  # gRPC server port (0 = automatically select a free port)
+  id: ""                        # Node identifier in hexadecimal (empty = randomly generated)
+  bind: ""                      # Local bind address for the gRPC server (empty = all interfaces)
+  host: ""                      # Publicly advertised host (empty = same as bind)
+  port: 0                       # gRPC server port (0 = automatically choose a free port)
 
 telemetry:
   tracing:
-    enabled: false          # Enable or disable distributed tracing (true | false)
-    exporter:        # Tracing exporter to use (otlp | jaeger )
-    endpoint:  # Exporter endpoint (OTLP or Jaeger)
+    enabled: false               # Enable or disable distributed tracing (true | false)
+    exporter:                    # Tracing exporter: otlp | jaeger
+    endpoint:                    # Exporter endpoint (OTLP or Jaeger collector address)

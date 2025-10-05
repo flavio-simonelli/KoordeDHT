@@ -1,16 +1,15 @@
 package zap
 
 import (
+	"KoordeDHT/internal/configloader"
 	"os"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
-
-	"KoordeDHT/internal/config"
 )
 
-func New(cfg config.LoggerConfig) (*zap.Logger, error) {
+func New(cfg configloader.LoggerConfig) (*zap.Logger, error) {
 	// log level
 	level := zap.NewAtomicLevel()
 	if err := level.UnmarshalText([]byte(cfg.Level)); err != nil {

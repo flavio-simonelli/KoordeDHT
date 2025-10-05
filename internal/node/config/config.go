@@ -1,15 +1,12 @@
 package config
 
 import (
+	"KoordeDHT/internal/configloader"
 	"KoordeDHT/internal/logger"
 	"fmt"
 	"net"
-	"os"
-	"strconv"
 	"strings"
 	"time"
-
-	"gopkg.in/yaml.v3"
 )
 
 type TracingConfig struct {
@@ -22,25 +19,8 @@ type TelemetryConfig struct {
 	Tracing TracingConfig `yaml:"tracing"`
 }
 
-type FileLoggerConfig struct {
-	Path       string `yaml:"path"`
-	MaxSize    int    `yaml:"maxSize"`
-	MaxBackups int    `yaml:"maxBackups"`
-	MaxAge     int    `yaml:"maxAge"`
-	Compress   bool   `yaml:"compress"`
-}
-
-type LoggerConfig struct {
-	Active   bool             `yaml:"active"`
-	Level    string           `yaml:"level"`
-	Encoding string           `yaml:"encoding"`
-	Mode     string           `yaml:"mode"`
-	File     FileLoggerConfig `yaml:"file"`
-}
-
 type DeBruijnConfig struct {
 	Degree      int           `yaml:"degree"`
-	BackupSize  int           `yaml:"backupSize"`
 	FixInterval time.Duration `yaml:"fixInterval"`
 }
 
@@ -50,30 +30,17 @@ type FaultToleranceConfig struct {
 	FailureTimeout        time.Duration `yaml:"failureTimeout"`
 }
 
-type Route53Config struct {
-	HostedZoneID string `yaml:"hostedZoneId"`
-	DomainSuffix string `yaml:"domainSuffix"`
-	TTL          int64  `yaml:"ttl"`
-	Region       string `yaml:"region"`
-}
-
-type BootstrapConfig struct {
-	Mode    string        `yaml:"mode"`
-	Peers   []string      `yaml:"peers"`
-	Route53 Route53Config `yaml:"route53"`
-}
-
 type StorageConfig struct {
 	FixInterval time.Duration `yaml:"fixInterval"`
 }
 
 type DHTConfig struct {
-	IDBits         int                  `yaml:"idBits"`
-	Mode           string               `yaml:"mode"`
-	DeBruijn       DeBruijnConfig       `yaml:"deBruijn"`
-	FaultTolerance FaultToleranceConfig `yaml:"faultTolerance"`
-	Storage        StorageConfig        `yaml:"storage"`
-	Bootstrap      BootstrapConfig      `yaml:"bootstrap"`
+	IDBits         int                          `yaml:"idBits"`
+	Mode           string                       `yaml:"mode"`
+	DeBruijn       DeBruijnConfig               `yaml:"deBruijn"`
+	FaultTolerance FaultToleranceConfig         `yaml:"faultTolerance"`
+	Storage        StorageConfig                `yaml:"storage"`
+	Bootstrap      configloader.BootstrapConfig `yaml:"bootstrap"`
 }
 
 type NodeConfig struct {
@@ -84,146 +51,65 @@ type NodeConfig struct {
 }
 
 type Config struct {
-	Logger    LoggerConfig    `yaml:"logger"`
-	DHT       DHTConfig       `yaml:"dht"`
-	Node      NodeConfig      `yaml:"node"`
-	Telemetry TelemetryConfig `yaml:"telemetry"`
+	Logger    configloader.LoggerConfig `yaml:"logger"`
+	DHT       DHTConfig                 `yaml:"dht"`
+	Node      NodeConfig                `yaml:"node"`
+	Telemetry TelemetryConfig           `yaml:"telemetry"`
 }
 
-// LoadConfig loads the configuration from a YAML file at the given path.
-//
-// Behavior:
-//   - Reads the file contents from disk.
-//   - Unmarshals the YAML data into a Config struct.
-//   - Returns the parsed configuration or an error if reading or parsing fails.
-//
-// This function performs only syntactic parsing of the YAML file.
-// To validate the configuration structure and check for missing or invalid
-// fields, call cfg.ValidateConfig() after loading.
 func LoadConfig(path string) (*Config, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
+	cfg := &Config{}
+	// Load from YAML file
+	if err := configloader.LoadYAML(path, cfg); err != nil {
+		return nil, fmt.Errorf("load config: %w", err)
 	}
 
-	var cfg Config
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, err
+	// Override with environment variables
+	configloader.OverrideString(&cfg.Node.Id, "NODE_ID")
+	configloader.OverrideString(&cfg.Node.Bind, "NODE_BIND")
+	configloader.OverrideString(&cfg.Node.Host, "NODE_HOST")
+	configloader.OverrideInt(&cfg.Node.Port, "NODE_PORT")
+
+	configloader.OverrideString(&cfg.DHT.Mode, "DHT_MODE")
+	configloader.OverrideInt(&cfg.DHT.IDBits, "DHT_ID_BITS")
+
+	configloader.OverrideInt(&cfg.DHT.DeBruijn.Degree, "DEBRUIJN_DEGREE")
+	configloader.OverrideDuration(&cfg.DHT.DeBruijn.FixInterval, "DEBRUIJN_FIX_INTERVAL")
+
+	configloader.OverrideInt(&cfg.DHT.FaultTolerance.SuccessorListSize, "SUCCESSOR_LIST_SIZE")
+	configloader.OverrideDuration(&cfg.DHT.FaultTolerance.StabilizationInterval, "STABILIZATION_INTERVAL")
+	configloader.OverrideDuration(&cfg.DHT.FaultTolerance.FailureTimeout, "FAILURE_TIMEOUT")
+
+	configloader.OverrideDuration(&cfg.DHT.Storage.FixInterval, "STORAGE_FIX_INTERVAL")
+
+	configloader.OverrideString(&cfg.DHT.Bootstrap.Mode, "BOOTSTRAP_MODE")
+	configloader.OverrideStringSlice(&cfg.DHT.Bootstrap.Peers, "BOOTSTRAP_PEERS") // comma-separated list
+
+	configloader.OverrideString(&cfg.DHT.Bootstrap.Route53.HostedZoneID, "ROUTE53_ZONE_ID")
+	configloader.OverrideString(&cfg.DHT.Bootstrap.Route53.DomainSuffix, "ROUTE53_SUFFIX")
+	configloader.OverrideInt64(&cfg.DHT.Bootstrap.Route53.TTL, "ROUTE53_TTL")
+	configloader.OverrideString(&cfg.DHT.Bootstrap.Route53.Region, "ROUTE53_REGION")
+
+	configloader.OverrideBool(&cfg.Telemetry.Tracing.Enabled, "TRACING_ENABLED")
+	configloader.OverrideString(&cfg.Telemetry.Tracing.Exporter, "TRACING_EXPORTER")
+	configloader.OverrideString(&cfg.Telemetry.Tracing.Endpoint, "TRACING_ENDPOINT")
+
+	configloader.OverrideBool(&cfg.Logger.Active, "LOGGER_ENABLED")
+	configloader.OverrideString(&cfg.Logger.Level, "LOGGER_LEVEL")
+	configloader.OverrideString(&cfg.Logger.Encoding, "LOGGER_ENCODING")
+	configloader.OverrideString(&cfg.Logger.Mode, "LOGGER_MODE")
+	configloader.OverrideString(&cfg.Logger.File.Path, "LOGGER_FILE_PATH")
+	configloader.OverrideInt(&cfg.Logger.File.MaxSize, "LOGGER_FILE_MAX_SIZE")
+	configloader.OverrideInt(&cfg.Logger.File.MaxBackups, "LOGGER_FILE_MAX_BACKUPS")
+	configloader.OverrideInt(&cfg.Logger.File.MaxAge, "LOGGER_FILE_MAX_AGE")
+	configloader.OverrideBool(&cfg.Logger.File.Compress, "LOGGER_FILE_COMPRESS")
+
+	// Apply defaults
+	if cfg.Node.Bind == "" {
+		cfg.Node.Bind = "0.0.0.0"
 	}
 
-	return &cfg, nil
-}
-
-// ApplyEnvOverrides applies environment variable overrides to the configuration.
-//
-// Behavior:
-//   - This method modifies only selected fields of the Config struct that are
-//     commonly node-specific or deployment-dependent.
-//   - For each supported field, if a corresponding environment variable is set,
-//     its value overrides the value loaded from the YAML configuration file.
-//
-// Supported overrides include:
-//
-//		NODE_ID             -> cfg.Node.Id
-//		NODE_BIND           -> cfg.Node.Bind
-//		NODE_HOST           -> cfg.Node.Host
-//		NODE_PORT           -> cfg.Node.Port
-//
-//		BOOTSTRAP_MODE      -> cfg.DHT.Bootstrap.Mode ("static" or "route53")
-//		BOOTSTRAP_PEERS     -> cfg.DHT.Bootstrap.Peers (comma-separated list, used only in mode=static)
-//
-//		ROUTE53_ZONE_ID     -> cfg.DHT.Bootstrap.Route53.HostedZoneID
-//		ROUTE53_SUFFIX      -> cfg.DHT.Bootstrap.Route53.DomainSuffix
-//		ROUTE53_TTL         -> cfg.DHT.Bootstrap.Route53.TTL
-//	 	ROUTE53_REGION 		-> cfg.DHT.Bootstrap.Route53.Region
-//
-//		TRACE_ENABLED       -> cfg.Telemetry.Tracing.Enabled
-//		TRACE_EXPORTER      -> cfg.Telemetry.Tracing.Exporter
-//		TRACE_ENDPOINT      -> cfg.Telemetry.Tracing.Endpoint
-//
-//		LOGGER_ENABLED      -> cfg.Logger.Active
-//		LOGGER_LEVEL        -> cfg.Logger.Level
-//		LOGGER_ENCODING     -> cfg.Logger.Encoding
-//		LOGGER_MODE         -> cfg.Logger.Mode
-//		LOGGER_FILE_PATH    -> cfg.Logger.File.Path
-//
-// Type conversions:
-//   - Integer fields (e.g., NODE_PORT, ROUTE53_TTL) are parsed using strconv.Atoi / ParseInt;
-//     invalid values are ignored.
-//   - Boolean fields (e.g., TRACE_ENABLED, LOGGER_ENABLED) accept "true", "1", or "yes"
-//     (case-insensitive) as true; any other non-empty value is treated as false.
-//   - Lists such as BOOTSTRAP_PEERS are parsed by splitting the string on commas.
-//
-// Usage example:
-//
-//	cfg, _ := LoadConfig("config.yaml")
-//	cfg.ApplyEnvOverrides()
-func (cfg *Config) ApplyEnvOverrides() {
-	if v := os.Getenv("NODE_ID"); v != "" {
-		cfg.Node.Id = v
-	}
-	if v := os.Getenv("NODE_BIND"); v != "" {
-		cfg.Node.Bind = v
-	} else {
-		cfg.Node.Bind = "0.0.0.0" // default
-	}
-	if v := os.Getenv("NODE_HOST"); v != "" {
-		cfg.Node.Host = v
-	}
-	if v := os.Getenv("NODE_PORT"); v != "" {
-		if port, err := strconv.Atoi(v); err == nil {
-			cfg.Node.Port = port
-		}
-	}
-	if v := os.Getenv("DHT_MODE"); v != "" {
-		cfg.DHT.Mode = v
-	}
-	if v := os.Getenv("BOOTSTRAP_MODE"); v != "" {
-		cfg.DHT.Bootstrap.Mode = v
-	}
-	if v := os.Getenv("BOOTSTRAP_PEERS"); v != "" {
-		cfg.DHT.Bootstrap.Peers = strings.Split(v, ",")
-	}
-	if v := os.Getenv("TRACE_ENABLED"); v != "" {
-		v = strings.ToLower(v)
-		cfg.Telemetry.Tracing.Enabled = v == "true" || v == "1" || v == "yes"
-	}
-	if v := os.Getenv("TRACE_EXPORTER"); v != "" {
-		cfg.Telemetry.Tracing.Exporter = v
-	}
-	if v := os.Getenv("TRACE_ENDPOINT"); v != "" {
-		cfg.Telemetry.Tracing.Endpoint = v
-	}
-	if v := os.Getenv("ROUTE53_ZONE_ID"); v != "" {
-		cfg.DHT.Bootstrap.Route53.HostedZoneID = v
-	}
-	if v := os.Getenv("ROUTE53_SUFFIX"); v != "" {
-		cfg.DHT.Bootstrap.Route53.DomainSuffix = v
-	}
-	if v := os.Getenv("ROUTE53_TTL"); v != "" {
-		if ttl, err := strconv.ParseInt(v, 10, 64); err == nil {
-			cfg.DHT.Bootstrap.Route53.TTL = ttl
-		}
-	}
-	if v := os.Getenv("ROUTE53_REGION"); v != "" {
-		cfg.DHT.Bootstrap.Route53.Region = v
-	}
-	if v := os.Getenv("LOGGER_ENABLED"); v != "" {
-		v = strings.ToLower(v)
-		cfg.Logger.Active = v == "true" || v == "1" || v == "yes"
-	}
-	if v := os.Getenv("LOGGER_LEVEL"); v != "" {
-		cfg.Logger.Level = v
-	}
-	if v := os.Getenv("LOGGER_ENCODING"); v != "" {
-		cfg.Logger.Encoding = v
-	}
-	if v := os.Getenv("LOGGER_MODE"); v != "" {
-		cfg.Logger.Mode = v
-	}
-	if v := os.Getenv("LOGGER_FILE_PATH"); v != "" {
-		cfg.Logger.File.Path = v
-	}
+	return cfg, nil
 }
 
 // ValidateConfig performs structural validation of the loaded configuration.
@@ -367,7 +253,6 @@ func (cfg *Config) LogConfig(lgr logger.Logger) {
 
 		// de Bruijn
 		logger.F("dht.deBruijn.degree", cfg.DHT.DeBruijn.Degree),
-		logger.F("dht.deBruijn.backupSize", cfg.DHT.DeBruijn.BackupSize),
 		logger.F("dht.deBruijn.fixInterval", cfg.DHT.DeBruijn.FixInterval.String()),
 		logger.F("dht.deBruijn.fixIntervalMs", cfg.DHT.DeBruijn.FixInterval.Milliseconds()),
 

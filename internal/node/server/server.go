@@ -4,7 +4,7 @@ import (
 	clientv1 "KoordeDHT/internal/api/client/v1"
 	dhtv1 "KoordeDHT/internal/api/dht/v1"
 	"KoordeDHT/internal/logger"
-	"KoordeDHT/internal/node"
+	"KoordeDHT/internal/node/logicnode"
 	"fmt"
 	"net"
 
@@ -35,7 +35,7 @@ type Server struct {
 // Returns:
 //   - A pointer to the initialized Server
 //   - An error if required arguments are missing
-func New(lis net.Listener, n *node.Node, grpcOpts []grpc.ServerOption, srvOpts ...Option) (*Server, error) {
+func New(lis net.Listener, n *logicnode.Node, grpcOpts []grpc.ServerOption, srvOpts ...Option) (*Server, error) {
 	if lis == nil {
 		return nil, fmt.Errorf("server: listener must not be nil")
 	}

@@ -1,15 +1,14 @@
 package telemetry
 
 import (
-	"KoordeDHT/internal/config"
 	"KoordeDHT/internal/domain"
+	"KoordeDHT/internal/node/config"
 	"context"
 	"fmt"
 	"log"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/exporters/jaeger"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/propagation"
@@ -27,6 +26,7 @@ func InitTracer(cfg config.TelemetryConfig, serviceName string, nodeId domain.ID
 	attrs := append(
 		[]attribute.KeyValue{
 			semconv.ServiceNameKey.String(serviceName),
+			attribute.String("service.instance.id", nodeId.ToHexString(true)),
 		},
 		IdAttributes("dht.node.id", nodeId)...,
 	)
@@ -49,22 +49,11 @@ func InitTracer(cfg config.TelemetryConfig, serviceName string, nodeId domain.ID
 			sdktrace.WithBatcher(exp),
 			sdktrace.WithResource(res),
 		)
-	case "jaeger":
-		exp, err := jaeger.New(
-			jaeger.WithCollectorEndpoint(jaeger.WithEndpoint(cfg.Tracing.Endpoint)),
-		)
-		if err != nil {
-			log.Fatalf("failed to initialize Jaeger exporter: %v", err)
-		}
-		tp = sdktrace.NewTracerProvider(
-			sdktrace.WithBatcher(exp),
-			sdktrace.WithResource(res),
-		)
 	case "otlp":
 		exp, err := otlptracegrpc.New(
 			context.Background(),
 			otlptracegrpc.WithInsecure(),
-			otlptracegrpc.WithEndpoint(cfg.Tracing.Endpoint), // porta OTLP
+			otlptracegrpc.WithEndpoint(cfg.Tracing.Endpoint),
 		)
 		if err != nil {
 			log.Fatalf("failed to initialize OTLP exporter: %v", err)
@@ -80,8 +69,8 @@ func InitTracer(cfg config.TelemetryConfig, serviceName string, nodeId domain.ID
 	otel.SetTracerProvider(tp)
 	otel.SetTextMapPropagator(
 		propagation.NewCompositeTextMapPropagator(
-			propagation.TraceContext{}, // traceparent/tracestate W3C
-			propagation.Baggage{},      // key=value opzionali
+			propagation.TraceContext{},
+			propagation.Baggage{},
 		),
 	)
 

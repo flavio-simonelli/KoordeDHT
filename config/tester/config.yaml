@@ -1,0 +1,44 @@
+# -----------------------------------------------------------------------------
+# KoordeDHT Client Tester Configuration
+# -----------------------------------------------------------------------------
+logger:
+  active: true             # Enable or disable logging (true | false)
+  level: "info"            # Minimum log level: debug | info | warn | error
+  encoding: "console"      # Log output format: console (human-readable) | json
+  mode: "stdout"           # Log destination: stdout | file
+  file:
+    path: "./logs/tester.log"   # Path to the log file
+    maxSize: 10              # Maximum size (in MB) per log file before rotation
+    maxBackups: 3           # Number of rotated log files to retain
+    maxAge: 7              # Maximum age (in days) to retain old log files
+    compress: true         # Compress old log files when rotating
+
+simulation:
+  duration: 10s            # Total simulation runtime (wall-clock time)
+
+dht:
+  idBits: 64               # Identifier space size (keyspace = 2^idBits)
+
+bootstrap:
+  mode: "docker"              # Bootstrap mode: docker | route53
+
+  route53:
+    hostedZoneId: ""          # AWS Route53 hosted zone ID
+    domainSuffix: ""          # Domain suffix for SRV records (e.g., "koorde.dht")
+    ttl:                      # TTL for SRV records (in seconds)
+    region: ""                # AWS region for Route53 queries (e.g., "us-east-1")
+
+  docker:
+    containerSuffix: "koorde_node"  # Docker container name or ID to bootstrap from
+    network: "bridge"               # Docker network to connect to
+    port: 4000                  # Port on which the KoordeDHT node is listening
+
+csv:
+  enabled: true            # Enable CSV result logging
+  path: "./results/tester.csv"  # Output file for query results
+
+query:
+  rate: 4                  # Average number of queries per second (global)
+  parallelism:             # Number of concurrent query workers
+    min: 1                  # Minimum number of parallel workers
+    max: 4                  # Maximum number of parallel workers

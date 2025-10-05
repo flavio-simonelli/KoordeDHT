@@ -535,6 +535,17 @@ func freeBits(lenBytes []byte) int {
 	return 0 // len = 0
 }
 
+func (sp Space) BestImaginarySimple(self, succ, target ID) (currentI, kshift ID, err error) {
+	base, err := sp.AddMod(self, sp.FromUint64(1))
+	if err != nil {
+		return nil, nil, fmt.Errorf("BestImaginarySimple: AddMod failed: %w", err)
+	}
+	currentI = base
+	kshift = target
+	return currentI, kshift, nil
+}
+
+/*
 // BestImaginarySimple selects the initial imaginary ID (currentI) and
 // the shifted target (kshift) for a successor lookup.
 //
@@ -618,6 +629,7 @@ func (sp Space) BestImaginarySimple(self, succ, target ID) (currentI, kshift ID,
 	kshift = target
 	return currentI, kshift, nil
 }
+*/
 
 // BuildPreloadFromTarget constructs an ID whose low freeDigits digits
 // match the high-order digits of target. Returns also the shifted target (kshift).

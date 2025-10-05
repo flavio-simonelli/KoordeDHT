@@ -1,7 +1,7 @@
 package bootstrap
 
 import (
-	koordeConfig "KoordeDHT/internal/config"
+	"KoordeDHT/internal/configloader"
 	"KoordeDHT/internal/domain"
 	"context"
 	"fmt"
@@ -23,7 +23,7 @@ type Route53Bootstrap struct {
 	ttl          int64
 }
 
-func NewRoute53Bootstrap(cfg koordeConfig.Route53Config) (*Route53Bootstrap, error) {
+func NewRoute53Bootstrap(cfg configloader.Route53Config) (*Route53Bootstrap, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 

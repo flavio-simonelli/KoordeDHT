@@ -4,11 +4,12 @@ import (
 	dhtv1 "KoordeDHT/internal/api/dht/v1"
 	"KoordeDHT/internal/domain"
 	"KoordeDHT/internal/logger"
-	"KoordeDHT/internal/telemetry/lookuptrace"
 	"fmt"
 	"sync"
 	"time"
 
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.opentelemetry.io/otel"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -96,10 +97,11 @@ func (p *Pool) AddRef(addr string) error {
 	// otherwise create new connection
 	conn, dialErr := grpc.NewClient(
 		addr,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithChainUnaryInterceptor(
-			lookuptrace.ClientInterceptor(),
-		),
+		grpc.WithTransportCredentials(insecure.NewCredentials()), // plaintext, no TLS
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler(
+			otelgrpc.WithTracerProvider(otel.GetTracerProvider()),
+			otelgrpc.WithPropagators(otel.GetTextMapPropagator()),
+		)),
 	)
 	if dialErr != nil {
 		p.mu.Unlock()
@@ -150,9 +152,10 @@ func (p *Pool) DialEphemeral(addr string) (dhtv1.DHTClient, *grpc.ClientConn, er
 	conn, err := grpc.NewClient(
 		addr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()), // plaintext, no TLS
-		grpc.WithChainUnaryInterceptor(
-			lookuptrace.ClientInterceptor(),
-		),
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler(
+			otelgrpc.WithTracerProvider(otel.GetTracerProvider()),
+			otelgrpc.WithPropagators(otel.GetTextMapPropagator()),
+		)),
 	)
 	if err != nil {
 		p.lgr.Error("DialEphemeral: failed to dial",
