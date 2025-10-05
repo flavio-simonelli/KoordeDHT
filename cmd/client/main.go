@@ -1,39 +1,28 @@
 package main
 
 import (
+	"KoordeDHT/internal/client"
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
 	"strings"
 	"time"
 
-	clientv1 "KoordeDHT/internal/api/client/v1"
-
 	"github.com/peterh/liner"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-func connect(addr string) (clientv1.ClientAPIClient, *grpc.ClientConn, error) {
-	conn, err := grpc.NewClient(
-		addr,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
-	if err != nil {
-		return nil, nil, err
-	}
-	return clientv1.NewClientAPIClient(conn), conn, nil
-}
-
 func main() {
+	// CLI flags
 	addr := flag.String("addr", "bootstrap:4000", "Address of the Koorde node (entry point)")
-	timeout := flag.Duration("timeout", 5*time.Second, "Request timeout")
+	timeout := flag.Duration("timeout", 5*time.Second, "Request timeout (e.g., 5s)")
 	flag.Parse()
 
-	client, conn, err := connect(*addr)
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
+	// --- Connect to initial node ---
+	api, conn, err := client.Connect(*addr)
 	if err != nil {
 		log.Fatalf("Failed to connect to node at %s: %v", *addr, err)
 	}
@@ -41,26 +30,23 @@ func main() {
 
 	currentAddr := *addr
 	fmt.Printf("Koorde interactive client. Connected to %s\n", currentAddr)
+	fmt.Println("Available commands: put/get/delete/getstore/getrt/lookup/use/exit")
 
-	// setup liner for readline support
+	// --- Setup liner shell ---
 	line := liner.NewLiner()
 	defer line.Close()
 	line.SetCtrlCAborts(true)
 
-	// prompt help
-	fmt.Println("Available commands: put/get/delete/getstore/getrt/lookup/use/exit")
-
 	for {
 		input, err := line.Prompt(fmt.Sprintf("koorde[%s]> ", currentAddr))
 		if err != nil {
-			if err == liner.ErrPromptAborted {
+			if errors.Is(err, liner.ErrPromptAborted) {
 				fmt.Println("Aborted")
 				continue
 			}
 			break
 		}
-
-		line.AppendHistory(input) // salva in cronologia
+		line.AppendHistory(input)
 
 		args := strings.Fields(strings.TrimSpace(input))
 		if len(args) == 0 {
@@ -69,9 +55,9 @@ func main() {
 		cmd := args[0]
 
 		ctx, cancel := context.WithTimeout(context.Background(), *timeout)
-		start := time.Now()
 
 		switch cmd {
+
 		case "put":
 			if len(args) < 3 {
 				fmt.Println("Usage: put <key> <value>")
@@ -79,13 +65,11 @@ func main() {
 				continue
 			}
 			key, value := args[1], args[2]
-			_, err := client.Put(ctx, &clientv1.PutRequest{
-				Resource: &clientv1.Resource{Key: key, Value: value},
-			})
+			delay, err := client.Put(ctx, api, key, value)
 			if err != nil {
-				log.Printf("Put failed: %v\n", err)
+				fmt.Printf("Put failed (%v) | latency=%s\n", err, delay)
 			} else {
-				fmt.Printf("Put succeeded (key=%s, value=%s) | latency=%s\n", key, value, time.Since(start))
+				fmt.Printf("Put succeeded (key=%s, value=%s) | latency=%s\n", key, value, delay)
 			}
 
 		case "get":
@@ -95,15 +79,14 @@ func main() {
 				continue
 			}
 			key := args[1]
-			resp, err := client.Get(ctx, &clientv1.GetRequest{Key: key})
-			if err != nil {
-				if s, ok := status.FromError(err); ok && s.Code().String() == "NotFound" {
-					fmt.Printf("Key not found: %s | latency=%s\n", key, time.Since(start))
-				} else {
-					log.Printf("Get failed: %v\n", err)
-				}
-			} else {
-				fmt.Printf("Get succeeded (key=%s, value=%s) | latency=%s\n", key, resp.Value, time.Since(start))
+			val, delay, err := client.Get(ctx, api, key)
+			switch err {
+			case nil:
+				fmt.Printf("Get succeeded (key=%s, value=%s) | latency=%s\n", key, val, delay)
+			case client.ErrNotFound:
+				fmt.Printf("Key not found: %s | latency=%s\n", key, delay)
+			default:
+				fmt.Printf("Get failed: %v | latency=%s\n", err, delay)
 			}
 
 		case "delete":
@@ -113,58 +96,51 @@ func main() {
 				continue
 			}
 			key := args[1]
-			_, err := client.Delete(ctx, &clientv1.DeleteRequest{Key: key})
-			if err != nil {
-				if s, ok := status.FromError(err); ok && s.Code().String() == "NotFound" {
-					fmt.Printf("Key not found: %s | latency=%s\n", key, time.Since(start))
-				} else {
-					log.Printf("Delete failed: %v\n", err)
-				}
-			} else {
-				fmt.Printf("Delete succeeded (key=%s) | latency=%s\n", key, time.Since(start))
+			delay, err := client.Delete(ctx, api, key)
+			switch err {
+			case nil:
+				fmt.Printf("Delete succeeded (key=%s) | latency=%s\n", key, delay)
+			case client.ErrNotFound:
+				fmt.Printf("Key not found: %s | latency=%s\n", key, delay)
+			default:
+				fmt.Printf("Delete failed: %v | latency=%s\n", err, delay)
 			}
 
 		case "getstore":
-			stream, err := client.GetStore(ctx, &emptypb.Empty{})
+			resources, delay, err := client.GetStore(ctx, api)
 			if err != nil {
-				log.Printf("GetStore failed: %v\n", err)
+				fmt.Printf("GetStore failed: %v | latency=%s\n", err, delay)
 				cancel()
 				continue
 			}
-			fmt.Println("Stored resources on node:")
-			for {
-				resp, err := stream.Recv()
-				if err != nil {
-					break
-				}
-				if resp.GetItem() != nil {
-					fmt.Printf("  - id=%s | key=%s | value=%s\n",
-						resp.Id, resp.Item.Key, resp.Item.Value)
-				}
+			fmt.Printf("Stored resources (count=%d) | latency=%s\n", len(resources), delay)
+			for _, r := range resources {
+				fmt.Printf("  - key=%s | value=%s\n", r.Key, r.Value)
 			}
 
 		case "getrt":
-			resp, err := client.GetRoutingTable(ctx, &emptypb.Empty{})
+			rt, delay, err := client.GetRoutingTable(ctx, api)
 			if err != nil {
-				log.Printf("GetRoutingTable failed: %v\n", err)
+				fmt.Printf("GetRoutingTable failed: %v | latency=%s\n", err, delay)
 				cancel()
 				continue
 			}
 			fmt.Println("Routing table:")
-			if resp.Self != nil {
-				fmt.Printf("  Self: %s (%s)\n", resp.Self.Id, resp.Self.Addr)
+			if rt.Self != nil {
+				fmt.Printf("  Self: %s (%s)\n", rt.Self.Id, rt.Self.Addr)
 			}
-			if resp.Predecessor != nil {
-				fmt.Printf("  Predecessor: %s (%s)\n", resp.Predecessor.Id, resp.Predecessor.Addr)
+			if rt.Predecessor != nil {
+				fmt.Printf("  Predecessor: %s (%s)\n", rt.Predecessor.Id, rt.Predecessor.Addr)
 			}
 			fmt.Println("  Successors:")
-			for i, s := range resp.Successors {
+			for i, s := range rt.Successors {
 				fmt.Printf("    [%d] %s (%s)\n", i, s.Id, s.Addr)
 			}
 			fmt.Println("  DeBruijn List:")
-			for i, d := range resp.DeBruijnList {
+			for i, d := range rt.DeBruijnList {
 				fmt.Printf("    [%d] %s (%s)\n", i, d.Id, d.Addr)
 			}
+			fmt.Printf("Latency: %s\n", delay)
 
 		case "lookup":
 			if len(args) < 2 {
@@ -173,12 +149,12 @@ func main() {
 				continue
 			}
 			id := args[1]
-			resp, err := client.Lookup(ctx, &clientv1.LookupRequest{Id: id})
+			node, delay, err := client.Lookup(ctx, api, id)
 			if err != nil {
-				log.Printf("Lookup failed: %v | latency=%s\n", err, time.Since(start))
+				fmt.Printf("Lookup failed: %v | latency=%s\n", err, delay)
 			} else {
-				fmt.Printf("Lookup result: %s (%s) | latency=%s\n",
-					resp.Successor.Id, resp.Successor.Addr, time.Since(start))
+				fmt.Printf("Lookup result: successor=%s (%s) | latency=%s\n",
+					node.Id, node.Addr, delay)
 			}
 
 		case "use":
@@ -188,14 +164,14 @@ func main() {
 				continue
 			}
 			newAddr := args[1]
-			newClient, newConn, err := connect(newAddr)
+			newClient, newConn, err := client.Connect(newAddr)
 			if err != nil {
-				log.Printf("Failed to connect to %s: %v\n", newAddr, err)
+				fmt.Printf("Failed to connect to %s: %v\n", newAddr, err)
 				cancel()
 				continue
 			}
 			conn.Close()
-			client = newClient
+			api = newClient
 			conn = newConn
 			currentAddr = newAddr
 			fmt.Printf("Switched connection to %s\n", currentAddr)

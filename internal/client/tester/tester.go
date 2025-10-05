@@ -8,6 +8,7 @@ import (
 	"KoordeDHT/internal/logger"
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"math/rand"
 	"sync"
@@ -129,9 +130,29 @@ func (t *Tester) doLookup(nodes []string) {
 
 	// Esegui il lookup
 	_, delay, err := client.Lookup(ctx, c, key)
-	result := "SUCCESS"
+	var result string
 	if err != nil {
-		result = "ERROR_" + err.Error()
+		switch {
+		case errors.Is(err, client.ErrUnavailable):
+			// Nodo irraggiungibile → skip senza scrivere nel CSV
+			t.logger.Debug("node unavailable (skipping CSV)",
+				logger.F("node", node),
+				logger.F("id", key),
+				logger.F("err", err),
+			)
+			return // ❌ non scrivere nulla
+
+		case errors.Is(err, client.ErrDeadlineExceeded):
+			result = "TIMEOUT"
+
+		case errors.Is(err, client.ErrNotFound):
+			result = "NOT_FOUND"
+
+		default:
+			result = fmt.Sprintf("ERROR_%v", err)
+		}
+	} else {
+		result = "SUCCESS"
 	}
 
 	// logga il risultato
