@@ -113,7 +113,7 @@ func (t *Tester) doLookup(nodes []string) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), t.cfg.Query.Timeout)
 	defer cancel()
 
 	c, conn, err := client.Connect(node)

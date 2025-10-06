@@ -49,7 +49,8 @@ type ParallelismConfig struct {
 
 // QueryConfig defines how queries are generated.
 type QueryConfig struct {
-	Rate        float64           `yaml:"rate"`        // global requests per second
+	Rate        float64           `yaml:"rate"` // global requests per second
+	Timeout     time.Duration     `yaml:"timeout"`
 	Parallelism ParallelismConfig `yaml:"parallelism"` // worker concurrency
 }
 
@@ -104,6 +105,7 @@ func Load(path string) (*Config, error) {
 	configloader.OverrideString(&cfg.CSV.Path, "CSV_PATH")
 
 	configloader.OverrideFloat(&cfg.Query.Rate, "QUERY_RATE")
+	configloader.OverrideDuration(&cfg.Query.Timeout, "QUERY_TIMEOUT")
 	configloader.OverrideInt(&cfg.Query.Parallelism.MinWorkers, "QUERY_PARALLELISM_MIN")
 	configloader.OverrideInt(&cfg.Query.Parallelism.MaxWorkers, "QUERY_PARALLELISM_MAX")
 

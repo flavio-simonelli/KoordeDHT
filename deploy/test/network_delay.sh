@@ -24,16 +24,20 @@ set -euo pipefail
 # -----------------------------------------------------------------------------
 
 # Default values
-ACTION="apply"
-DELAY="200ms"
-JITTER="50ms"
-LOSS="0.0%"
-NETWORK="koordenet"
-TIMEOUT=60   # seconds
+ACTION=""
+DELAY=""
+JITTER=""
+LOSS=""
+NETWORK=""
+TIMEOUT=60 # seconds
+
+# Redirect stdout/stderr both to console and log
+LOG_FILE="/var/log/test/network-delay.log"
+exec > >(tee -a "$LOG_FILE") 2>&1
 
 # Usage message
 usage() {
-  echo "Usage: $0 <apply|clear> [--delay Xms] [--jitter Yms] [--loss Z%] [--network NAME] [--timeout N]"
+  echo "Usage: $0 <apply|clear> --delay Xms --jitter Yms --loss Z% --network NAME --timeout N"
   echo
   echo "Examples:"
   echo "  $0 apply --delay 200ms --jitter 50ms --loss 0.1% --network koordenet"
@@ -42,11 +46,11 @@ usage() {
   echo "Options:"
   echo "  apply           Apply network emulation (default)"
   echo "  clear           Remove existing emulation rules"
-  echo "  --delay Xms     Average latency to introduce (default: 200ms)"
-  echo "  --jitter Yms    Random delay variation (default: 50ms)"
-  echo "  --loss Z%       Packet loss percentage (default: 0.0%)"
-  echo "  --network NAME  Target Docker network (default: koordenet)"
-  echo "  --timeout N     Max seconds to wait for network availability (default: 60)"
+  echo "  --delay Xms     Average latency to introduce"
+  echo "  --jitter Yms    Random delay variation"
+  echo "  --loss Z%       Packet loss percentage"
+  echo "  --network NAME  Target Docker network"
+  echo "  --timeout N     Max seconds to wait for network availability (default: 60s)"
   exit 1
 }
 
@@ -70,7 +74,23 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# Wait for the Docker network (with timeout)
+# Validate parameters
+missing=""
+[[ -z "$ACTION" ]]  && missing+=" ACTION"
+[[ -z "$NETWORK" ]] && missing+=" --network"
+[[ "$ACTION" == "apply" && -z "$DELAY" ]]   && missing+=" --delay"
+[[ "$ACTION" == "apply" && -z "$JITTER" ]]  && missing+=" --jitter"
+[[ "$ACTION" == "apply" && -z "$LOSS" ]]    && missing+=" --loss"
+
+if [[ -n "$missing" ]]; then
+  echo "[ERROR] Missing required parameters:$missing"
+  usage
+fi
+
+# Enseure tc exists
+command -v tc >/dev/null 2>&1 || { echo "[ERROR] tc not found (install iproute2)"; exit 1; }
+
+# Wait for the Docker network
 echo "[INFO] Waiting for Docker network '$NETWORK' (timeout: ${TIMEOUT}s)..."
 ELAPSED=0
 INTERVAL=2
@@ -88,6 +108,11 @@ echo "[OK] Docker network '$NETWORK' detected."
 # Identify the Linux bridge interface
 NET_ID=$(docker network inspect "$NETWORK" -f '{{.Id}}' | cut -c1-12)
 IFACE="br-$NET_ID"
+
+if [[ ! -d "/sys/class/net/$IFACE" ]]; then
+  echo "[ERROR] Interface $IFACE not found."
+  exit 1
+fi
 
 # Apply or remove delay
 case "$ACTION" in

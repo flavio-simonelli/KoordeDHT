@@ -39,6 +39,7 @@ csv:
 
 query:
   rate:                   # Average number of queries per second (global)
+  timeout:                # Timeout for each query (e.g., 10s, 1m)
   parallelism:             # Number of concurrent query workers
     min:                   # Minimum number of parallel workers
     max:                   # Maximum number of parallel workers
