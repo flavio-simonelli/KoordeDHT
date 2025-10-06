@@ -4,7 +4,7 @@ networks:
 
 services:
   bootstrap:
-    image: flaviosimonelli/koorde-node:latest
+    image: flaviosimonelli/koorde-node:netem
     env_file:
       - ./common_node.env
     environment:
@@ -16,7 +16,7 @@ services:
     restart: always
 
   node:
-    image: flaviosimonelli/koorde-node:latest
+    image: flaviosimonelli/koorde-node:netem
     env_file:
       - ./common_node.env
     environment:
@@ -37,6 +37,7 @@ services:
       - QUERY_RATE=${QUERY_RATE}
       - QUERY_PARALLELISM_MIN=${QUERY_PARALLELISM_MIN}
       - QUERY_PARALLELISM_MAX=${QUERY_PARALLELISM_MAX}
+      - QUERY_TIMEOUT=${QUERY_TIMEOUT}
     env_file:
       - ./tester.env
     volumes:

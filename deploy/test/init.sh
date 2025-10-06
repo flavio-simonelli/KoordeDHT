@@ -115,6 +115,9 @@ command -v docker >/dev/null 2>&1 || { echo "[ERROR] docker not found (install d
 command -v docker-compose >/dev/null 2>&1 || { echo "[ERROR] docker-compose not found (install docker-compose)"; exit 1; }
 command -v tc >/dev/null 2>&1 || { echo "[ERROR] tc not found (install iproute2)"; exit 1; }
 
+echo "[INFO] Removing previous output..."
+rm -f results/output.log
+
 # generate compose file
 echo "[INFO] Generating docker-compose file..."
 ./gen_compose.sh \
@@ -147,8 +150,8 @@ docker run -d --name pumba-delay \
   -v /var/run/docker.sock:/var/run/docker.sock \
   gaiaadm/pumba netem \
   --duration "$SIM_DURATION" \
-  delay --time "${DELAY/ms/}" --jitter "${JITTER/ms/}" --loss "${LOSS/[%]/}" \
-  re2:^${CHURN_PREFIX}-
+  delay --time "${DELAY/ms/}" --jitter "${JITTER/ms/}" \
+  re2:.*node
 echo "[OK] Pumba delay running for $SIM_DURATION (delay=$DELAY, jitter=$JITTER, loss=$LOSS)."
 
 
@@ -185,7 +188,7 @@ echo "[OK] Network delay removed."
 
 # stop and remove containers
 echo "[INFO] Stopping and removing all containers..."
-#docker compose -f "$GENERATED" down
+docker compose -f "$GENERATED" down
 echo "[OK] All containers stopped and removed."
 
 echo "[SUCCESS] Simulation completed successfully."

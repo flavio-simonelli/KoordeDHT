@@ -30,14 +30,14 @@ usage() {
   echo
   echo "Usage:"
   echo "  $0 --sim-duration <duration> --query-rate <rate> \\"
-  echo "     --query-parallelism-min <min> --query-parallelism-max <max>"
+  echo "     --query-parallelism-min <min> --query-parallelism-max <max> --query-timeout <timeout>"
   echo
   echo "Example:"
-  echo "  $0 --sim-duration 1m --query-rate 0.5 --query-parallelism-min 1 --query-parallelism-max 5"
+  echo "  $0 --sim-duration 1m --query-rate 0.5 --query-parallelism-min 1 --query-parallelism-max 5 --query-timeout 10s"
   echo
   echo "Description:"
   echo "  Generates a docker-compose file replacing placeholders in:"
-  echo "    \${SIM_DURATION}, \${QUERY_RATE}, \${QUERY_PARALLELISM_MIN}, \${QUERY_PARALLELISM_MAX}"
+  echo "    \${SIM_DURATION}, \${QUERY_RATE}, \${QUERY_PARALLELISM_MIN}, \${QUERY_PARALLELISM_MAX}, \${QUERY_TIMEOUT}"
   echo
   exit 1
 }
@@ -47,6 +47,7 @@ SIM_DURATION=""
 QUERY_RATE=""
 QUERY_PARALLELISM_MIN=""
 QUERY_PARALLELISM_MAX=""
+QUERY_TIMEOUT="10s"  # Default timeout for queries
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -54,6 +55,7 @@ while [[ $# -gt 0 ]]; do
     --query-rate)            QUERY_RATE="$2"; shift 2 ;;
     --query-parallelism-min) QUERY_PARALLELISM_MIN="$2"; shift 2 ;;
     --query-parallelism-max) QUERY_PARALLELISM_MAX="$2"; shift 2 ;;
+    --query-timeout)         QUERY_TIMEOUT="$2"; shift 2 ;;
     -h|--help) usage ;;
     *) echo "Error: unknown argument '$1'"; usage ;;
   esac
@@ -78,6 +80,7 @@ sed \
   -e "s|\${QUERY_RATE}|${QUERY_RATE}|g" \
   -e "s|\${QUERY_PARALLELISM_MIN}|${QUERY_PARALLELISM_MIN}|g" \
   -e "s|\${QUERY_PARALLELISM_MAX}|${QUERY_PARALLELISM_MAX}|g" \
+  -e "s|\${QUERY_TIMEOUT}|${QUERY_TIMEOUT}|g" \
   "$TEMPLATE" > "$OUTPUT"
 
 echo
@@ -86,6 +89,7 @@ echo "  SIM_DURATION=${SIM_DURATION}"
 echo "  QUERY_RATE=${QUERY_RATE}"
 echo "  QUERY_PARALLELISM_MIN=${QUERY_PARALLELISM_MIN}"
 echo "  QUERY_PARALLELISM_MAX=${QUERY_PARALLELISM_MAX}"
+echo "  QUERY_TIMEOUT=${QUERY_TIMEOUT}"
 echo
 echo "Logs saved to: $LOG_FILE"
 exit 0
