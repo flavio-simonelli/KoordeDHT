@@ -1,0 +1,57 @@
+networks:
+  koordenet:
+    driver: bridge
+
+services:
+  bootstrap:
+    image: flaviosimonelli/koorde-node:latest
+    env_file:
+      - ./common_node.env
+    environment:
+      - BOOTSTRAP_PEERS=
+    networks:
+      - koordenet
+    depends_on:
+      - jaeger
+    restart: always
+
+  node:
+    image: flaviosimonelli/koorde-node:latest
+    env_file:
+      - ./common_node.env
+    environment:
+      - BOOTSTRAP_PEERS=bootstrap:4000
+    networks:
+      - koordenet
+    depends_on:
+      - bootstrap
+    restart: unless-stopped
+
+  tester:
+    image: flaviosimonelli/koorde-tester:latest
+    depends_on:
+      - bootstrap
+    environment:
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - SIM_DURATION=1m
+      - QUERY_RATE=0.5
+      - QUERY_PARALLELISM_MIN=1
+      - QUERY_PARALLELISM_MAX=10
+    env_file:
+      - ./tester.env
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:z
+      - ./results:/data/results:z
+    user: "0:0"  # root
+    networks:
+      - koordenet
+
+  jaeger:
+    image: cr.jaegertracing.io/jaegertracing/jaeger:latest
+    container_name: jaeger
+    ports:
+      - "16686:16686"   # UI Jaeger
+      - "4317:4317"     # OTLP gRPC
+    networks:
+      - koordenet
+    restart: unless-stopped

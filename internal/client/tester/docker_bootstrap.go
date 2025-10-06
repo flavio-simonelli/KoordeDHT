@@ -2,17 +2,18 @@ package tester
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"os/exec"
 	"strings"
 
 	"KoordeDHT/internal/domain"
+
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/client"
 )
 
-// DockerBootstrap discovers nodes by container name suffix and network.
+// DockerBootstrap discovers nodes by container name prefix and network.
 type DockerBootstrap struct {
-	Suffix  string // e.g. "localtest-node"
+	Prefix  string // e.g. "localtest-node"
 	Port    int    // e.g. 4000
 	Network string // e.g. "koorde-net"
 }
@@ -20,59 +21,43 @@ type DockerBootstrap struct {
 // NewDockerBootstrap creates a Docker-based bootstrapper.
 func NewDockerBootstrap(suffix string, port int, network string) *DockerBootstrap {
 	return &DockerBootstrap{
-		Suffix:  strings.TrimSpace(suffix),
+		Prefix:  strings.TrimSpace(suffix),
 		Port:    port,
 		Network: strings.TrimSpace(network),
 	}
 }
 
-// Discover returns a list of reachable peers in the given Docker network.
+// Discover returns a list of reachable peers by container name prefix.
+// Since the tester runs in the same Docker network, it returns hostnames only.
 func (d *DockerBootstrap) Discover(ctx context.Context) ([]string, error) {
-	cmd := exec.CommandContext(ctx, "docker", "ps", "--format", "{{.Names}}")
-	out, err := cmd.Output()
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return nil, fmt.Errorf("docker client init failed: %w", err)
+	}
+	defer cli.Close()
+
+	containers, err := cli.ContainerList(ctx, container.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("docker ps failed: %w", err)
 	}
 
-	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-	var addrs []string
-
-	for _, name := range lines {
-		name = strings.TrimSpace(name)
-		if name == "" || !strings.Contains(name, d.Suffix) {
+	var peers []string
+	for _, c := range containers {
+		if len(c.Names) == 0 {
 			continue
 		}
 
-		// Inspect container JSON for its network list
-		inspect := exec.CommandContext(ctx, "docker", "inspect", name)
-		raw, err := inspect.Output()
-		if err != nil {
-			continue
+		name := strings.TrimPrefix(c.Names[0], "/")
+		if strings.HasPrefix(name, d.Prefix) {
+			peers = append(peers, fmt.Sprintf("%s:%d", name, d.Port))
 		}
-
-		var data []struct {
-			NetworkSettings struct {
-				Networks map[string]struct {
-					IPAddress string `json:"IPAddress"`
-				} `json:"Networks"`
-			} `json:"NetworkSettings"`
-		}
-
-		if err := json.Unmarshal(raw, &data); err != nil || len(data) == 0 {
-			continue
-		}
-
-		// Filter by network name
-		netInfo, ok := data[0].NetworkSettings.Networks[d.Network]
-		if !ok || netInfo.IPAddress == "" {
-			continue
-		}
-
-		addr := fmt.Sprintf("%s:%d", name, d.Port) // use name (DNS) instead of IP
-		addrs = append(addrs, addr)
 	}
 
-	return addrs, nil
+	if len(peers) == 0 {
+		return nil, fmt.Errorf("no active containers found with prefix %q", d.Prefix)
+	}
+
+	return peers, nil
 }
 
 // Register and Deregister are no-ops
