@@ -33,10 +33,10 @@ services:
       - bootstrap
     environment:
       - DOCKER_HOST=unix:///var/run/docker.sock
-      - SIM_DURATION=1m
-      - QUERY_RATE=0.5
-      - QUERY_PARALLELISM_MIN=1
-      - QUERY_PARALLELISM_MAX=10
+      - SIM_DURATION=${SIM_DURATION}
+      - QUERY_RATE=${QUERY_RATE}
+      - QUERY_PARALLELISM_MIN=${QUERY_PARALLELISM_MIN}
+      - QUERY_PARALLELISM_MAX=${QUERY_PARALLELISM_MAX}
     env_file:
       - ./tester.env
     volumes:

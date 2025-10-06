@@ -1,98 +1,91 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-LOG_FILE="/var/log/gen_compose.log"
-exec > >(tee -a "$LOG_FILE") 2>&1
-
 # -----------------------------------------------------------------------------
-# Koorde Cluster Compose Generator
+# KoordeDHT Docker Compose Generator
 # -----------------------------------------------------------------------------
-# Generates a docker-compose file with one bootstrap node, one client,
-# and N peer nodes.
+# Generates a docker-compose file replacing template variables for the tester.
+#
+# Usage:
+#   ./gen_compose.sh \
+#       --sim-duration <duration> \
+#       --query-rate <rate> \
+#       --query-parallelism-min <min> \
+#       --query-parallelism-max <max>
 #
 # Example:
-#   ./gen-compose.sh --peers 8 \
-#       --sim-duration 10s \
-#       --query-rate 5 \
-#       --parallelism-min 1 \
-#       --parallelism-max 4
+#   ./gen_compose.sh --sim-duration 2m --query-rate 0.8 \
+#       --query-parallelism-min 2 --query-parallelism-max 10
 # -----------------------------------------------------------------------------
 
+LOG_FILE="/var/log/test/gen_compose.log"
+TEMPLATE="docker-compose.template.yml"
+OUTPUT="docker-compose.generated.yml"
+
+# Redirect stdout/stderr both to console and log
+exec > >(tee -a "$LOG_FILE") 2>&1
+
+# --- Usage -------------------------------------------------------------------
 usage() {
-  echo "Usage: $0 --peers <N> [--sim-duration <T>] [--query-rate <R>] [--parallelism-min <N>] [--parallelism-max <N>]"
   echo
-  echo "Options:"
-  echo "  --peers <N>              Number of peer containers to generate"
-  echo "  --sim-duration <T>       Duration of tester simulation (default: 10s)"
-  echo "  --query-rate <R>         Query rate for tester (req/s, default: 1)"
-  echo "  --parallelism-min <N>    Minimum parallelism (default: 1)"
-  echo "  --parallelism-max <N>    Maximum parallelism (default: 1)"
+  echo "Usage:"
+  echo "  $0 --sim-duration <duration> --query-rate <rate> \\"
+  echo "     --query-parallelism-min <min> --query-parallelism-max <max>"
   echo
   echo "Example:"
-  echo "  $0 --peers 5 --sim-duration 60s --query-rate 10 --parallelism-min 2 --parallelism-max 5"
+  echo "  $0 --sim-duration 1m --query-rate 0.5 --query-parallelism-min 1 --query-parallelism-max 5"
+  echo
+  echo "Description:"
+  echo "  Generates a docker-compose file replacing placeholders in:"
+  echo "    \${SIM_DURATION}, \${QUERY_RATE}, \${QUERY_PARALLELISM_MIN}, \${QUERY_PARALLELISM_MAX}"
+  echo
   exit 1
 }
 
-# --- Default values ---
-PEERS=""
+# --- Parse arguments ---------------------------------------------------------
 SIM_DURATION=""
 QUERY_RATE=""
-PARALLELISM_MIN=""
-PARALLELISM_MAX=""
+QUERY_PARALLELISM_MIN=""
+QUERY_PARALLELISM_MAX=""
 
-# --- Parse arguments ---
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --peers)            PEERS="$2"; shift 2 ;;
-    --sim-duration)     SIM_DURATION="$2"; shift 2 ;;
-    --query-rate)       QUERY_RATE="$2"; shift 2 ;;
-    --parallelism-min)  PARALLELISM_MIN="$2"; shift 2 ;;
-    --parallelism-max)  PARALLELISM_MAX="$2"; shift 2 ;;
-    -h|--help)          usage ;;
-    *) echo "Unknown argument: $1"; usage ;;
+    --sim-duration)          SIM_DURATION="$2"; shift 2 ;;
+    --query-rate)            QUERY_RATE="$2"; shift 2 ;;
+    --query-parallelism-min) QUERY_PARALLELISM_MIN="$2"; shift 2 ;;
+    --query-parallelism-max) QUERY_PARALLELISM_MAX="$2"; shift 2 ;;
+    -h|--help) usage ;;
+    *) echo "Error: unknown argument '$1'"; usage ;;
   esac
 done
 
-if [[ -z "$PEERS" || -z "$SIM_DURATION" || -z "$QUERY_RATE" || -z "$PARALLELISM_MIN" || -z "$PARALLELISM_MAX" ]]; then
-  echo "[ERROR] Missing required arguments."
-  echo "You must specify all of: --peers, --sim-duration, --query-rate, --parallelism-min, --parallelism-max"
-  echo
+# --- Validate input ----------------------------------------------------------
+if [[ -z "$SIM_DURATION" || -z "$QUERY_RATE" || -z "$QUERY_PARALLELISM_MIN" || -z "$QUERY_PARALLELISM_MAX" ]]; then
+  echo "Error: all parameters are required."
   usage
 fi
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TEMPLATE="$SCRIPT_DIR/docker-compose.test.template.yml"
-OUT="$SCRIPT_DIR/docker-compose.test.generated.yml"
+if [[ ! -f "$TEMPLATE" ]]; then
+  echo "Error: template file $TEMPLATE not found!"
+  exit 1
+fi
 
-# Copy static parts (everything before '# Template for peers')
-awk '/# Template for peers/ {exit} {print}' "$TEMPLATE" > "$OUT"
-
-# Replace placeholders in the bootstrap and tester sections before peers
-sed -i \
-  -e "s/\${SIM_DURATION}/$SIM_DURATION/g" \
-  -e "s/\${QUERY_RATE}/$QUERY_RATE/g" \
-  -e "s/\${QUERY_PARALLELISM_MIN}/$PARALLELISM_MIN/g" \
-  -e "s/\${QUERY_PARALLELISM_MAX}/$PARALLELISM_MAX/g" \
-  "$OUT"
-
-# Append generated peers
-echo "  # Peers" >> "$OUT"
-for i in $(seq 1 "$PEERS"); do
-  echo "  koorde-peer-$i:" >> "$OUT"
-
-  awk '/peer-template:/,/^$/' "$TEMPLATE" \
-    | tail -n +2 \
-    | sed "s/\$ID/$i/g" \
-    | sed 's/^  /  /' >> "$OUT"
-
-  echo "" >> "$OUT"
-done
-
-echo "[SUCCESS] Generated compose file:"
-echo "  -> $OUT"
+# --- Generate file -----------------------------------------------------------
 echo
-echo "Tester configuration:"
-echo "  SIM_DURATION=$SIM_DURATION"
-echo "  QUERY_RATE=$QUERY_RATE"
-echo "  QUERY_PARALLELISM_MIN=$PARALLELISM_MIN"
-echo "  QUERY_PARALLELISM_MAX=$PARALLELISM_MAX"
+echo "Generating $OUTPUT ..."
+sed \
+  -e "s|\${SIM_DURATION}|${SIM_DURATION}|g" \
+  -e "s|\${QUERY_RATE}|${QUERY_RATE}|g" \
+  -e "s|\${QUERY_PARALLELISM_MIN}|${QUERY_PARALLELISM_MIN}|g" \
+  -e "s|\${QUERY_PARALLELISM_MAX}|${QUERY_PARALLELISM_MAX}|g" \
+  "$TEMPLATE" > "$OUTPUT"
+
+echo
+echo "Generated $OUTPUT successfully."
+echo "  SIM_DURATION=${SIM_DURATION}"
+echo "  QUERY_RATE=${QUERY_RATE}"
+echo "  QUERY_PARALLELISM_MIN=${QUERY_PARALLELISM_MIN}"
+echo "  QUERY_PARALLELISM_MAX=${QUERY_PARALLELISM_MAX}"
+echo
+echo "Logs saved to: $LOG_FILE"
+exit 0
