@@ -4,6 +4,7 @@ import (
 	"KoordeDHT/internal/configloader"
 	"KoordeDHT/internal/logger"
 	"fmt"
+	"math/bits"
 	"net"
 	"strings"
 	"time"
@@ -177,8 +178,12 @@ func (cfg *Config) ValidateConfig() error {
 	if cfg.DHT.DeBruijn.Degree > cfg.DHT.FaultTolerance.SuccessorListSize {
 		errs = append(errs, "dht.deBruijn.degree must be <= dht.faultTolerance.successorListSize")
 	}
-	if cfg.DHT.IDBits%cfg.DHT.DeBruijn.Degree != 0 {
-		errs = append(errs, "dht.idBits must be multiple of dht.deBruijn.degree")
+	if cfg.DHT.IDBits%bits.TrailingZeros(uint(cfg.DHT.DeBruijn.Degree)) != 0 {
+		errs = append(errs, fmt.Sprintf(
+			"dht.idBits (%d) must be a multiple of log2(dht.deBruijn.degree) = %d",
+			cfg.DHT.IDBits,
+			bits.TrailingZeros(uint(cfg.DHT.DeBruijn.Degree)),
+		))
 	}
 
 	// --- Bootstrap ---
