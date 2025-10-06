@@ -14,13 +14,13 @@ logger:
     compress:          # Compress old log files when rotating
 
 simulation:
-  duration:             # Total simulation runtime (wall-clock time)
+  duration: 20m            # Total simulation runtime (wall-clock time)
 
 dht:
-  idBits:                # Identifier space size (keyspace = 2^idBits)
+  idBits: 64               # Identifier space size (keyspace = 2^idBits)
 
 bootstrap:
-  mode: ""              # Bootstrap mode: docker | route53
+  mode: "docker"              # Bootstrap mode: docker | route53
 
   route53:
     hostedZoneId: ""          # AWS Route53 hosted zone ID
@@ -29,7 +29,7 @@ bootstrap:
     region: ""                # AWS region for Route53 queries (e.g., "us-east-1")
 
   docker:
-    containerSuffix: ""  # Docker container name or ID to bootstrap from
+    containerSuffix: "koorde-node"  # Docker container name or ID to bootstrap from
     network: ""               # Docker network to connect to
     port:                   # Port on which the KoordeDHT node is listening
 

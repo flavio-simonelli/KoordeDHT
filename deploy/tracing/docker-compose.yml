@@ -1,0 +1,53 @@
+networks:
+  koordenet:
+    driver: bridge
+
+services:
+
+  jaeger:
+    image: cr.jaegertracing.io/jaegertracing/jaeger:latest
+    container_name: jaeger
+    ports:
+      - "16686:16686"   # UI Jaeger
+      - "4317:4317"     # OTLP gRPC
+    networks:
+      - koordenet
+    restart: unless-stopped
+
+  bootstrap:
+    image: flaviosimonelli/koorde-node:latest
+    container_name: koorde-bootstrap
+    env_file:
+      - ./common_node.env
+    environment:
+      - BOOTSTRAP_PEERS=
+    networks:
+      - koordenet
+    depends_on:
+      - jaeger
+    restart: always 
+
+  node:
+    image: flaviosimonelli/koorde-node:latest
+    env_file:
+      - ./common_node.env
+    environment:
+      - BOOTSTRAP_PEERS=bootstrap:4000
+    networks:
+      - koordenet
+    depends_on:
+      - bootstrap
+    restart: unless-stopped
+
+  client:
+    image: flaviosimonelli/koorde-client:latest
+    container_name: koorde-client
+    command: ["--addr=bootstrap:4000", "--timeout=5s"]
+    stdin_open: true
+    tty: true
+    networks:
+      - koordenet
+    depends_on:
+      - bootstrap
+    restart: no
+  

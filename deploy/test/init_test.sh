@@ -88,6 +88,11 @@ echo "==> [STEP] Generating docker-compose for ${PEERS} peers..."
   --parallelism-min "$PARALLELISM_MIN" \
   --parallelism-max "$PARALLELISM_MAX"
 
+# create the folder for csv results if it doesn't exist
+mkdir -p ./results
+sudo chown -R $(id -u):$(id -g) ./results
+
+
 # --- Start cluster ---
 echo "==> [STEP] Starting cluster..."
 docker compose -f "${SCRIPT_DIR}/docker-compose.test.generated.yml" up -d

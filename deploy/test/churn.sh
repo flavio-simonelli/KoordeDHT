@@ -7,11 +7,9 @@ set -euo pipefail
 # Randomly stops and starts Docker containers to simulate churn.
 # Works only with containers already defined in docker-compose.
 #
-# Usage:
-#   ./churn.sh -p PREFIX -i INTERVAL -m MIN_ACTIVE -j P_JOIN -l P_LEAVE
-#
-# Example:
-#   ./churn.sh -p localtest-node -i 15 -m 3 -j 0.5 -l 0.4
+# Stop options:
+#   - Press Ctrl+C (SIGINT)
+#   - Or create a file named ".stop-churn" in the same directory
 # -----------------------------------------------------------------------------
 
 usage() {
@@ -24,9 +22,6 @@ usage() {
   echo "  -j P_JOIN       Probability of performing a join (0.0–1.0, default: 0.5)"
   echo "  -l P_LEAVE      Probability of performing a leave (0.0–1.0, default: 0.5)"
   echo "  -h              Show this help message"
-  echo
-  echo "Example:"
-  echo "  $0 -p node -i 20 -m 3 -j 0.4 -l 0.3"
   exit 0
 }
 
@@ -36,6 +31,7 @@ INTERVAL=10
 MIN_ACTIVE=2
 P_JOIN=0.5
 P_LEAVE=0.5
+STOP_FILE=".stop-churn"
 
 # --- Parse options ---
 while getopts ":p:i:m:j:l:h" opt; do
@@ -51,10 +47,15 @@ while getopts ":p:i:m:j:l:h" opt; do
   esac
 done
 
-if [[ -z "$PREFIX" ]]; then
-  echo "Error: -p PREFIX is required."
-  usage
-fi
+[[ -z "$PREFIX" ]] && { echo "Error: -p PREFIX is required."; usage; }
+
+# --- Graceful shutdown handler ---
+stop_churn() {
+  echo
+  echo "[SUCCESS] Stopping churn controller gracefully..."
+  exit 0
+}
+trap stop_churn SIGINT SIGTERM
 
 # --- Helpers ---
 get_active_containers() {
@@ -62,10 +63,9 @@ get_active_containers() {
 }
 
 join_node() {
-  local stopped
+  local stopped target
   stopped=$(docker ps -a --filter "status=exited" --format '{{.Names}}' | grep "^${PREFIX}-" || true)
   if [[ -n "$stopped" ]]; then
-    local target
     target=$(echo "$stopped" | shuf -n 1)
     echo -e "\033[0;32m[JOIN]\033[0m Starting $target..."
     docker start "$target" >/dev/null
@@ -87,16 +87,20 @@ leave_node() {
   fi
 }
 
-# --- Main ---
+# --- Main loop ---
 echo "==> Starting churn controller"
 echo "    Prefix:      $PREFIX"
 echo "    Interval:    ${INTERVAL}s"
 echo "    Min active:  $MIN_ACTIVE"
 echo "    P(join):     $P_JOIN"
 echo "    P(leave):    $P_LEAVE"
+echo "    Stop file:   $STOP_FILE"
 echo "------------------------------------------------------------"
 
 while true; do
+  # Stop condition (manual)
+  [[ -f "$STOP_FILE" ]] && { echo "[STOP FILE] Detected — stopping..."; stop_churn; }
+
   sleep "$INTERVAL"
 
   r=$(awk -v seed=$RANDOM 'BEGIN{srand(seed); print rand()}')

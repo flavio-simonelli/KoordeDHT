@@ -2,6 +2,9 @@ networks:
   koordenet:
     driver: bridge
 
+volumes:
+  koorde-results:
+
 services:
     # Bootstrap node
   koorde-bootstrap:
@@ -30,7 +33,7 @@ services:
     env_file:
       - ./tester.env
     volumes:
-      - ./results:/data/results
+      - koorde-results:/data/results
     networks:
       - koordenet
 

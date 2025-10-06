@@ -16,8 +16,8 @@ dht:
   mode: "private"          # Network mode: public (real network) | private (local/isolated)
 
   bootstrap:
-    mode: ""              # Bootstrap mode: static | route53
-    peers: []                   # List of peer addresses (used if mode = "static")
+    mode: "static"              # Bootstrap mode: static | route53
+    peers: ["192.168.1.102:40237"]                   # List of peer addresses (used if mode = "static")
 
     route53:
       hostedZoneId: ""          # AWS Route53 hosted zone ID
@@ -26,16 +26,16 @@ dht:
       region: ""                # AWS region for Route53 queries (e.g., "us-east-1")
 
   deBruijn:
-    degree:                    # Degree of the de Bruijn graph (2 = minimal, log n = optimal; must be a power of 2 for binary IDs)
-    fixInterval:             # Periodic refresh interval for de Bruijn pointers
+    degree: 8                    # Degree of the de Bruijn graph (2 = minimal, log n = optimal; must be a power of 2 for binary IDs)
+    fixInterval: 5s            # Periodic refresh interval for de Bruijn pointers
 
   storage:
-    fixInterval:             # Periodic refresh interval for key-value storage maintenance
+    fixInterval: 20s           # Periodic refresh interval for key-value storage maintenance
 
   faultTolerance:
-    successorListSize:         # Number of successors to maintain (≈ log n for fault tolerance)
-    stabilizationInterval:    # Periodic interval for successor stabilization
-    failureTimeout:           # Timeout for gRPC stabilization calls; nodes exceeding this timeout are marked as failed
+    successorListSize: 8         # Number of successors to maintain (≈ log n for fault tolerance)
+    stabilizationInterval: 2s    # Periodic interval for successor stabilization
+    failureTimeout: 1s           # Timeout for gRPC stabilization calls; nodes exceeding this timeout are marked as failed
 
 node:
   id: ""                        # Node identifier in hexadecimal (empty = randomly generated)
