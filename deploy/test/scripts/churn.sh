@@ -51,7 +51,7 @@ usage() {
   exit 1
 }
 
-# --- Parse options ---
+# Parse options
 if [[ $# -lt 1 ]]; then
   usage
 fi

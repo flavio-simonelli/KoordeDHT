@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// CSVWriter gestisce la scrittura incrementale di log CSV (thread-safe).
+// CSVWriter handles incremental writing of CSV logs (thread-safe).
 type CSVWriter struct {
 	mu      sync.Mutex
 	file    *os.File
@@ -17,9 +17,9 @@ type CSVWriter struct {
 	flushed bool
 }
 
-// NewCSVWriter crea o apre un file CSV e scrive l’header se necessario.
+// NewCSVWriter creates or opens a CSV file and writes the header if necessary.
 func NewCSVWriter(filename string) (*CSVWriter, error) {
-	// Crea la directory se non esiste
+	// Create directory if it doesn't exist
 	dir := filepath.Dir(filename)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, fmt.Errorf("cannot create directory %q: %w", dir, err)
@@ -37,7 +37,7 @@ func NewCSVWriter(filename string) (*CSVWriter, error) {
 
 	w := csv.NewWriter(file)
 
-	// Se il file è nuovo, scrivi l’header
+	// Write header if file is new
 	if !fileExists {
 		header := []string{"timestamp", "node", "result", "delay_ms"}
 		if err := w.Write(header); err != nil {
@@ -53,7 +53,7 @@ func NewCSVWriter(filename string) (*CSVWriter, error) {
 	}, nil
 }
 
-// WriteRow scrive una singola riga nel CSV
+// WriteRow writes a single row to the CSV file in a thread-safe manner.
 func (cw *CSVWriter) WriteRow(node, result string, delay time.Duration) error {
 	cw.mu.Lock()
 	defer cw.mu.Unlock()
@@ -76,7 +76,7 @@ func (cw *CSVWriter) WriteRow(node, result string, delay time.Duration) error {
 	return nil
 }
 
-// Flush forza la scrittura su disco
+// Flush flushes the CSV writer buffer to the file.
 func (cw *CSVWriter) Flush() error {
 	cw.mu.Lock()
 	defer cw.mu.Unlock()
@@ -88,7 +88,7 @@ func (cw *CSVWriter) Flush() error {
 	return nil
 }
 
-// Close effettua il flush e chiude il file
+// Close closes the CSV file after flushing any remaining data.
 func (cw *CSVWriter) Close() error {
 	cw.mu.Lock()
 	defer cw.mu.Unlock()

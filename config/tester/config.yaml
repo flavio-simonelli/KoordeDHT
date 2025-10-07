@@ -1,6 +1,3 @@
-# -----------------------------------------------------------------------------
-# KoordeDHT Client Tester Configuration
-# -----------------------------------------------------------------------------
 logger:
   active: true            # Enable or disable logging (true | false)
   level: "info"            # Minimum log level: debug | info | warn | error

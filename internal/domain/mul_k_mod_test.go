@@ -19,36 +19,36 @@ func TestMulKMod(t *testing.T) {
 		name       string
 		bits       int
 		graphGrade int
-		aHex       string // input ID in hex
-		wantHex    string // expected ID in hex
+		aHex       string
+		wantHex    string
 	}{
 		{
 			name:       "32-bit *4",
 			bits:       32,
 			graphGrade: 4,
 			aHex:       "71c8502c",
-			wantHex:    "c72140b0", // (0x71c8502c * 4) mod 2^32
+			wantHex:    "c72140b0",
 		},
 		{
 			name:       "8-bit *3 overflow",
 			bits:       8,
 			graphGrade: 3,
-			aHex:       "ff", // 255
-			wantHex:    "fd", // (255*3) mod 256 = 765 mod 256 = 253
+			aHex:       "ff",
+			wantHex:    "fd",
 		},
 		{
 			name:       "16-bit *2 with overflow",
 			bits:       16,
 			graphGrade: 2,
-			aHex:       "ffff", // 65535
-			wantHex:    "fffe", // (65535*2) mod 2^16 = 131070 mod 65536 = 65534
+			aHex:       "ffff",
+			wantHex:    "fffe",
 		},
 		{
 			name:       "12-bit (not byte aligned) *2",
 			bits:       12,
 			graphGrade: 2,
-			aHex:       "0fff", // 4095 (12 bits all 1)
-			wantHex:    "0ffe", // (4095*2) mod 2^12 = 8190 mod 4096 = 4094
+			aHex:       "0fff",
+			wantHex:    "0ffe",
 		},
 	}
 

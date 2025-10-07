@@ -239,7 +239,7 @@ func (s *clientService) Lookup(ctx context.Context, req *clientv1.LookupRequest)
 		return nil, status.Error(codes.InvalidArgument, "invalid ID")
 	}
 
-	// Add lookup tracing to context //TODO: make this good
+	// Add lookup tracing to context
 	ctx = lookuptrace.WithLookup(ctx)
 
 	// Enrich tracing span

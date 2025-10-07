@@ -24,65 +24,65 @@ func TestNextDigitBaseK(t *testing.T) {
 		name       string
 		bits       int
 		graphGrade int
-		aHex       string // input ID in hex
+		aHex       string
 		wantDigit  uint64
-		wantRest   string // expected rest in hex
+		wantRest   string
 	}{
 		{
 			name:       "8-bit, base 2 (r=1)",
 			bits:       8,
 			graphGrade: 2,
-			aHex:       "aa", // 10101010
-			wantDigit:  1,    // MSB = 1
-			wantRest:   "54", // shift left 1 bit = 01010100
+			aHex:       "aa",
+			wantDigit:  1,
+			wantRest:   "54",
 		},
 		{
 			name:       "8-bit, base 4 (r=2)",
 			bits:       8,
 			graphGrade: 4,
-			aHex:       "c3", // 11000011
-			wantDigit:  3,    // primi 2 bit = 11 (bin) = 3
-			wantRest:   "0c", // shift left 2 → 00001100
+			aHex:       "c3",
+			wantDigit:  3,
+			wantRest:   "0c",
 		},
 		{
 			name:       "16-bit, base 4 (r=2)",
 			bits:       16,
 			graphGrade: 4,
-			aHex:       "abcd", // 1010 1011 1100 1101
-			wantDigit:  2,      // primi 2 bit = 10 (bin) = 2
-			wantRest:   "af34", // risultato dello shift
+			aHex:       "abcd",
+			wantDigit:  2,
+			wantRest:   "af34",
 		},
 		{
 			name:       "12-bit, base 4 (r=2, non byte-aligned)",
 			bits:       12,
 			graphGrade: 4,
-			aHex:       "00f0", // 0000 1111 0000 (solo 12 bit validi)
-			wantDigit:  0,      // primi 2 bit = 00
-			wantRest:   "03c0", // shift left 2 → 0011 1100 0000
+			aHex:       "00f0",
+			wantDigit:  0,
+			wantRest:   "03c0",
 		},
 		{
 			name:       "12-bit, base 8 (r=3, non byte-aligned)",
 			bits:       12,
 			graphGrade: 8,
-			aHex:       "00f0", // 0000 0000 1111 0000 (solo 12 bit validi)
-			wantDigit:  0,      // primi 3 bit = 000
-			wantRest:   "0780", // shift left 3 → 0000 0111 1000 0000
+			aHex:       "00f0",
+			wantDigit:  0,
+			wantRest:   "0780",
 		},
 		{
 			name:       "12-bit, base 8 (r=3, non byte-aligned)",
 			bits:       12,
 			graphGrade: 8,
-			aHex:       "0780", // 0000 0111 1000 0000 (solo 12 bit validi)
-			wantDigit:  3,      // primi 3 bit = 000
-			wantRest:   "0c00", // shift left 3 → 0000 1100 0000 0000
+			aHex:       "0780",
+			wantDigit:  3,
+			wantRest:   "0c00",
 		},
 		{
 			name:       "20-bit, base 16 (r=4, non byte-aligned)",
 			bits:       32,
 			graphGrade: 4,
-			aHex:       "1c8502c0", // 1010 1011 1100 1101 1110 (solo 20 bit validi)
-			wantDigit:  0,          // primi 4 bit = 1010 (bin) = 10
-			wantRest:   "72140b00", // shift left 4 → 1011 1100 1101 1110 0000
+			aHex:       "1c8502c0",
+			wantDigit:  0,
+			wantRest:   "72140b00",
 		},
 	}
 

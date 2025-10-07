@@ -14,9 +14,6 @@ set -euo pipefail
 #       --query-parallelism-max <max> \
 #       --docker-suffix <suffix> \
 #
-# Example:
-#   ./gen_compose.sh --sim-duration 2m --query-rate 0.8 \
-#       --query-parallelism-min 2 --query-parallelism-max 10
 # -----------------------------------------------------------------------------
 
 LOG_FILE="/var/log/test/gen_compose.log"
@@ -26,7 +23,7 @@ OUTPUT="docker-compose.generated.yml"
 # Redirect stdout/stderr both to console and log
 exec > >(tee -a "$LOG_FILE") 2>&1
 
-# --- Usage -------------------------------------------------------------------
+# Usage
 usage() {
   echo
   echo "Usage:"
@@ -43,7 +40,7 @@ usage() {
   exit 1
 }
 
-# --- Parse arguments ---------------------------------------------------------
+# Parse arguments
 SIM_DURATION=""
 QUERY_RATE=""
 QUERY_PARALLELISM_MIN=""
@@ -64,7 +61,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# --- Validate input ----------------------------------------------------------
+# Validate input
 if [[ -z "$SIM_DURATION" || -z "$QUERY_RATE" || -z "$QUERY_PARALLELISM_MIN" || -z "$QUERY_PARALLELISM_MAX" || -z "$DOCKER_SUFFIX" ]]; then
   echo "Error: all parameters are required."
   usage
@@ -75,7 +72,7 @@ if [[ ! -f "$TEMPLATE" ]]; then
   exit 1
 fi
 
-# --- Generate file -----------------------------------------------------------
+# Generate file
 echo
 echo "Generating $OUTPUT ..."
 sed \

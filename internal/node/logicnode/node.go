@@ -26,7 +26,7 @@ func New(rout *routingtable.RoutingTable, clientpool *client2.Pool, storage *sto
 		cp:  clientpool,
 		s:   storage,
 	}
-	// applica le opzioni
+	// Apply options
 	for _, opt := range opts {
 		opt(n)
 	}

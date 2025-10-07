@@ -127,7 +127,7 @@ func LoadConfig(path string) (*Config, error) {
 func (cfg *Config) ValidateConfig() error {
 	var errs []string
 
-	// --- Logger ---
+	// Logger
 	switch cfg.Logger.Level {
 	case "debug", "info", "warn", "error":
 	default:
@@ -151,7 +151,7 @@ func (cfg *Config) ValidateConfig() error {
 		errs = append(errs, fmt.Sprintf("invalid logger.mode: %s", cfg.Logger.Mode))
 	}
 
-	// --- DHT ---
+	// DHT
 	if cfg.DHT.IDBits <= 0 {
 		errs = append(errs, "dht.idBits must be > 0")
 	}
@@ -186,7 +186,7 @@ func (cfg *Config) ValidateConfig() error {
 		))
 	}
 
-	// --- Bootstrap ---
+	// Bootstrap
 	b := cfg.DHT.Bootstrap
 	switch b.Mode {
 	case "route53":
@@ -214,12 +214,12 @@ func (cfg *Config) ValidateConfig() error {
 		errs = append(errs, fmt.Sprintf("invalid bootstrap.mode: %s (must be dns, static or init)", b.Mode))
 	}
 
-	// --- Node ---
+	// Node
 	if cfg.Node.Port < 0 || cfg.Node.Port > 65535 {
 		errs = append(errs, fmt.Sprintf("node.port must be in [0,65535], got %d", cfg.Node.Port))
 	}
 
-	// --- Telemetry ---
+	// Telemetry
 	if cfg.Telemetry.Tracing.Enabled {
 		switch cfg.Telemetry.Tracing.Exporter {
 		case "stdout", "jaeger", "otlp":
@@ -231,7 +231,7 @@ func (cfg *Config) ValidateConfig() error {
 		}
 	}
 
-	// --- Return result ---
+	// Return result
 	if len(errs) > 0 {
 		return fmt.Errorf("configuration errors:\n  - %s", strings.Join(errs, "\n  - "))
 	}

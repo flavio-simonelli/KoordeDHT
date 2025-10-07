@@ -29,9 +29,8 @@ usage() {
   exit 1
 }
 
-# -----------------------------------------------------------------------------
+
 # Parse arguments
-# -----------------------------------------------------------------------------
 INSTANCES="" NODES="" BASE_PORT="" MODE="" ROUTE53_ZONE_ID="" ROUTE53_SUFFIX=""
 S3_BUCKET="" S3_PREFIX="" KEY_NAME="" INSTANCE_TYPE="" VPC_ID="" SUBNET_ID="" ROUTE53_REGION=""
 
@@ -54,9 +53,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# -----------------------------------------------------------------------------
+
 # Validation
-# -----------------------------------------------------------------------------
 if [[ -z "$INSTANCES" || -z "$NODES" || -z "$BASE_PORT" || -z "$MODE" || -z "$ROUTE53_ZONE_ID" || -z "$ROUTE53_SUFFIX" || -z "$ROUTE53_REGION" || -z "$S3_BUCKET" || -z "$S3_PREFIX" || -z "$KEY_NAME" || -z "$INSTANCE_TYPE" || -z "$VPC_ID" || -z "$SUBNET_ID" ]]; then
   echo "[ERROR] Missing required parameters"
   usage
@@ -82,9 +80,8 @@ if [[ "$MODE" != "public" && "$MODE" != "private" ]]; then
   exit 1
 fi
 
-# -----------------------------------------------------------------------------
+
 # Deploy M stacks (one per EC2 instance)
-# -----------------------------------------------------------------------------
 NODE_BASE_PORT=$((BASE_PORT))
 NODE_MAX_PORT=$((NODE_BASE_PORT + NODES - 1))
 

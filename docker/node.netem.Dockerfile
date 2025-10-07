@@ -15,7 +15,6 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends iproute2 ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy binary and config
 COPY --from=builder /koorde-node /usr/local/bin/koorde
 COPY config/node/config.yaml /etc/koorde/config.yaml
 

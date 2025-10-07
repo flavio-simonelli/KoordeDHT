@@ -2,10 +2,10 @@ package writer
 
 import "time"
 
-// NopWriter è un writer che ignora tutte le operazioni (no-op).
+// NopWriter is a writer that does nothing.
 type NopWriter struct{}
 
-// WriteRow ignora l'input e non scrive nulla.
+// WriteRow non fa nulla.
 func (NopWriter) WriteRow(node, result string, delay time.Duration) error { return nil }
 
 // Flush non fa nulla.

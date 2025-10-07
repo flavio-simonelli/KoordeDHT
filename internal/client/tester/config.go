@@ -76,7 +76,7 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("parse yaml: %w", err)
 	}
 
-	// --- Environment overrides ---
+	// Environment overrides
 	configloader.OverrideBool(&cfg.Logger.Active, "LOGGER_ACTIVE")
 	configloader.OverrideString(&cfg.Logger.Level, "LOGGER_LEVEL")
 	configloader.OverrideString(&cfg.Logger.Encoding, "LOGGER_ENCODING")
@@ -115,7 +115,7 @@ func Load(path string) (*Config, error) {
 func (c *Config) Validate() error {
 	var errs []string
 
-	// --- Logger ---
+	// Logger
 	if c.Logger.Active {
 		switch c.Logger.Level {
 		case "debug", "info", "warn", "error":
@@ -127,17 +127,17 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	// --- Simulation ---
+	// Simulation
 	if c.Simulation.Duration <= 0 {
 		errs = append(errs, fmt.Sprintf("simulation.duration must be > 0 (got %v)", c.Simulation.Duration))
 	}
 
-	// --- DHT ---
+	// DHT
 	if c.DHT.IDBits <= 0 {
 		errs = append(errs, fmt.Sprintf("dht.idBits must be > 0 (got %d)", c.DHT.IDBits))
 	}
 
-	// --- Bootstrap ---
+	// Bootstrap
 	switch c.Bootstrap.Mode {
 	case "docker":
 		d := c.Bootstrap.Docker
@@ -162,12 +162,12 @@ func (c *Config) Validate() error {
 		errs = append(errs, fmt.Sprintf("bootstrap.mode must be one of [docker, route53], got %q", c.Bootstrap.Mode))
 	}
 
-	// --- CSV ---
+	// CSV
 	if c.CSV.Enabled && c.CSV.Path == "" {
 		errs = append(errs, "csv.path must be set when csv.enabled = true")
 	}
 
-	// --- Query ---
+	// Query
 	if c.Query.Rate <= 0 {
 		errs = append(errs, fmt.Sprintf("query.rate must be > 0 (got %f)", c.Query.Rate))
 	}

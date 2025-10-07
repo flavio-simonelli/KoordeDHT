@@ -30,9 +30,7 @@ done
 
 echo "[INFO] Using AWS region: $AWS_REGION"
 
-# -----------------------------------------------------------------------------
 # Fetch all stacks with the 'koorde-instance-' prefix
-# -----------------------------------------------------------------------------
 STACK_NAMES=$(aws cloudformation describe-stacks \
   --region "$AWS_REGION" \
   --query "Stacks[].StackName" \
@@ -47,9 +45,7 @@ echo "[INFO] Found the following stacks to delete:"
 echo "$STACK_NAMES"
 echo
 
-# -----------------------------------------------------------------------------
 # Delete each stack and wait for completion
-# -----------------------------------------------------------------------------
 for STACK_NAME in $STACK_NAMES; do
   echo "[INFO] Deleting stack: $STACK_NAME ..."
   aws cloudformation delete-stack \

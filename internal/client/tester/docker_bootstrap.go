@@ -13,9 +13,9 @@ import (
 
 // DockerBootstrap discovers nodes by container name prefix and network.
 type DockerBootstrap struct {
-	Prefix  string // e.g. "localtest-node"
-	Port    int    // e.g. 4000
-	Network string // e.g. "koorde-net"
+	Prefix  string
+	Port    int
+	Network string
 }
 
 // NewDockerBootstrap creates a Docker-based bootstrapper.

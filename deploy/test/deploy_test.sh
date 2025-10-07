@@ -29,7 +29,7 @@ set -euo pipefail
 TEMPLATE_FILE="test_koorde.yml"
 STACK_NAME="koorde-test-stack"
 
-# --- Parameters --------------------------------------------------------------
+# Parameters
 KEYPAIR=""
 S3_BUCKET=""
 S3_PREFIX=""
@@ -49,7 +49,7 @@ CHURN_PJOIN=""
 CHURN_PLEAVE=""
 MAX_NODES=""
 
-# --- Usage -------------------------------------------------------------------
+# Usage
 usage() {
   echo
   echo "Usage:"
@@ -69,7 +69,7 @@ usage() {
   exit 1
 }
 
-# --- Parse Arguments ---------------------------------------------------------
+# Parse Arguments
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --keypair) KEYPAIR="$2"; shift 2 ;;
@@ -95,7 +95,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# --- Validate required -------------------------------------------------------
+# Validate required
 missing=()
 [[ -z "$KEYPAIR" ]] && missing+=("--keypair")
 [[ -z "$S3_BUCKET" ]] && missing+=("--s3-bucket")
@@ -121,7 +121,7 @@ if (( ${#missing[@]} > 0 )); then
   usage
 fi
 
-# --- Create Stack ------------------------------------------------------------
+# Create Stack
 echo "[INFO] Creating CloudFormation stack '${STACK_NAME}'..."
 aws cloudformation create-stack \
   --stack-name "$STACK_NAME" \

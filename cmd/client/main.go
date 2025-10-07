@@ -21,7 +21,7 @@ func main() {
 
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
-	// --- Connect to initial node ---
+	// Connect to initial node
 	api, conn, err := client.Connect(*addr)
 	if err != nil {
 		log.Fatalf("Failed to connect to node at %s: %v", *addr, err)
@@ -32,7 +32,7 @@ func main() {
 	fmt.Printf("Koorde interactive client. Connected to %s\n", currentAddr)
 	fmt.Println("Available commands: put/get/delete/getstore/getrt/lookup/use/exit")
 
-	// --- Setup liner shell ---
+	// Setup liner shell
 	line := liner.NewLiner()
 	defer line.Close()
 	line.SetCtrlCAborts(true)

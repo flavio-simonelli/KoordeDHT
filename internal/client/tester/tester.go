@@ -26,7 +26,7 @@ type Tester struct {
 	started time.Time
 }
 
-// New crea un nuovo tester
+// New create a new Tester instance
 func New(cfg *Config, lgr logger.Logger, writer writer.Writer, boot bootstrap.Bootstrap, space domain.Space) *Tester {
 	return &Tester{
 		cfg:    cfg,
@@ -37,7 +37,7 @@ func New(cfg *Config, lgr logger.Logger, writer writer.Writer, boot bootstrap.Bo
 	}
 }
 
-// Run esegue il test per la durata configurata o finché non viene interrotto
+// Run starts the tester for the configured duration or until the context is cancelled
 func (t *Tester) Run(ctx context.Context) error {
 	t.logger.Info("Tester started", logger.F("duration", t.cfg.Simulation.Duration))
 	t.started = time.Now()
@@ -67,7 +67,7 @@ func (t *Tester) Run(ctx context.Context) error {
 	return nil
 }
 
-// runQueryWave esegue una “ondata” di lookup paralleli
+// runQueryWave executes a wave of parallel queries
 func (t *Tester) runQueryWave(ctx context.Context) error {
 	nodes, err := t.boot.Discover(ctx)
 	if err != nil {
@@ -78,7 +78,7 @@ func (t *Tester) runQueryWave(ctx context.Context) error {
 		return nil
 	}
 
-	// Determina grado di parallelismo
+	// choise a random number of parallel workers between min and max
 	p := randomInt(t.cfg.Query.Parallelism.MinWorkers, t.cfg.Query.Parallelism.MaxWorkers)
 	t.logger.Info("Starting query wave",
 		logger.F("parallel", p),
@@ -104,7 +104,7 @@ func (t *Tester) runQueryWave(ctx context.Context) error {
 	return nil
 }
 
-// doLookup seleziona un nodo random e simula una lookup
+// doLookup performs a single lookup operation on a random node
 func (t *Tester) doLookup(nodes []string) {
 	node := nodes[rand.Intn(len(nodes))]
 	key, err := t.generateRandomID()
@@ -128,19 +128,18 @@ func (t *Tester) doLookup(nodes []string) {
 		}
 	}(conn)
 
-	// Esegui il lookup
 	_, delay, err := client.Lookup(ctx, c, key)
 	var result string
 	if err != nil {
 		switch {
 		case errors.Is(err, client.ErrUnavailable):
-			// Nodo irraggiungibile → skip senza scrivere nel CSV
+			// Node not reachable, skip writing to CSV
 			t.logger.Debug("node unavailable (skipping CSV)",
 				logger.F("node", node),
 				logger.F("id", key),
 				logger.F("err", err),
 			)
-			return // ❌ non scrivere nulla
+			return
 
 		case errors.Is(err, client.ErrDeadlineExceeded):
 			result = "TIMEOUT"
@@ -155,7 +154,7 @@ func (t *Tester) doLookup(nodes []string) {
 		result = "SUCCESS"
 	}
 
-	// logga il risultato
+	// log the result
 	t.logger.Info("Lookup result",
 		logger.F("node", node),
 		logger.F("key", key),
@@ -163,13 +162,13 @@ func (t *Tester) doLookup(nodes []string) {
 		logger.F("delay_ms", delay.Milliseconds()),
 	)
 
-	// scrivi il risultato nel CSV
+	// write to CSV
 	if err := t.writer.WriteRow(node, result, delay); err != nil {
 		t.logger.Warn("failed to write CSV row", logger.F("err", err))
 	}
 }
 
-// randomInt restituisce un numero intero random compreso tra min e max inclusi
+// randomInt returns a random integer between min and max (inclusive)
 func randomInt(min, max int) int {
 	if min >= max {
 		return min
@@ -177,17 +176,16 @@ func randomInt(min, max int) int {
 	return rand.Intn(max-min+1) + min
 }
 
-// generateRandomID usa il metodo domain.Space.NewIdFromString()
-// con un input casuale, così ottieni un ID valido nel tuo spazio.
+// generateRandomID generates a random valid ID string using the domain.Space logic
 func (t *Tester) generateRandomID() (string, error) {
-	// genera 16 byte casuali per la stringa sorgente
+	// create a random byte slice
 	buf := make([]byte, 16)
 	if _, err := rand.Read(buf); err != nil {
 		return "", fmt.Errorf("failed to generate random input: %w", err)
 	}
 	randomStr := hex.EncodeToString(buf)
 
-	// usa la logica di domain.Space per ottenere un ID valido
+	// convert to ID using domain.Space
 	id := t.space.NewIdFromString(randomStr)
 	idString := id.ToHexString(true)
 	return idString, nil

@@ -459,7 +459,7 @@ func (sp Space) NextDigitBaseK(x ID) (digit uint64, rest ID, err error) {
 	// r = log2(k), i.e. number of bits per digit
 	r := bits.TrailingZeros(uint(sp.GraphGrade))
 
-	// --- extract the most significant r bits ---
+	// extract the most significant r bits
 	bitPos := extraBits // skip the padding bits
 	digit = 0
 	for i := 0; i < r; i++ {
@@ -469,7 +469,7 @@ func (sp Space) NextDigitBaseK(x ID) (digit uint64, rest ID, err error) {
 		digit = (digit << 1) | uint64(bit)
 	}
 
-	// --- shift left by r bits ---
+	// shift left by r bits
 	rest = make(ID, sp.ByteLen)
 	carry := byte(0)
 	for i := sp.ByteLen - 1; i >= 0; i-- {
@@ -478,7 +478,7 @@ func (sp Space) NextDigitBaseK(x ID) (digit uint64, rest ID, err error) {
 		carry = val >> (8 - r)
 	}
 
-	// --- mask unused high-order bits ---
+	// mask unused high-order bits
 	if extraBits > 0 {
 		mask := byte(0xFF >> extraBits)
 		rest[0] &= mask
@@ -487,54 +487,6 @@ func (sp Space) NextDigitBaseK(x ID) (digit uint64, rest ID, err error) {
 	return digit, rest, nil
 }
 
-// subMod computes (a - b) mod 2^Bits, where a and b are big-endian IDs.
-// The result has the same length as the inputs.
-func (sp Space) subMod(a, b ID) ID {
-	if len(a) != sp.ByteLen || len(b) != sp.ByteLen {
-		panic("invalid ID length")
-	}
-	res := make(ID, sp.ByteLen)
-	borrow := 0
-
-	// big-endian order: start from the least significant byte
-	for i := sp.ByteLen - 1; i >= 0; i-- {
-		ai := int(a[i])
-		bi := int(b[i]) + borrow
-		if ai < bi {
-			ai += 256
-			borrow = 1
-		} else {
-			borrow = 0
-		}
-		res[i] = byte(ai - bi)
-	}
-
-	// Se c’è ancora borrow alla fine, significa che a < b,
-	// quindi il risultato è già "mod 2^Bits".
-	// Non serve fare altro.
-
-	// Maschera eventuali bit inutilizzati nel byte più significativo
-	if sp.Bits%8 != 0 {
-		mask := byte(0xFF >> (8 - (sp.Bits % 8)))
-		res[0] &= mask
-	}
-
-	return res
-}
-
-// freeBits returns floor(log2(len)) where len is a big-endian byte slice.
-func freeBits(lenBytes []byte) int {
-	for i, b := range lenBytes {
-		if b != 0 {
-			// Calcola posizione del MSB nel primo byte non nullo
-			leadingZeros := bits.LeadingZeros8(b)
-			bitPos := (len(lenBytes)-i)*8 - leadingZeros - 1
-			return bitPos
-		}
-	}
-	return 0 // len = 0
-}
-
 func (sp Space) BestImaginarySimple(self, succ, target ID) (currentI, kshift ID, err error) {
 	base, err := sp.AddMod(self, sp.FromUint64(1))
 	if err != nil {
@@ -543,115 +495,4 @@ func (sp Space) BestImaginarySimple(self, succ, target ID) (currentI, kshift ID,
 	currentI = base
 	kshift = target
 	return currentI, kshift, nil
-}
-
-/*
-// BestImaginarySimple selects the initial imaginary ID (currentI) and
-// the shifted target (kshift) for a successor lookup.
-//
-// It tries to preload as many digits of the target as possible without
-// leaving the interval (self, succ]. If no candidate is found at the
-// maximum preload, the algorithm falls back by reducing the number of
-// preloaded digits. As a last resort, if no preload is possible,
-// currentI = self+1 and kshift = target.
-//
-// Returns:
-//   - currentI: the chosen imaginary starting ID
-//   - kshift: the shifted target for continued routing
-//   - error: if arithmetic operations fail
-func (sp Space) BestImaginarySimple(self, succ, target ID) (currentI, kshift ID, err error) {
-	// Step 1: interval length
-	dist := sp.subMod(succ, self)
-	if dist.Equal(sp.Zero()) {
-		return nil, nil, fmt.Errorf("BestImaginarySimple: zero interval (self == succ)")
-	}
-
-	// Step 2: free bits
-	fb := freeBits(dist)
-
-	// Step 3: digit size (GraphGrade must be power of two)
-	if sp.GraphGrade == 0 || (sp.GraphGrade&(sp.GraphGrade-1)) != 0 {
-		return nil, nil, fmt.Errorf("BestImaginarySimple: GraphGrade %d not power of 2", sp.GraphGrade)
-	}
-	digitBits := bits.TrailingZeros(uint(sp.GraphGrade))
-
-	// Step 4: maximum free digits
-	maxFreeDigits := fb / digitBits
-
-	// Base = self + 1
-	base, err := sp.AddMod(self, sp.FromUint64(1))
-	if err != nil {
-		return nil, nil, fmt.Errorf("BestImaginarySimple: AddMod failed: %w", err)
-	}
-
-	// Try with decreasing number of freeDigits
-	for freeDigits := maxFreeDigits; freeDigits > 0; freeDigits-- {
-		usedBits := freeDigits * digitBits
-
-		// Build preload and shifted target
-		preload, shifted, err := sp.BuildPreloadFromTarget(target, freeDigits)
-		if err != nil {
-			return nil, nil, fmt.Errorf("BestImaginarySimple: BuildPreloadFromTarget failed: %w", err)
-		}
-		kshift = shifted
-
-		// Mask for low usedBits
-		mask := sp.FromUint64((1 << usedBits) - 1)
-
-		// Residues mod 2^usedBits
-		baseResidue := make(ID, sp.ByteLen)
-		preloadResidue := make(ID, sp.ByteLen)
-		for i := 0; i < sp.ByteLen; i++ {
-			baseResidue[i] = base[i] & mask[i]
-			preloadResidue[i] = preload[i] & mask[i]
-		}
-
-		// delta = (preloadResidue - baseResidue) mod 2^usedBits
-		delta := sp.subMod(preloadResidue, baseResidue)
-		for i := 0; i < sp.ByteLen; i++ {
-			delta[i] &= mask[i]
-		}
-
-		// currentI = base + delta
-		currentI, err = sp.AddMod(base, delta)
-		if err != nil {
-			return nil, nil, fmt.Errorf("BestImaginarySimple: AddMod failed: %w", err)
-		}
-
-		// Check membership
-		if currentI.Between(self, succ) {
-			return currentI, kshift, nil
-		}
-	}
-
-	// Fallback: no preload possible
-	currentI = base
-	kshift = target
-	return currentI, kshift, nil
-}
-*/
-
-// BuildPreloadFromTarget constructs an ID whose low freeDigits digits
-// match the high-order digits of target. Returns also the shifted target (kshift).
-func (sp Space) BuildPreloadFromTarget(target ID, freeDigits int) (ID, ID, error) {
-	preload := sp.Zero()
-	kshift := target
-	var err error
-
-	for i := 0; i < freeDigits; i++ {
-		var digit uint64
-		digit, kshift, err = sp.NextDigitBaseK(kshift)
-		if err != nil {
-			return nil, nil, fmt.Errorf("BuildPreloadFromTarget: invalid target: %w", err)
-		}
-		preload, err = sp.MulKMod(preload)
-		if err != nil {
-			return nil, nil, fmt.Errorf("BuildPreloadFromTarget: MulKMod failed: %w", err)
-		}
-		preload, err = sp.AddMod(preload, sp.FromUint64(digit))
-		if err != nil {
-			return nil, nil, fmt.Errorf("BuildPreloadFromTarget: AddMod failed: %w", err)
-		}
-	}
-	return preload, kshift, nil
 }
