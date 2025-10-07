@@ -46,3 +46,9 @@ Per arrestare l'ambiente e rimuovere i container, esegui:
 ```bash
 docker-compose down
 ```
+
+### Note
+- Tutti i nodi condividono la stessa configurazione (`common_node.env`).
+- Il nodo bootstrap viene avviato per primo e funge da punto di contatto iniziale.
+- Gli altri nodi si connettono al bootstrap tramite la variabile d’ambiente `BOOTSTRAP_PEERS=bootstrap:4000`.
+- I trace OpenTelemetry vengono inviati automaticamente a Jaeger sulla porta `4317`.
