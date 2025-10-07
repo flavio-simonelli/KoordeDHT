@@ -1,4 +1,3 @@
-# --- Build stage (identico) --------------------------------------------------
 FROM golang:1.25 AS builder
 
 WORKDIR /app
@@ -9,16 +8,14 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -o /koorde-node ./cmd/node
 
-# --- Runtime stage: Debian with tc ------------------------------------------
-# Distroless è troppo minimale per test di rete: usiamo Debian base
+# Debian with tc installed
 FROM debian:12-slim
 
-# Installiamo solo tc e le dipendenze essenziali
 RUN apt-get update && \
     apt-get install -y --no-install-recommends iproute2 ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
-# Copia del binario e config
+# Copy binary and config
 COPY --from=builder /koorde-node /usr/local/bin/koorde
 COPY config/node/config.yaml /etc/koorde/config.yaml
 

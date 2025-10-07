@@ -97,11 +97,11 @@ fi
 
 # Helper functions
 get_active_containers() {
-  docker ps --format '{{.Names}}' | grep "^${PREFIX}-" || true
+  docker ps --format '{{.Names}}' | grep "^${PREFIX}" || true
 }
 
 get_stopped_containers() {
-  docker ps -a --filter "status=exited" --format '{{.Names}}' | grep "^${PREFIX}-" || true
+  docker ps -a --filter "status=exited" --format '{{.Names}}' | grep "^${PREFIX}" || true
 }
 
 join_node() {
@@ -175,18 +175,7 @@ if [[ "$ACTION" == "clear" ]]; then
     echo "[INFO] No active churn.sh processes found."
   fi
 
-  echo "[INFO] Restoring all containers with prefix '${PREFIX}-'..."
-  stopped=$(get_stopped_containers)
-  if [[ -n "$stopped" ]]; then
-    echo "$stopped" | while read -r c; do
-      echo "[CLEAR] Starting $c..."
-      docker start "$c" >/dev/null
-    done
-    echo "[OK] All stopped containers restarted."
-  else
-    echo "[INFO] No stopped containers to restart."
-  fi
-
-  echo "[INFO] Churn fully cleared and system restored."
+  echo "[SUCCESS] Churn controller stopped."
+  echo "[INFO] Containers state preserved (no restarts performed)."
   exit 0
 fi

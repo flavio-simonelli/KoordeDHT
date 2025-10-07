@@ -11,7 +11,8 @@ set -euo pipefail
 #       --sim-duration <duration> \
 #       --query-rate <rate> \
 #       --query-parallelism-min <min> \
-#       --query-parallelism-max <max>
+#       --query-parallelism-max <max> \
+#       --docker-suffix <suffix> \
 #
 # Example:
 #   ./gen_compose.sh --sim-duration 2m --query-rate 0.8 \
@@ -30,14 +31,14 @@ usage() {
   echo
   echo "Usage:"
   echo "  $0 --sim-duration <duration> --query-rate <rate> \\"
-  echo "     --query-parallelism-min <min> --query-parallelism-max <max> --query-timeout <timeout>"
+  echo "     --query-parallelism-min <min> --query-parallelism-max <max> --query-timeout <timeout> --docker-suffix <suffix>"
   echo
   echo "Example:"
-  echo "  $0 --sim-duration 1m --query-rate 0.5 --query-parallelism-min 1 --query-parallelism-max 5 --query-timeout 10s"
+  echo "  $0 --sim-duration 1m --query-rate 0.5 --query-parallelism-min 1 --query-parallelism-max 5 --query-timeout 10s --docker-suffix test"
   echo
   echo "Description:"
   echo "  Generates a docker-compose file replacing placeholders in:"
-  echo "    \${SIM_DURATION}, \${QUERY_RATE}, \${QUERY_PARALLELISM_MIN}, \${QUERY_PARALLELISM_MAX}, \${QUERY_TIMEOUT}"
+  echo "    \${SIM_DURATION}, \${QUERY_RATE}, \${QUERY_PARALLELISM_MIN}, \${QUERY_PARALLELISM_MAX}, \${QUERY_TIMEOUT}, \${DOCKER_SUFFIX}"
   echo
   exit 1
 }
@@ -48,6 +49,7 @@ QUERY_RATE=""
 QUERY_PARALLELISM_MIN=""
 QUERY_PARALLELISM_MAX=""
 QUERY_TIMEOUT="10s"  # Default timeout for queries
+DOCKER_SUFFIX=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -56,13 +58,14 @@ while [[ $# -gt 0 ]]; do
     --query-parallelism-min) QUERY_PARALLELISM_MIN="$2"; shift 2 ;;
     --query-parallelism-max) QUERY_PARALLELISM_MAX="$2"; shift 2 ;;
     --query-timeout)         QUERY_TIMEOUT="$2"; shift 2 ;;
+    --docker-suffix)         DOCKER_SUFFIX="$2"; shift 2 ;;
     -h|--help) usage ;;
     *) echo "Error: unknown argument '$1'"; usage ;;
   esac
 done
 
 # --- Validate input ----------------------------------------------------------
-if [[ -z "$SIM_DURATION" || -z "$QUERY_RATE" || -z "$QUERY_PARALLELISM_MIN" || -z "$QUERY_PARALLELISM_MAX" ]]; then
+if [[ -z "$SIM_DURATION" || -z "$QUERY_RATE" || -z "$QUERY_PARALLELISM_MIN" || -z "$QUERY_PARALLELISM_MAX" || -z "$DOCKER_SUFFIX" ]]; then
   echo "Error: all parameters are required."
   usage
 fi
@@ -81,6 +84,7 @@ sed \
   -e "s|\${QUERY_PARALLELISM_MIN}|${QUERY_PARALLELISM_MIN}|g" \
   -e "s|\${QUERY_PARALLELISM_MAX}|${QUERY_PARALLELISM_MAX}|g" \
   -e "s|\${QUERY_TIMEOUT}|${QUERY_TIMEOUT}|g" \
+  -e "s|\${DOCKER_SUFFIX}|${DOCKER_SUFFIX}|g" \
   "$TEMPLATE" > "$OUTPUT"
 
 echo
@@ -90,6 +94,7 @@ echo "  QUERY_RATE=${QUERY_RATE}"
 echo "  QUERY_PARALLELISM_MIN=${QUERY_PARALLELISM_MIN}"
 echo "  QUERY_PARALLELISM_MAX=${QUERY_PARALLELISM_MAX}"
 echo "  QUERY_TIMEOUT=${QUERY_TIMEOUT}"
+echo "  DOCKER_SUFFIX=${DOCKER_SUFFIX}"
 echo
 echo "Logs saved to: $LOG_FILE"
 exit 0

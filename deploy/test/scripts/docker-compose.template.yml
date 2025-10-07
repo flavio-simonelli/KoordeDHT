@@ -6,19 +6,17 @@ services:
   bootstrap:
     image: flaviosimonelli/koorde-node:netem
     env_file:
-      - ./common_node.env
+      - common_node.env
     environment:
       - BOOTSTRAP_PEERS=
     networks:
       - koordenet
-    depends_on:
-      - jaeger
     restart: always
 
   node:
     image: flaviosimonelli/koorde-node:netem
     env_file:
-      - ./common_node.env
+      - common_node.env
     environment:
       - BOOTSTRAP_PEERS=bootstrap:4000
     networks:
@@ -38,21 +36,12 @@ services:
       - QUERY_PARALLELISM_MIN=${QUERY_PARALLELISM_MIN}
       - QUERY_PARALLELISM_MAX=${QUERY_PARALLELISM_MAX}
       - QUERY_TIMEOUT=${QUERY_TIMEOUT}
+      - DOCKER_SUFFIX=${DOCKER_SUFFIX}
     env_file:
-      - ./tester.env
+      - tester.env
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:z
       - ./results:/data/results:z
     user: "0:0"  # root
     networks:
       - koordenet
-
-  jaeger:
-    image: cr.jaegertracing.io/jaegertracing/jaeger:latest
-    container_name: jaeger
-    ports:
-      - "16686:16686"   # UI Jaeger
-      - "4317:4317"     # OTLP gRPC
-    networks:
-      - koordenet
-    restart: unless-stopped

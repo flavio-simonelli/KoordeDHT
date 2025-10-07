@@ -134,15 +134,6 @@ docker compose -f "$GENERATED" up -d --scale node="$MAX_NODES"
 echo "[OK] Docker Compose started."
 
 # apply network delay
-echo "[INFO] Applying network delay..."
-NETWORK=$(docker network ls --format '{{.Name}}' | grep 'koordenet$' | head -n1)
-./network_delay.sh apply \
-  --delay "$DELAY" \
-  --jitter "$JITTER" \
-  --loss "$LOSS" \
-  --network "$NETWORK"
-echo "[OK] Network delay applied on the network $NETWORK"
-
 echo "[INFO] Starting Pumba network delay daemon..."
 docker rm -f pumba-delay >/dev/null 2>&1 || true
 docker run -d --name pumba-delay \

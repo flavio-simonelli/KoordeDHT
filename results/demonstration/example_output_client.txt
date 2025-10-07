@@ -1,0 +1,73 @@
+docker run -it flaviosimonelli/koorde-client:latest --addr xx.xxx.xxx.xx:4002
+Koorde interactive client. Connected to xx.xxx.xxx.xx:4002
+Available commands: put/get/delete/getstore/getrt/lookup/use/exit
+koorde[xx.xxx.xxx.xx:4002]> getrt
+GetRoutingTable failed: node unavailable | latency=102.461051ms
+koorde[xx.xxx.xxx.xx:4002]> use xx.xxx.xxx.xx:4000
+Switched connection to xx.xxx.xxx.xx:4000
+koorde[xx.xxx.xxx.xx:4000]> getrt
+Routing table:
+  Self: 0x0139a675cf05ffab3b (10.0.0.94:4000)
+  Predecessor: 0x00ebb3455b6713e6a1 (10.0.0.111:4002)
+  Successors:
+    [0] 0x017711a25686d9b0d1 (10.0.0.94:4003)
+    [1] 0x01a724dc057d73c030 (10.0.0.8:4006)
+    [2] 0x01df4741ef45b41cad (10.0.0.68:4003)
+    [3] 0x01e45f06db0ed6a64a (10.0.0.68:4007)
+    [4] 0x01ef0e8abb4719a1b0 (10.0.0.68:4008)
+    [5] 0x01f12fa23fb731ac75 (10.0.0.94:4009)
+    [6] 0x0220137fa845648907 (10.0.0.32:4004)
+    [7] 0x024e703ad916f4ab91 (10.0.0.111:4005)
+  DeBruijn List:
+    [0] 0x01a724dc057d73c030 (10.0.0.8:4006)
+    [1] 0x01df4741ef45b41cad (10.0.0.68:4003)
+    [2] 0x01e45f06db0ed6a64a (10.0.0.68:4007)
+    [3] 0x01ef0e8abb4719a1b0 (10.0.0.68:4008)
+    [4] 0x01f12fa23fb731ac75 (10.0.0.94:4009)
+    [5] 0x0220137fa845648907 (10.0.0.32:4004)
+    [6] 0x024e703ad916f4ab91 (10.0.0.111:4005)
+    [7] 0x0251ad625c6c46d0a4 (10.0.0.68:4001)
+Latency: 315.524222ms
+koorde[xx.xxx.xxx.xx:4000]> use xx.xxx.xxx.xx:4001
+Switched connection to xx.xxx.xxx.xx:4001
+koorde[xx.xxx.xxx.xx:4001]> getrt
+Routing table:
+  Self: 0x02b3436176e73a1cd7 (10.0.0.94:4001)
+  Predecessor: 0x02ad6c7424b2f715f6 (10.0.0.68:4002)
+  Successors:
+    [0] 0x02df770b1417fe7c9a (10.0.0.8:4004)
+    [1] 0x02e2d1ddeb78880ed5 (10.0.0.8:4000)
+    [2] 0x030a088e5640de4e24 (10.0.0.32:4008)
+    [3] 0x0313ec381b51842465 (10.0.0.68:4006)
+    [4] 0x031639e014eec6a825 (10.0.0.68:4005)
+    [5] 0x03226323e14e307cf5 (10.0.0.94:4008)
+    [6] 0x032c7752fe5e59340b (10.0.0.68:4000)
+    [7] 0x0350258dd65eb211dd (10.0.0.8:4007)
+  DeBruijn List:
+    [0] 0x017711a25686d9b0d1 (10.0.0.94:4003)
+    [1] 0x01a724dc057d73c030 (10.0.0.8:4006)
+    [2] 0x01df4741ef45b41cad (10.0.0.68:4003)
+    [3] 0x01e45f06db0ed6a64a (10.0.0.68:4007)
+    [4] 0x01ef0e8abb4719a1b0 (10.0.0.68:4008)
+    [5] 0x01f12fa23fb731ac75 (10.0.0.94:4009)
+    [6] 0x0220137fa845648907 (10.0.0.32:4004)
+    [7] 0x024e703ad916f4ab91 (10.0.0.111:4005)
+Latency: 338.878243ms
+koorde[xx.xxx.xxx.xx:4001]> use xx.xxx.xxx.xx:4000
+Switched connection to xx.xxx.xxx.xx:4000
+koorde[xx.xxx.xxx.xx:4000]> lookup 0x02f3768475aa
+Lookup result: successor=0x0011bbc8cbf804736f (10.0.0.111:4008) | latency=142.506269ms
+koorde[xx.xxx.xxx.xx:4000]> lookup 0x02f3768475aa53af6478
+Lookup failed: internal gRPC error | latency=104.622044ms
+koorde[xx.xxx.xxx.xx:4000]> lookup 0x0220137fa845648907
+Lookup result: successor=0x0220137fa845648907 (10.0.0.32:4004) | latency=106.713255ms
+koorde[xx.xxx.xxx.xx:4000]> lookup 0x02ff137fa845648907
+Lookup result: successor=0x030a088e5640de4e24 (10.0.0.32:4008) | latency=150.998596ms
+koorde[xx.xxx.xxx.xx:4000]> lookup 0x03ff137fa845648907
+Lookup result: successor=0x0011bbc8cbf804736f (10.0.0.111:4008) | latency=137.149727ms
+koorde[xx.xxx.xxx.xx:4000]> lookup 0x03af137fa845648907
+Lookup result: successor=0x03ce7a3dfaa0f362f9 (10.0.0.111:4000) | latency=133.745823ms
+koorde[xx.xxx.xxx.xx:4000]> lookup 0x033f137fa845648907
+Lookup result: successor=0x0350258dd65eb211dd (10.0.0.8:4007) | latency=113.849369ms
+koorde[xx.xxx.xxx.xx:4000]> quit
+Bye!

@@ -1,0 +1,169 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  CloudFormation stack to launch an EC2 instance for running the KoordeDHT simulation.
+  The instance installs Docker, downloads init.sh from S3, and runs it automatically.
+Parameters:
+  InstanceType:
+    Type: String
+    Default: t2.small
+    Description: EC2 Instance Type
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Name of an existing EC2 KeyPair for SSH access
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC where to deploy instances
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Subnet where to deploy instances
+
+  S3Bucket:
+    Type: String
+    Description: S3 bucket containing init.sh and other scripts
+  S3Prefix:
+    Type: String
+    Default: scripts
+    Description: Prefix (folder) inside S3 bucket
+
+  SimDuration:
+    Type: String
+    Default: 60s
+    Description: Duration of the simulation (Go-style time).
+
+  QueryRate:
+    Type: String
+    Default: 0.5
+    Description: Query rate for tester.
+  ParallelMin:
+    Type: Number
+    Default: 1
+    Description: Minimum query parallelism.
+  ParallelMax:
+    Type: Number
+    Default: 5
+    Description: Maximum query parallelism.
+
+  Delay:
+    Type: String
+    Default: 200ms
+    Description: Network delay to simulate.
+  Jitter:
+    Type: String
+    Default: 50ms
+    Description: Network jitter.
+  Loss:
+    Type: String
+    Default: 0.1%
+    Description: Network packet loss rate.
+
+  ChurnInterval:
+    Type: Number
+    Default: 20
+    Description: Interval (seconds) between churn events.
+  ChurnMinActive:
+    Type: Number
+    Default: 3
+    Description: Minimum number of active containers.
+  ChurnPJoin:
+    Type: String
+    Default: 0.4
+    Description: Probability of a node join event.
+  ChurnPLeave:
+    Type: String
+    Default: 0.3
+    Description: Probability of a node leave event.
+
+  MaxNodes:
+    Type: Number
+    Default: 5
+    Description: Number of DHT nodes to deploy.
+
+Resources:
+
+  KoordeSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable SSH and koorde ports
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+
+  KoordeInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - LabRole
+
+  KoordeInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      ImageId: ami-052064a798f08f0d3 # Amazon Linux 2023 kernel-6.1 AMI
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeviceIndex: 0
+          GroupSet:
+            - !Ref KoordeSecurityGroup
+          SubnetId: !Ref SubnetId
+      IamInstanceProfile: !Ref KoordeInstanceProfile
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euxo pipefail
+          
+          echo "[INFO] Updating system and installing dependencies..."
+          dnf update -y
+          dnf install -y docker unzip awscli jq iproute-tc
+          
+          echo "[INFO] Downloading Docker setup script..."
+          aws s3 cp "s3://${S3Bucket}/${S3Prefix}/install_docker.sh" ./install_docker.sh
+          chmod +x install_docker.sh
+          
+          echo "[INFO] Installing Docker and Docker Compose..."
+          bash install_docker.sh
+          
+          
+          mkdir -p /opt/koorde
+          cd /opt/koorde
+          
+          echo "[INFO] Downloading init.sh from S3..."
+          aws s3 cp "s3://${S3Bucket}/${S3Prefix}/init.sh" ./init.sh
+          chmod +x init.sh
+          
+          echo "[INFO] Running simulation..."
+          ./init.sh \
+            --bucket "${S3Bucket}" \
+            --prefix "${S3Prefix}" \
+            --sim-duration "${SimDuration}" \
+            --query-rate "${QueryRate}" \
+            --parallel-min "${ParallelMin}" \
+            --parallel-max "${ParallelMax}" \
+            --delay "${Delay}" \
+            --jitter "${Jitter}" \
+            --loss "${Loss}" \
+            --churn-interval "${ChurnInterval}" \
+            --churn-min-active "${ChurnMinActive}" \
+            --churn-pjoin "${ChurnPJoin}" \
+            --churn-pleave "${ChurnPLeave}" \
+            --max-nodes "${MaxNodes}"
+
+      Tags:
+        - Key: Name
+          Value: KoordeDHT-Simulation-Instance
+
+Outputs:
+  InstanceId:
+    Description: ID of the created EC2 instance
+    Value: !Ref KoordeInstance
+
+  PublicIP:
+    Description: Public IP of the KoordeDHT simulation instance
+    Value: !GetAtt KoordeInstance.PublicIp
+
+  SSHCommand:
+    Description: SSH command to access the instance
+    Value: !Sub "ssh -i <path_to_key> ec2-user@${KoordeInstance.PublicDnsName}"
