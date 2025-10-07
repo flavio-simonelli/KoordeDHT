@@ -14,7 +14,7 @@ La configurazione della rete e dei nodi può essere personalizzata modificando i
 Per avviare l'ambiente con un numero specifico di nodi, esegui:
 
 ```bash
-docker-compose up --build --scale node=<NUMERO_NODI>
+docker-compose up --scale node=<NUMERO_NODI>
 ```
 Sostituisci `<NUMERO_NODI>` con il numero desiderato di nodi Koorde (ad esempio, `3`).
 Il bootstrap node e il client interattivo verranno avviati automaticamente.
@@ -52,3 +52,4 @@ docker-compose down
 - Il nodo bootstrap viene avviato per primo e funge da punto di contatto iniziale.
 - Gli altri nodi si connettono al bootstrap tramite la variabile d’ambiente `BOOTSTRAP_PEERS=bootstrap:4000`.
 - I trace OpenTelemetry vengono inviati automaticamente a Jaeger sulla porta `4317`.
+- Sono presenti dei risultati di esemprio nella cartella `results` che mostrano i trace raccolti durante alcune operazioni di lookup.
