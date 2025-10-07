@@ -1,0 +1,1108 @@
+[INFO] Detected EC2 environment.
+[INFO] Downloading input files from s3://koorde-bucket/test/ ...
+Completed 4.9 KiB/23.5 KiB (53.5 KiB/s) with 7 file(s) remainingdownload: s3://koorde-bucket/test/churn.sh to ./churn.sh        
+Completed 4.9 KiB/23.5 KiB (53.5 KiB/s) with 6 file(s) remainingCompleted 5.9 KiB/23.5 KiB (51.2 KiB/s) with 6 file(s) remainingdownload: s3://koorde-bucket/test/docker-compose.template.yml to ./docker-compose.template.yml
+Completed 5.9 KiB/23.5 KiB (51.2 KiB/s) with 5 file(s) remainingCompleted 8.9 KiB/23.5 KiB (61.7 KiB/s) with 5 file(s) remainingdownload: s3://koorde-bucket/test/common_node.env to ./common_node.env
+Completed 8.9 KiB/23.5 KiB (61.7 KiB/s) with 4 file(s) remainingCompleted 10.7 KiB/23.5 KiB (71.7 KiB/s) with 4 file(s) remainingdownload: s3://koorde-bucket/test/tester.env to ./tester.env     
+Completed 10.7 KiB/23.5 KiB (71.7 KiB/s) with 3 file(s) remainingCompleted 12.7 KiB/23.5 KiB (77.3 KiB/s) with 3 file(s) remainingdownload: s3://koorde-bucket/test/install_docker.sh to ./install_docker.sh
+Completed 12.7 KiB/23.5 KiB (77.3 KiB/s) with 2 file(s) remainingCompleted 15.9 KiB/23.5 KiB (95.5 KiB/s) with 2 file(s) remainingdownload: s3://koorde-bucket/test/gen_compose.sh to ./gen_compose.sh
+Completed 15.9 KiB/23.5 KiB (95.5 KiB/s) with 1 file(s) remainingCompleted 23.5 KiB/23.5 KiB (132.8 KiB/s) with 1 file(s) remainingdownload: s3://koorde-bucket/test/init.sh to ./init.sh            
+[INFO] Setting executable permissions for shell scripts...
+  [+] churn.sh made executable
+  [+] gen_compose.sh made executable
+  [+] init.sh made executable
+  [+] install_docker.sh made executable
+[INFO] SELinux already permissive or disabled.
+[INFO] Generating Docker Compose file...
+
+Generating docker-compose.generated.yml ...
+[OK] Generated docker-compose.generated.yml.
+[INFO] Starting Docker Compose with 30 nodes...
+
+Generated docker-compose.generated.yml successfully.
+  SIM_DURATION=5m
+  QUERY_RATE=0.8
+  QUERY_PARALLELISM_MIN=1
+  QUERY_PARALLELISM_MAX=5
+  QUERY_TIMEOUT=10s
+
+Logs saved to: /var/log/test/gen_compose.log
+ node Pulling 
+ tester Pulling 
+ bootstrap Pulling 
+ 5c32499ab806 Pulling fs layer 
+ 8998c6acc9b6 Pulling fs layer 
+ 2a2e46592a3e Pulling fs layer 
+ d51a3b1399cc Pulling fs layer 
+ d51a3b1399cc Waiting 
+ 259db2ee6b87 Pulling fs layer 
+ 2e4cf50eeb92 Pulling fs layer 
+ 56ce5a7a0a8c Pulling fs layer 
+ e1089d61b200 Pulling fs layer 
+ 0f8b424aa0b9 Pulling fs layer 
+ d557676654e5 Pulling fs layer 
+ d82bc7a76a83 Pulling fs layer 
+ d858cbc252ad Pulling fs layer 
+ 1069fc2daed1 Pulling fs layer 
+ b40161cd83fc Pulling fs layer 
+ 3f4e2c586348 Pulling fs layer 
+ eb8f5749650b Pulling fs layer 
+ b3c9f64f6f17 Pulling fs layer 
+ 94b97c75a0a1 Pulling fs layer 
+ 55c54771c1ab Pulling fs layer 
+ c0cb70eee6af Pulling fs layer 
+ ece1fccf17a6 Pulling fs layer 
+ 259db2ee6b87 Waiting 
+ 2e4cf50eeb92 Waiting 
+ 56ce5a7a0a8c Waiting 
+ e1089d61b200 Waiting 
+ 0f8b424aa0b9 Waiting 
+ d557676654e5 Waiting 
+ d82bc7a76a83 Waiting 
+ d858cbc252ad Waiting 
+ 1069fc2daed1 Waiting 
+ b40161cd83fc Waiting 
+ 3f4e2c586348 Waiting 
+ eb8f5749650b Waiting 
+ b3c9f64f6f17 Waiting 
+ 94b97c75a0a1 Waiting 
+ 55c54771c1ab Waiting 
+ c0cb70eee6af Waiting 
+ ece1fccf17a6 Waiting 
+ 5c32499ab806 Pulling fs layer 
+ 8998c6acc9b6 Pulling fs layer 
+ 2a2e46592a3e Pulling fs layer 
+ d51a3b1399cc Pulling fs layer 
+ d51a3b1399cc Waiting 
+ 5c32499ab806 Downloading [>                                                  ]  294.4kB/28.23MB
+ 5c32499ab806 Downloading [>                                                  ]  294.4kB/28.23MB
+ 5c32499ab806 Downloading [=======================>                           ]  12.99MB/28.23MB
+ 5c32499ab806 Downloading [=======================>                           ]  12.99MB/28.23MB
+ 8998c6acc9b6 Downloading [>                                                  ]  69.15kB/6MB
+ 2a2e46592a3e Downloading [>                                                  ]  138.8kB/13.81MB
+ 8998c6acc9b6 Downloading [>                                                  ]  69.15kB/6MB
+ 2a2e46592a3e Downloading [>                                                  ]  138.8kB/13.81MB
+ 5c32499ab806 Downloading [======================================>            ]  21.72MB/28.23MB
+ 5c32499ab806 Downloading [======================================>            ]  21.72MB/28.23MB
+ 8998c6acc9b6 Downloading [========>                                          ]  973.3kB/6MB
+ 2a2e46592a3e Downloading [==================>                                ]  5.151MB/13.81MB
+ 8998c6acc9b6 Downloading [========>                                          ]  973.3kB/6MB
+ 2a2e46592a3e Downloading [==================>                                ]  5.151MB/13.81MB
+ 5c32499ab806 Downloading [===============================================>   ]     27MB/28.23MB
+ 5c32499ab806 Downloading [===============================================>   ]     27MB/28.23MB
+ 5c32499ab806 Verifying Checksum 
+ 5c32499ab806 Verifying Checksum 
+ 5c32499ab806 Download complete 
+ 5c32499ab806 Download complete 
+ 8998c6acc9b6 Downloading [=====================>                             ]  2.575MB/6MB
+ 2a2e46592a3e Downloading [=======================================>           ]  10.86MB/13.81MB
+ 8998c6acc9b6 Downloading [=====================>                             ]  2.575MB/6MB
+ 2a2e46592a3e Downloading [=======================================>           ]  10.86MB/13.81MB
+ 2a2e46592a3e Verifying Checksum 
+ 2a2e46592a3e Verifying Checksum 
+ 2a2e46592a3e Download complete 
+ 2a2e46592a3e Download complete 
+ 8998c6acc9b6 Verifying Checksum 
+ 8998c6acc9b6 Verifying Checksum 
+ 8998c6acc9b6 Download complete 
+ 8998c6acc9b6 Download complete 
+ 5c32499ab806 Extracting [>                                                  ]  294.9kB/28.23MB
+ 5c32499ab806 Extracting [>                                                  ]  294.9kB/28.23MB
+ 259db2ee6b87 Downloading [=========>                                         ]  16.38kB/84.72kB
+ 259db2ee6b87 Downloading [==================================================>]  84.72kB/84.72kB
+ 259db2ee6b87 Verifying Checksum 
+ 259db2ee6b87 Download complete 
+ 259db2ee6b87 Extracting [===================>                               ]  32.77kB/84.72kB
+ 259db2ee6b87 Extracting [==================================================>]  84.72kB/84.72kB
+ 259db2ee6b87 Extracting [==================================================>]  84.72kB/84.72kB
+ 2e4cf50eeb92 Downloading [==================================================>]  12.58kB/12.58kB
+ 2e4cf50eeb92 Verifying Checksum 
+ 2e4cf50eeb92 Download complete 
+ d51a3b1399cc Downloading [==================================================>]  1.265kB/1.265kB
+ d51a3b1399cc Downloading [==================================================>]  1.265kB/1.265kB
+ d51a3b1399cc Verifying Checksum 
+ d51a3b1399cc Verifying Checksum 
+ d51a3b1399cc Download complete 
+ d51a3b1399cc Download complete 
+ 56ce5a7a0a8c Downloading [=>                                                 ]  16.38kB/458.6kB
+ 259db2ee6b87 Pull complete 
+ 2e4cf50eeb92 Extracting [==================================================>]  12.58kB/12.58kB
+ 2e4cf50eeb92 Extracting [==================================================>]  12.58kB/12.58kB
+ 2e4cf50eeb92 Pull complete 
+ 56ce5a7a0a8c Downloading [==================================================>]  458.6kB/458.6kB
+ 56ce5a7a0a8c Verifying Checksum 
+ 56ce5a7a0a8c Download complete 
+ 56ce5a7a0a8c Extracting [===>                                               ]  32.77kB/458.6kB
+ 5c32499ab806 Extracting [===>                                               ]  1.769MB/28.23MB
+ e1089d61b200 Downloading [============================>                      ]  16.38kB/28.39kB
+ 5c32499ab806 Extracting [===>                                               ]  1.769MB/28.23MB
+ e1089d61b200 Downloading [==================================================>]  28.39kB/28.39kB
+ e1089d61b200 Verifying Checksum 
+ e1089d61b200 Download complete 
+ 0f8b424aa0b9 Downloading [==================================================>]      75B/75B
+ 0f8b424aa0b9 Verifying Checksum 
+ 0f8b424aa0b9 Download complete 
+ 56ce5a7a0a8c Extracting [===================================>               ]  327.7kB/458.6kB
+ d557676654e5 Downloading [==================================================>]     193B/193B
+ d82bc7a76a83 Downloading [==================================================>]     130B/130B
+ d557676654e5 Verifying Checksum 
+ d557676654e5 Download complete 
+ d82bc7a76a83 Verifying Checksum 
+ d82bc7a76a83 Download complete 
+ 56ce5a7a0a8c Extracting [==================================================>]  458.6kB/458.6kB
+ d858cbc252ad Downloading [==================================================>]     173B/173B
+ d858cbc252ad Verifying Checksum 
+ d858cbc252ad Download complete 
+ 56ce5a7a0a8c Pull complete 
+ e1089d61b200 Extracting [==================================================>]  28.39kB/28.39kB
+ e1089d61b200 Extracting [==================================================>]  28.39kB/28.39kB
+ 5c32499ab806 Extracting [====>                                              ]  2.359MB/28.23MB
+ 5c32499ab806 Extracting [====>                                              ]  2.359MB/28.23MB
+ 1069fc2daed1 Downloading [==================================================>]      97B/97B
+ 1069fc2daed1 Verifying Checksum 
+ 1069fc2daed1 Download complete 
+ b40161cd83fc Downloading [==================================================>]     382B/382B
+ b40161cd83fc Verifying Checksum 
+ b40161cd83fc Download complete 
+ e1089d61b200 Pull complete 
+ 0f8b424aa0b9 Extracting [==================================================>]      75B/75B
+ 0f8b424aa0b9 Extracting [==================================================>]      75B/75B
+ 3f4e2c586348 Downloading [==================================================>]     326B/326B
+ 3f4e2c586348 Verifying Checksum 
+ 3f4e2c586348 Download complete 
+ 0f8b424aa0b9 Pull complete 
+ eb8f5749650b Downloading [======>                                            ]  16.38kB/130.9kB
+ d557676654e5 Extracting [==================================================>]     193B/193B
+ d557676654e5 Extracting [==================================================>]     193B/193B
+ eb8f5749650b Downloading [==================================================>]  130.9kB/130.9kB
+ eb8f5749650b Verifying Checksum 
+ eb8f5749650b Download complete 
+ b3c9f64f6f17 Downloading [>                                                  ]  51.21kB/5.089MB
+ 5c32499ab806 Extracting [======>                                            ]  3.539MB/28.23MB
+ 5c32499ab806 Extracting [======>                                            ]  3.539MB/28.23MB
+ d557676654e5 Pull complete 
+ d82bc7a76a83 Extracting [==================================================>]     130B/130B
+ d82bc7a76a83 Extracting [==================================================>]     130B/130B
+ b3c9f64f6f17 Verifying Checksum 
+ b3c9f64f6f17 Download complete 
+ 94b97c75a0a1 Downloading [>                                                  ]  33.27kB/2.572MB
+ d82bc7a76a83 Pull complete 
+ d858cbc252ad Extracting [==================================================>]     173B/173B
+ d858cbc252ad Extracting [==================================================>]     173B/173B
+ 55c54771c1ab Downloading [==================================================>]     113B/113B
+ 55c54771c1ab Verifying Checksum 
+ 55c54771c1ab Download complete 
+ d858cbc252ad Pull complete 
+ 5c32499ab806 Extracting [======>                                            ]  3.834MB/28.23MB
+ 5c32499ab806 Extracting [======>                                            ]  3.834MB/28.23MB
+ 1069fc2daed1 Extracting [==================================================>]      97B/97B
+ 1069fc2daed1 Extracting [==================================================>]      97B/97B
+ 94b97c75a0a1 Downloading [==================================================>]  2.572MB/2.572MB
+ 94b97c75a0a1 Verifying Checksum 
+ 94b97c75a0a1 Download complete 
+ 1069fc2daed1 Pull complete 
+ b40161cd83fc Extracting [==================================================>]     382B/382B
+ b40161cd83fc Extracting [==================================================>]     382B/382B
+ b40161cd83fc Pull complete 
+ 3f4e2c586348 Extracting [==================================================>]     326B/326B
+ 3f4e2c586348 Extracting [==================================================>]     326B/326B
+ ece1fccf17a6 Downloading [==================================================>]     992B/992B
+ ece1fccf17a6 Verifying Checksum 
+ ece1fccf17a6 Download complete 
+ 3f4e2c586348 Pull complete 
+ eb8f5749650b Extracting [============>                                      ]  32.77kB/130.9kB
+ 5c32499ab806 Extracting [=========>                                         ]  5.308MB/28.23MB
+ 5c32499ab806 Extracting [=========>                                         ]  5.308MB/28.23MB
+ eb8f5749650b Extracting [==================================================>]  130.9kB/130.9kB
+ eb8f5749650b Pull complete 
+ b3c9f64f6f17 Extracting [>                                                  ]  65.54kB/5.089MB
+ 5c32499ab806 Extracting [===========>                                       ]  6.488MB/28.23MB
+ 5c32499ab806 Extracting [===========>                                       ]  6.488MB/28.23MB
+ c0cb70eee6af Downloading [>                                                  ]  137.8kB/13.05MB
+ b3c9f64f6f17 Extracting [===========>                                       ]   1.18MB/5.089MB
+ c0cb70eee6af Downloading [==========================>                        ]  6.962MB/13.05MB
+ 5c32499ab806 Extracting [============>                                      ]  7.078MB/28.23MB
+ 5c32499ab806 Extracting [============>                                      ]  7.078MB/28.23MB
+ b3c9f64f6f17 Extracting [================>                                  ]  1.638MB/5.089MB
+ c0cb70eee6af Verifying Checksum 
+ c0cb70eee6af Download complete 
+ 5c32499ab806 Extracting [==============>                                    ]  7.963MB/28.23MB
+ 5c32499ab806 Extracting [==============>                                    ]  7.963MB/28.23MB
+ b3c9f64f6f17 Extracting [==========================>                        ]  2.687MB/5.089MB
+ b3c9f64f6f17 Extracting [====================================>              ]   3.67MB/5.089MB
+ 5c32499ab806 Extracting [===============>                                   ]  8.847MB/28.23MB
+ 5c32499ab806 Extracting [===============>                                   ]  8.847MB/28.23MB
+ b3c9f64f6f17 Extracting [=============================================>     ]  4.588MB/5.089MB
+ 5c32499ab806 Extracting [================>                                  ]  9.437MB/28.23MB
+ 5c32499ab806 Extracting [================>                                  ]  9.437MB/28.23MB
+ b3c9f64f6f17 Extracting [==================================================>]  5.089MB/5.089MB
+ b3c9f64f6f17 Pull complete 
+ 94b97c75a0a1 Extracting [>                                                  ]  32.77kB/2.572MB
+ 5c32499ab806 Extracting [==================>                                ]  10.32MB/28.23MB
+ 5c32499ab806 Extracting [==================>                                ]  10.32MB/28.23MB
+ 94b97c75a0a1 Extracting [==============>                                    ]  720.9kB/2.572MB
+ 5c32499ab806 Extracting [====================>                              ]   11.5MB/28.23MB
+ 5c32499ab806 Extracting [====================>                              ]   11.5MB/28.23MB
+ 94b97c75a0a1 Extracting [=========================================>         ]   2.13MB/2.572MB
+ 94b97c75a0a1 Extracting [==================================================>]  2.572MB/2.572MB
+ 94b97c75a0a1 Pull complete 
+ 55c54771c1ab Extracting [==================================================>]     113B/113B
+ 55c54771c1ab Extracting [==================================================>]     113B/113B
+ 5c32499ab806 Extracting [======================>                            ]  12.98MB/28.23MB
+ 5c32499ab806 Extracting [======================>                            ]  12.98MB/28.23MB
+ 55c54771c1ab Pull complete 
+ c0cb70eee6af Extracting [>                                                  ]  131.1kB/13.05MB
+ 5c32499ab806 Extracting [==========================>                        ]  14.75MB/28.23MB
+ 5c32499ab806 Extracting [==========================>                        ]  14.75MB/28.23MB
+ c0cb70eee6af Extracting [======>                                            ]  1.573MB/13.05MB
+ 5c32499ab806 Extracting [============================>                      ]  16.22MB/28.23MB
+ 5c32499ab806 Extracting [============================>                      ]  16.22MB/28.23MB
+ c0cb70eee6af Extracting [===========>                                       ]  2.884MB/13.05MB
+ 5c32499ab806 Extracting [===============================>                   ]  17.69MB/28.23MB
+ 5c32499ab806 Extracting [===============================>                   ]  17.69MB/28.23MB
+ c0cb70eee6af Extracting [===============>                                   ]  3.932MB/13.05MB
+ 5c32499ab806 Extracting [=================================>                 ]  19.17MB/28.23MB
+ 5c32499ab806 Extracting [=================================>                 ]  19.17MB/28.23MB
+ c0cb70eee6af Extracting [===================>                               ]  4.981MB/13.05MB
+ 5c32499ab806 Extracting [====================================>              ]  20.64MB/28.23MB
+ 5c32499ab806 Extracting [====================================>              ]  20.64MB/28.23MB
+ c0cb70eee6af Extracting [=========================>                         ]  6.554MB/13.05MB
+ c0cb70eee6af Extracting [========================================>          ]  10.62MB/13.05MB
+ 5c32499ab806 Extracting [======================================>            ]  21.82MB/28.23MB
+ 5c32499ab806 Extracting [======================================>            ]  21.82MB/28.23MB
+ c0cb70eee6af Extracting [==================================================>]  13.05MB/13.05MB
+ c0cb70eee6af Pull complete 
+ ece1fccf17a6 Extracting [==================================================>]     992B/992B
+ ece1fccf17a6 Extracting [==================================================>]     992B/992B
+ 5c32499ab806 Extracting [========================================>          ]     23MB/28.23MB
+ 5c32499ab806 Extracting [========================================>          ]     23MB/28.23MB
+ ece1fccf17a6 Pull complete 
+ tester Pulled 
+ 5c32499ab806 Extracting [==========================================>        ]  23.89MB/28.23MB
+ 5c32499ab806 Extracting [==========================================>        ]  23.89MB/28.23MB
+ 5c32499ab806 Extracting [==============================================>    ]  26.25MB/28.23MB
+ 5c32499ab806 Extracting [==============================================>    ]  26.25MB/28.23MB
+ 5c32499ab806 Extracting [===============================================>   ]  26.84MB/28.23MB
+ 5c32499ab806 Extracting [===============================================>   ]  26.84MB/28.23MB
+ 5c32499ab806 Extracting [================================================>  ]  27.43MB/28.23MB
+ 5c32499ab806 Extracting [================================================>  ]  27.43MB/28.23MB
+ 5c32499ab806 Extracting [==================================================>]  28.23MB/28.23MB
+ 5c32499ab806 Extracting [==================================================>]  28.23MB/28.23MB
+ 5c32499ab806 Pull complete 
+ 5c32499ab806 Pull complete 
+ 8998c6acc9b6 Extracting [>                                                  ]  65.54kB/6MB
+ 8998c6acc9b6 Extracting [>                                                  ]  65.54kB/6MB
+ 8998c6acc9b6 Extracting [===============>                                   ]  1.901MB/6MB
+ 8998c6acc9b6 Extracting [===============>                                   ]  1.901MB/6MB
+ 8998c6acc9b6 Extracting [=======================================>           ]  4.784MB/6MB
+ 8998c6acc9b6 Extracting [=======================================>           ]  4.784MB/6MB
+ 8998c6acc9b6 Extracting [=================================================> ]  5.898MB/6MB
+ 8998c6acc9b6 Extracting [=================================================> ]  5.898MB/6MB
+ 8998c6acc9b6 Extracting [==================================================>]      6MB/6MB
+ 8998c6acc9b6 Extracting [==================================================>]      6MB/6MB
+ 8998c6acc9b6 Pull complete 
+ 8998c6acc9b6 Pull complete 
+ 2a2e46592a3e Extracting [>                                                  ]  163.8kB/13.81MB
+ 2a2e46592a3e Extracting [>                                                  ]  163.8kB/13.81MB
+ 2a2e46592a3e Extracting [==========>                                        ]  2.785MB/13.81MB
+ 2a2e46592a3e Extracting [==========>                                        ]  2.785MB/13.81MB
+ 2a2e46592a3e Extracting [=================>                                 ]  4.915MB/13.81MB
+ 2a2e46592a3e Extracting [=================>                                 ]  4.915MB/13.81MB
+ 2a2e46592a3e Extracting [=================================>                 ]  9.339MB/13.81MB
+ 2a2e46592a3e Extracting [=================================>                 ]  9.339MB/13.81MB
+ 2a2e46592a3e Extracting [==================================================>]  13.81MB/13.81MB
+ 2a2e46592a3e Extracting [==================================================>]  13.81MB/13.81MB
+ 2a2e46592a3e Pull complete 
+ 2a2e46592a3e Pull complete 
+ d51a3b1399cc Extracting [==================================================>]  1.265kB/1.265kB
+ d51a3b1399cc Extracting [==================================================>]  1.265kB/1.265kB
+ d51a3b1399cc Extracting [==================================================>]  1.265kB/1.265kB
+ d51a3b1399cc Pull complete 
+ d51a3b1399cc Pull complete 
+ bootstrap Pulled 
+ node Pulled 
+ Network koorde_koordenet  Creating
+ Network koorde_koordenet  Created
+ Container koorde-bootstrap-1  Creating
+ Container koorde-bootstrap-1  Created
+ Container koorde-node-30  Creating
+ Container koorde-tester-1  Creating
+ Container koorde-node-1  Creating
+ Container koorde-node-2  Creating
+ Container koorde-node-3  Creating
+ Container koorde-node-4  Creating
+ Container koorde-node-5  Creating
+ Container koorde-node-6  Creating
+ Container koorde-node-7  Creating
+ Container koorde-node-8  Creating
+ Container koorde-node-9  Creating
+ Container koorde-node-10  Creating
+ Container koorde-node-11  Creating
+ Container koorde-node-12  Creating
+ Container koorde-node-13  Creating
+ Container koorde-node-14  Creating
+ Container koorde-node-15  Creating
+ Container koorde-node-16  Creating
+ Container koorde-node-17  Creating
+ Container koorde-node-18  Creating
+ Container koorde-node-19  Creating
+ Container koorde-node-20  Creating
+ Container koorde-node-21  Creating
+ Container koorde-node-22  Creating
+ Container koorde-node-23  Creating
+ Container koorde-node-24  Creating
+ Container koorde-node-25  Creating
+ Container koorde-node-26  Creating
+ Container koorde-node-27  Creating
+ Container koorde-node-28  Creating
+ Container koorde-node-29  Creating
+ Container koorde-node-1  Created
+ Container koorde-node-2  Created
+ Container koorde-node-12  Created
+ Container koorde-node-20  Created
+ Container koorde-node-15  Created
+ Container koorde-node-7  Created
+ Container koorde-node-3  Created
+ Container koorde-node-4  Created
+ Container koorde-node-22  Created
+ Container koorde-node-11  Created
+ Container koorde-node-6  Created
+ Container koorde-node-18  Created
+ Container koorde-node-24  Created
+ Container koorde-node-17  Created
+ Container koorde-tester-1  Created
+ Container koorde-node-8  Created
+ Container koorde-node-5  Created
+ Container koorde-node-27  Created
+ Container koorde-node-13  Created
+ Container koorde-node-16  Created
+ Container koorde-node-21  Created
+ Container koorde-node-30  Created
+ Container koorde-node-9  Created
+ Container koorde-node-25  Created
+ Container koorde-node-14  Created
+ Container koorde-node-19  Created
+ Container koorde-node-23  Created
+ Container koorde-node-10  Created
+ Container koorde-node-29  Created
+ Container koorde-node-26  Created
+ Container koorde-node-28  Created
+ Container koorde-bootstrap-1  Starting
+ Container koorde-bootstrap-1  Started
+ Container koorde-node-28  Starting
+ Container koorde-tester-1  Starting
+ Container koorde-node-28  Started
+ Container koorde-node-27  Starting
+ Container koorde-tester-1  Started
+ Container koorde-node-27  Started
+ Container koorde-node-26  Starting
+ Container koorde-node-26  Started
+ Container koorde-node-25  Starting
+ Container koorde-node-25  Started
+ Container koorde-node-24  Starting
+ Container koorde-node-24  Started
+ Container koorde-node-23  Starting
+ Container koorde-node-23  Started
+ Container koorde-node-29  Starting
+ Container koorde-node-29  Started
+ Container koorde-node-21  Starting
+ Container koorde-node-21  Started
+ Container koorde-node-20  Starting
+ Container koorde-node-20  Started
+ Container koorde-node-19  Starting
+ Container koorde-node-19  Started
+ Container koorde-node-18  Starting
+ Container koorde-node-18  Started
+ Container koorde-node-17  Starting
+ Container koorde-node-17  Started
+ Container koorde-node-16  Starting
+ Container koorde-node-16  Started
+ Container koorde-node-15  Starting
+ Container koorde-node-15  Started
+ Container koorde-node-14  Starting
+ Container koorde-node-14  Started
+ Container koorde-node-13  Starting
+ Container koorde-node-13  Started
+ Container koorde-node-12  Starting
+ Container koorde-node-12  Started
+ Container koorde-node-22  Starting
+ Container koorde-node-22  Started
+ Container koorde-node-10  Starting
+ Container koorde-node-10  Started
+ Container koorde-node-9  Starting
+ Container koorde-node-9  Started
+ Container koorde-node-8  Starting
+ Container koorde-node-8  Started
+ Container koorde-node-7  Starting
+ Container koorde-node-7  Started
+ Container koorde-node-6  Starting
+ Container koorde-node-6  Started
+ Container koorde-node-5  Starting
+ Container koorde-node-5  Started
+ Container koorde-node-4  Starting
+ Container koorde-node-4  Started
+ Container koorde-node-3  Starting
+ Container koorde-node-3  Started
+ Container koorde-node-11  Starting
+ Container koorde-node-11  Started
+ Container koorde-node-2  Starting
+ Container koorde-node-2  Started
+ Container koorde-node-1  Starting
+ Container koorde-node-1  Started
+ Container koorde-node-30  Starting
+ Container koorde-node-30  Started
+[OK] Compose cluster up.
+[INFO] Starting Pumba network emulator...
+Unable to find image 'gaiaadm/pumba:latest' locally
+latest: Pulling from gaiaadm/pumba
+041add05b84b: Pulling fs layer
+91f19819f77d: Pulling fs layer
+05ea3d9360c9: Pulling fs layer
+91f19819f77d: Verifying Checksum
+91f19819f77d: Download complete
+041add05b84b: Verifying Checksum
+041add05b84b: Download complete
+041add05b84b: Pull complete
+05ea3d9360c9: Verifying Checksum
+05ea3d9360c9: Download complete
+91f19819f77d: Pull complete
+05ea3d9360c9: Pull complete
+Digest: sha256:7591c3e8c373b900275d49a1d36c1f27b9b2de7e0eca02d2aec85a9d70e0f00e
+Status: Downloaded newer image for gaiaadm/pumba:latest
+342575dc56b6abb3ebc7885f2eea9a553a4417fdfa31889375fd3121e46bb764
+[OK] Pumba delay running for 5m (delay=100ms, jitter=50ms, loss=0.1%).
+[INFO] Starting churn controller...
+[OK] Churn controller started with PID 37605.
+[INFO] Simulation running for 5m+60s...
+------------------------------------------------------------
+[INFO] Starting churn controller
+       Prefix:      test-node
+       Interval:    15s
+       Min active:  5
+       P(join):     0.5
+       P(leave):    0.5
+       Log file:    /var/log/test/churn.log
+------------------------------------------------------------
+[LEAVE] Skipping — only 1 active (min=5).
+[LEAVE] Skipping — only 1 active (min=5).
+[JOIN] No stopped containers available.
+[LEAVE] Skipping — only 1 active (min=5).
+[INFO] Simulation window complete.
+[INFO] Stopping churn and Pumba...
+
+[INFO] Stopping churn controller gracefully...
+unknown shorthand flag: 'f' in -f
+See 'docker --help'.
+
+Usage:  docker [OPTIONS] COMMAND
+
+A self-sufficient runtime for containers
+
+Common Commands:
+  run         Create and run a new container from an image
+  exec        Execute a command in a running container
+  ps          List containers
+  build       Build an image from a Dockerfile
+  pull        Download an image from a registry
+  push        Upload an image to a registry
+  images      List images
+  login       Log in to a registry
+  logout      Log out from a registry
+  search      Search Docker Hub for images
+  version     Show the Docker version information
+  info        Display system-wide information
+
+Management Commands:
+  builder     Manage builds
+  buildx*     Docker Buildx (Docker Inc., 0.12.1)
+  container   Manage containers
+  context     Manage contexts
+  image       Manage images
+  manifest    Manage Docker image manifests and manifest lists
+  network     Manage networks
+  plugin      Manage plugins
+  system      Manage Docker
+  trust       Manage trust on Docker images
+  volume      Manage volumes
+
+Swarm Commands:
+  swarm       Manage Swarm
+
+Commands:
+  attach      Attach local standard input, output, and error streams to a running container
+  commit      Create a new image from a container's changes
+  cp          Copy files/folders between a container and the local filesystem
+  create      Create a new container
+  diff        Inspect changes to files or directories on a container's filesystem
+  events      Get real time events from the server
+  export      Export a container's filesystem as a tar archive
+  history     Show the history of an image
+  import      Import the contents from a tarball to create a filesystem image
+  inspect     Return low-level information on Docker objects
+  kill        Kill one or more running containers
+  load        Load an image from a tar archive or STDIN
+  logs        Fetch the logs of a container
+  pause       Pause all processes within one or more containers
+  port        List port mappings or a specific mapping for the container
+  rename      Rename a container
+  restart     Restart one or more containers
+  rm          Remove one or more containers
+  rmi         Remove one or more images
+  save        Save one or more images to a tar archive (streamed to STDOUT by default)
+  start       Start one or more stopped containers
+  stats       Display a live stream of container(s) resource usage statistics
+  stop        Stop one or more running containers
+  tag         Create a tag TARGET_IMAGE that refers to SOURCE_IMAGE
+  top         Display the running processes of a container
+  unpause     Unpause all processes within one or more containers
+  update      Update configuration of one or more containers
+  wait        Block until one or more containers stop, then print their exit codes
+
+Global Options:
+      --config string      Location of client config files (default "/root/.docker")
+  -c, --context string     Name of the context to use to connect to the daemon (overrides DOCKER_HOST env var and default context set with "docker context use")
+  -D, --debug              Enable debug mode
+  -H, --host list          Daemon socket to connect to
+  -l, --log-level string   Set the logging level ("debug", "info", "warn", "error", "fatal") (default "info")
+      --tls                Use TLS; implied by --tlsverify
+      --tlscacert string   Trust certs signed only by this CA (default "/root/.docker/ca.pem")
+      --tlscert string     Path to TLS certificate file (default "/root/.docker/cert.pem")
+      --tlskey string      Path to TLS key file (default "/root/.docker/key.pem")
+      --tlsverify          Use TLS and verify the remote
+  -v, --version            Print version information and quit
+
+Run 'docker COMMAND --help' for more information on a command.
+
+For more help on how to use Docker, head to https://docs.docker.com/go/guides/
+
+[INFO] Detected EC2 environment.
+[INFO] Downloading input files from s3://koorde-bucket/test/ ...
+Completed 4.9 KiB/24.3 KiB (53.8 KiB/s) with 7 file(s) remainingdownload: s3://koorde-bucket/test/churn.sh to ./churn.sh        
+Completed 4.9 KiB/24.3 KiB (53.8 KiB/s) with 6 file(s) remainingCompleted 6.6 KiB/24.3 KiB (48.8 KiB/s) with 6 file(s) remainingdownload: s3://koorde-bucket/test/tester.env to ./tester.env    
+Completed 6.6 KiB/24.3 KiB (48.8 KiB/s) with 5 file(s) remainingCompleted 9.6 KiB/24.3 KiB (69.7 KiB/s) with 5 file(s) remainingdownload: s3://koorde-bucket/test/common_node.env to ./common_node.env
+Completed 9.6 KiB/24.3 KiB (69.7 KiB/s) with 4 file(s) remainingCompleted 13.1 KiB/24.3 KiB (88.9 KiB/s) with 4 file(s) remainingdownload: s3://koorde-bucket/test/gen_compose.sh to ./gen_compose.sh
+Completed 13.1 KiB/24.3 KiB (88.9 KiB/s) with 3 file(s) remainingCompleted 21.2 KiB/24.3 KiB (139.1 KiB/s) with 3 file(s) remainingdownload: s3://koorde-bucket/test/init.sh to ./init.sh            
+Completed 21.2 KiB/24.3 KiB (139.1 KiB/s) with 2 file(s) remainingCompleted 23.2 KiB/24.3 KiB (145.0 KiB/s) with 2 file(s) remainingdownload: s3://koorde-bucket/test/install_docker.sh to ./install_docker.sh
+Completed 23.2 KiB/24.3 KiB (145.0 KiB/s) with 1 file(s) remainingCompleted 24.3 KiB/24.3 KiB (133.6 KiB/s) with 1 file(s) remainingdownload: s3://koorde-bucket/test/docker-compose.template.yml to ./docker-compose.template.yml
+[INFO] Setting executable permissions for shell scripts...
+  [+] churn.sh made executable
+  [+] gen_compose.sh made executable
+  [+] init.sh made executable
+  [+] install_docker.sh made executable
+[INFO] SELinux already permissive or disabled.
+[INFO] Using Docker project name: koorde
+[INFO] Generating Docker Compose file...
+
+Generating docker-compose.generated.yml ...
+[OK] Generated docker-compose.generated.yml.
+[INFO] Starting Docker Compose with 30 nodes...
+
+Generated docker-compose.generated.yml successfully.
+  SIM_DURATION=5m
+  QUERY_RATE=0.8
+  QUERY_PARALLELISM_MIN=1
+  QUERY_PARALLELISM_MAX=5
+  QUERY_TIMEOUT=10s
+  DOCKER_SUFFIX=koorde-node-
+
+Logs saved to: /var/log/test/gen_compose.log
+ Network koorde_koordenet  Creating
+ Network koorde_koordenet  Created
+ Container koorde-bootstrap-1  Creating
+ Container koorde-bootstrap-1  Created
+ Container koorde-node-30  Creating
+ Container koorde-tester-1  Creating
+ Container koorde-node-1  Creating
+ Container koorde-node-2  Creating
+ Container koorde-node-3  Creating
+ Container koorde-node-4  Creating
+ Container koorde-node-5  Creating
+ Container koorde-node-6  Creating
+ Container koorde-node-7  Creating
+ Container koorde-node-8  Creating
+ Container koorde-node-9  Creating
+ Container koorde-node-10  Creating
+ Container koorde-node-11  Creating
+ Container koorde-node-12  Creating
+ Container koorde-node-13  Creating
+ Container koorde-node-14  Creating
+ Container koorde-node-15  Creating
+ Container koorde-node-16  Creating
+ Container koorde-node-17  Creating
+ Container koorde-node-18  Creating
+ Container koorde-node-19  Creating
+ Container koorde-node-20  Creating
+ Container koorde-node-21  Creating
+ Container koorde-node-22  Creating
+ Container koorde-node-23  Creating
+ Container koorde-node-24  Creating
+ Container koorde-node-25  Creating
+ Container koorde-node-26  Creating
+ Container koorde-node-27  Creating
+ Container koorde-node-28  Creating
+ Container koorde-node-29  Creating
+ Container koorde-node-7  Created
+ Container koorde-node-2  Created
+ Container koorde-node-30  Created
+ Container koorde-tester-1  Created
+ Container koorde-node-1  Created
+ Container koorde-node-4  Created
+ Container koorde-node-12  Created
+ Container koorde-node-8  Created
+ Container koorde-node-10  Created
+ Container koorde-node-17  Created
+ Container koorde-node-24  Created
+ Container koorde-node-11  Created
+ Container koorde-node-28  Created
+ Container koorde-node-9  Created
+ Container koorde-node-5  Created
+ Container koorde-node-14  Created
+ Container koorde-node-29  Created
+ Container koorde-node-3  Created
+ Container koorde-node-23  Created
+ Container koorde-node-16  Created
+ Container koorde-node-13  Created
+ Container koorde-node-18  Created
+ Container koorde-node-6  Created
+ Container koorde-node-15  Created
+ Container koorde-node-19  Created
+ Container koorde-node-25  Created
+ Container koorde-node-20  Created
+ Container koorde-node-27  Created
+ Container koorde-node-22  Created
+ Container koorde-node-26  Created
+ Container koorde-node-21  Created
+ Container koorde-bootstrap-1  Starting
+ Container koorde-bootstrap-1  Started
+ Container koorde-tester-1  Starting
+ Container koorde-node-28  Starting
+ Container koorde-node-28  Started
+ Container koorde-node-27  Starting
+ Container koorde-tester-1  Started
+ Container koorde-node-27  Started
+ Container koorde-node-26  Starting
+ Container koorde-node-26  Started
+ Container koorde-node-25  Starting
+ Container koorde-node-25  Started
+ Container koorde-node-24  Starting
+ Container koorde-node-24  Started
+ Container koorde-node-23  Starting
+ Container koorde-node-23  Started
+ Container koorde-node-22  Starting
+ Container koorde-node-22  Started
+ Container koorde-node-21  Starting
+ Container koorde-node-21  Started
+ Container koorde-node-20  Starting
+ Container koorde-node-20  Started
+ Container koorde-node-19  Starting
+ Container koorde-node-19  Started
+ Container koorde-node-18  Starting
+ Container koorde-node-18  Started
+ Container koorde-node-17  Starting
+ Container koorde-node-17  Started
+ Container koorde-node-16  Starting
+ Container koorde-node-16  Started
+ Container koorde-node-15  Starting
+ Container koorde-node-15  Started
+ Container koorde-node-14  Starting
+ Container koorde-node-14  Started
+ Container koorde-node-13  Starting
+ Container koorde-node-13  Started
+ Container koorde-node-29  Starting
+ Container koorde-node-29  Started
+ Container koorde-node-12  Starting
+ Container koorde-node-12  Started
+ Container koorde-node-11  Starting
+ Container koorde-node-11  Started
+ Container koorde-node-10  Starting
+ Container koorde-node-10  Started
+ Container koorde-node-9  Starting
+ Container koorde-node-9  Started
+ Container koorde-node-8  Starting
+ Container koorde-node-8  Started
+ Container koorde-node-7  Starting
+ Container koorde-node-7  Started
+ Container koorde-node-6  Starting
+ Container koorde-node-6  Started
+ Container koorde-node-5  Starting
+ Container koorde-node-5  Started
+ Container koorde-node-4  Starting
+ Container koorde-node-4  Started
+ Container koorde-node-3  Starting
+ Container koorde-node-3  Started
+ Container koorde-node-2  Starting
+ Container koorde-node-2  Started
+ Container koorde-node-1  Starting
+ Container koorde-node-1  Started
+ Container koorde-node-30  Starting
+ Container koorde-node-30  Started
+[OK] Compose cluster up.
+[INFO] Starting Pumba network emulator...
+f99618214870bd354a6953f533f14531502fbdf7c0b556d9b240ad7167d39e76
+[OK] Pumba delay running for 5m (delay=100ms, jitter=50ms, loss=0.1%).
+[INFO] Starting churn controller...
+[OK] Churn controller started with PID 51100.
+[INFO] Simulation running for 5m + 60s (≈360s total)...
+------------------------------------------------------------
+[INFO] Starting churn controller
+       Prefix:      test-node
+       Interval:    15s
+       Min active:  5
+       P(join):     0.5
+       P(leave):    0.5
+       Log file:    /var/log/test/churn.log
+------------------------------------------------------------
+[JOIN] No stopped containers available.
+[LEAVE] Skipping — only 1 active (min=5).
+[LEAVE] Skipping — only 1 active (min=5).
+[LEAVE] Skipping — only 1 active (min=5).
+[LEAVE] Skipping — only 1 active (min=5).
+[LEAVE] Skipping — only 1 active (min=5).
+[JOIN] No stopped containers available.
+[JOIN] No stopped containers available.
+[LEAVE] Skipping — only 1 active (min=5).
+[JOIN] No stopped containers available.
+[LEAVE] Skipping — only 1 active (min=5).
+[JOIN] No stopped containers available.
+[JOIN] No stopped containers available.
+[JOIN] No stopped containers available.
+[JOIN] No stopped containers available.
+[LEAVE] Skipping — only 1 active (min=5).
+[LEAVE] Skipping — only 1 active (min=5).
+[LEAVE] Skipping — only 1 active (min=5).
+[INFO] Detected EC2 environment.
+[INFO] Downloading input files from s3://koorde-bucket/test/ ...
+Completed 2.0 KiB/24.3 KiB (21.6 KiB/s) with 7 file(s) remainingdownload: s3://koorde-bucket/test/install_docker.sh to ./install_docker.sh
+Completed 2.0 KiB/24.3 KiB (21.6 KiB/s) with 6 file(s) remainingCompleted 10.1 KiB/24.3 KiB (66.9 KiB/s) with 6 file(s) remainingdownload: s3://koorde-bucket/test/init.sh to ./init.sh           
+Completed 10.1 KiB/24.3 KiB (66.9 KiB/s) with 5 file(s) remainingCompleted 15.0 KiB/24.3 KiB (98.3 KiB/s) with 5 file(s) remainingdownload: s3://koorde-bucket/test/churn.sh to ./churn.sh         
+Completed 15.0 KiB/24.3 KiB (98.3 KiB/s) with 4 file(s) remainingCompleted 18.0 KiB/24.3 KiB (114.8 KiB/s) with 4 file(s) remainingdownload: s3://koorde-bucket/test/common_node.env to ./common_node.env
+Completed 18.0 KiB/24.3 KiB (114.8 KiB/s) with 3 file(s) remainingCompleted 19.0 KiB/24.3 KiB (117.9 KiB/s) with 3 file(s) remainingdownload: s3://koorde-bucket/test/docker-compose.template.yml to ./docker-compose.template.yml
+Completed 19.0 KiB/24.3 KiB (117.9 KiB/s) with 2 file(s) remainingCompleted 20.8 KiB/24.3 KiB (119.5 KiB/s) with 2 file(s) remainingdownload: s3://koorde-bucket/test/tester.env to ./tester.env      
+Completed 20.8 KiB/24.3 KiB (119.5 KiB/s) with 1 file(s) remainingCompleted 24.3 KiB/24.3 KiB (124.2 KiB/s) with 1 file(s) remainingdownload: s3://koorde-bucket/test/gen_compose.sh to ./gen_compose.sh
+[INFO] Setting executable permissions for shell scripts...
+  [+] churn.sh made executable
+  [+] gen_compose.sh made executable
+  [+] init.sh made executable
+  [+] install_docker.sh made executable
+[INFO] SELinux already permissive or disabled.
+[INFO] Using Docker project name: koorde
+[INFO] Generating Docker Compose file...
+
+Generating docker-compose.generated.yml ...
+[OK] Generated docker-compose.generated.yml.
+[INFO] Starting Docker Compose with 30 nodes...
+
+Generated docker-compose.generated.yml successfully.
+  SIM_DURATION=5m
+  QUERY_RATE=0.8
+  QUERY_PARALLELISM_MIN=1
+  QUERY_PARALLELISM_MAX=5
+  QUERY_TIMEOUT=10s
+  DOCKER_SUFFIX=koorde-node-
+
+Logs saved to: /var/log/test/gen_compose.log
+ Network koorde_koordenet  Creating
+ Network koorde_koordenet  Created
+ Container koorde-bootstrap-1  Creating
+ Container koorde-bootstrap-1  Created
+ Container koorde-tester-1  Creating
+ Container koorde-node-30  Creating
+ Container koorde-node-1  Creating
+ Container koorde-node-2  Creating
+ Container koorde-node-3  Creating
+ Container koorde-node-4  Creating
+ Container koorde-node-5  Creating
+ Container koorde-node-6  Creating
+ Container koorde-node-7  Creating
+ Container koorde-node-8  Creating
+ Container koorde-node-9  Creating
+ Container koorde-node-10  Creating
+ Container koorde-node-11  Creating
+ Container koorde-node-12  Creating
+ Container koorde-node-13  Creating
+ Container koorde-node-14  Creating
+ Container koorde-node-15  Creating
+ Container koorde-node-16  Creating
+ Container koorde-node-17  Creating
+ Container koorde-node-18  Creating
+ Container koorde-node-19  Creating
+ Container koorde-node-20  Creating
+ Container koorde-node-21  Creating
+ Container koorde-node-22  Creating
+ Container koorde-node-23  Creating
+ Container koorde-node-24  Creating
+ Container koorde-node-25  Creating
+ Container koorde-node-26  Creating
+ Container koorde-node-27  Creating
+ Container koorde-node-28  Creating
+ Container koorde-node-29  Creating
+ Container koorde-node-1  Created
+ Container koorde-node-7  Created
+ Container koorde-node-5  Created
+ Container koorde-tester-1  Created
+ Container koorde-node-15  Created
+ Container koorde-node-3  Created
+ Container koorde-node-6  Created
+ Container koorde-node-11  Created
+ Container koorde-node-8  Created
+ Container koorde-node-4  Created
+ Container koorde-node-17  Created
+ Container koorde-node-2  Created
+ Container koorde-node-30  Created
+ Container koorde-node-9  Created
+ Container koorde-node-18  Created
+ Container koorde-node-29  Created
+ Container koorde-node-16  Created
+ Container koorde-node-14  Created
+ Container koorde-node-12  Created
+ Container koorde-node-27  Created
+ Container koorde-node-10  Created
+ Container koorde-node-13  Created
+ Container koorde-node-22  Created
+ Container koorde-node-28  Created
+ Container koorde-node-19  Created
+ Container koorde-node-23  Created
+ Container koorde-node-26  Created
+ Container koorde-node-20  Created
+ Container koorde-node-25  Created
+ Container koorde-node-24  Created
+ Container koorde-node-21  Created
+ Container koorde-bootstrap-1  Starting
+ Container koorde-bootstrap-1  Started
+ Container koorde-node-28  Starting
+ Container koorde-tester-1  Starting
+ Container koorde-node-28  Started
+ Container koorde-node-27  Starting
+ Container koorde-tester-1  Started
+ Container koorde-node-27  Started
+ Container koorde-node-26  Starting
+ Container koorde-node-26  Started
+ Container koorde-node-25  Starting
+ Container koorde-node-25  Started
+ Container koorde-node-24  Starting
+ Container koorde-node-24  Started
+ Container koorde-node-23  Starting
+ Container koorde-node-23  Started
+ Container koorde-node-22  Starting
+ Container koorde-node-22  Started
+ Container koorde-node-21  Starting
+ Container koorde-node-21  Started
+ Container koorde-node-20  Starting
+ Container koorde-node-20  Started
+ Container koorde-node-19  Starting
+ Container koorde-node-19  Started
+ Container koorde-node-18  Starting
+ Container koorde-node-18  Started
+ Container koorde-node-17  Starting
+ Container koorde-node-17  Started
+ Container koorde-node-16  Starting
+ Container koorde-node-16  Started
+ Container koorde-node-29  Starting
+ Container koorde-node-29  Started
+ Container koorde-node-15  Starting
+ Container koorde-node-15  Started
+ Container koorde-node-14  Starting
+ Container koorde-node-14  Started
+ Container koorde-node-13  Starting
+ Container koorde-node-13  Started
+ Container koorde-node-12  Starting
+ Container koorde-node-12  Started
+ Container koorde-node-11  Starting
+ Container koorde-node-11  Started
+ Container koorde-node-10  Starting
+ Container koorde-node-10  Started
+ Container koorde-node-9  Starting
+ Container koorde-node-9  Started
+ Container koorde-node-8  Starting
+ Container koorde-node-8  Started
+ Container koorde-node-7  Starting
+ Container koorde-node-7  Started
+ Container koorde-node-5  Starting
+ Container koorde-node-5  Started
+ Container koorde-node-4  Starting
+ Container koorde-node-4  Started
+ Container koorde-node-6  Starting
+ Container koorde-node-6  Started
+ Container koorde-node-2  Starting
+ Container koorde-node-2  Started
+ Container koorde-node-1  Starting
+ Container koorde-node-1  Started
+ Container koorde-node-30  Starting
+ Container koorde-node-30  Started
+ Container koorde-node-3  Starting
+ Container koorde-node-3  Started
+[OK] Compose cluster up.
+[INFO] Starting Pumba network emulator...
+0d07d6b30e1934f0527e345be6ccd5346f286a72f06a21673a6a4c0945c469ec
+[OK] Pumba delay running for 5m (delay=100ms, jitter=50ms, loss=0.1%).
+[INFO] Starting churn controller...
+[OK] Churn controller started with PID 64956.
+[INFO] Simulation running for 5m + 60s (≈360s total)...
+------------------------------------------------------------
+[INFO] Starting churn controller
+       Prefix:      koorde-node-
+       Interval:    15s
+       Min active:  5
+       P(join):     0.5
+       P(leave):    0.5
+       Log file:    /var/log/test/churn.log
+------------------------------------------------------------
+[JOIN] No stopped containers available.
+[LEAVE] Skipping — only 1 active (min=5).
+[JOIN] No stopped containers available.
+[LEAVE] Skipping — only 1 active (min=5).
+[JOIN] No stopped containers available.
+[LEAVE] Skipping — only 1 active (min=5).
+[JOIN] No stopped containers available.
+[JOIN] No stopped containers available.
+[LEAVE] Skipping — only 1 active (min=5).
+[JOIN] No stopped containers available.
+[LEAVE] Skipping — only 1 active (min=5).
+[JOIN] No stopped containers available.
+[LEAVE] Skipping — only 1 active (min=5).
+[LEAVE] Skipping — only 1 active (min=5).
+[LEAVE] Skipping — only 1 active (min=5).
+[JOIN] No stopped containers available.
+[LEAVE] Skipping — only 1 active (min=5).
+[LEAVE] Skipping — only 1 active (min=5).
+[JOIN] No stopped containers available.
+[JOIN] No stopped containers available.
+[JOIN] No stopped containers available.
+[LEAVE] Skipping — only 1 active (min=5).
+[JOIN] No stopped containers available.
+[INFO] Simulation window complete.
+[INFO] Stopping churn and Pumba...
+ Container koorde-tester-1  Stopping
+ Container koorde-node-3  Stopping
+ Container koorde-node-28  Stopping
+ Container koorde-node-27  Stopping
+ Container koorde-node-26  Stopping
+ Container koorde-node-25  Stopping
+ Container koorde-node-24  Stopping
+ Container koorde-node-23  Stopping
+ Container koorde-node-22  Stopping
+ Container koorde-node-21  Stopping
+ Container koorde-node-20  Stopping
+ Container koorde-node-19  Stopping
+ Container koorde-node-18  Stopping
+ Container koorde-node-17  Stopping
+ Container koorde-node-16  Stopping
+ Container koorde-node-29  Stopping
+ Container koorde-node-15  Stopping
+ Container koorde-node-14  Stopping
+ Container koorde-node-13  Stopping
+ Container koorde-node-12  Stopping
+ Container koorde-node-11  Stopping
+ Container koorde-node-10  Stopping
+ Container koorde-node-9  Stopping
+ Container koorde-node-8  Stopping
+ Container koorde-node-7  Stopping
+ Container koorde-node-5  Stopping
+ Container koorde-node-4  Stopping
+ Container koorde-node-6  Stopping
+ Container koorde-node-2  Stopping
+ Container koorde-node-1  Stopping
+ Container koorde-node-30  Stopping
+ Container koorde-tester-1  Stopped
+ Container koorde-tester-1  Removing
+ Container koorde-tester-1  Removed
+
+[INFO] Stopping churn controller gracefully...
+ Container koorde-node-11  Stopped
+ Container koorde-node-11  Removing
+ Container koorde-node-29  Stopped
+ Container koorde-node-29  Removing
+ Container koorde-node-11  Removed
+ Container koorde-node-29  Removed
+ Container koorde-node-26  Stopped
+ Container koorde-node-26  Removing
+ Container koorde-node-26  Removed
+ Container koorde-node-21  Stopped
+ Container koorde-node-21  Removing
+ Container koorde-node-3  Stopped
+ Container koorde-node-3  Removing
+ Container koorde-node-21  Removed
+ Container koorde-node-20  Stopped
+ Container koorde-node-20  Removing
+ Container koorde-node-3  Removed
+ Container koorde-node-20  Removed
+ Container koorde-node-1  Stopped
+ Container koorde-node-1  Removing
+ Container koorde-node-4  Stopped
+ Container koorde-node-4  Removing
+ Container koorde-node-1  Removed
+ Container koorde-node-4  Removed
+ Container koorde-node-12  Stopped
+ Container koorde-node-12  Removing
+ Container koorde-node-12  Removed
+ Container koorde-node-15  Stopped
+ Container koorde-node-15  Removing
+ Container koorde-node-19  Stopped
+ Container koorde-node-19  Removing
+ Container koorde-node-15  Removed
+ Container koorde-node-19  Removed
+ Container koorde-node-9  Stopped
+ Container koorde-node-9  Removing
+ Container koorde-node-9  Removed
+ Container koorde-node-24  Stopped
+ Container koorde-node-24  Removing
+ Container koorde-node-24  Removed
+ Container koorde-node-18  Stopped
+ Container koorde-node-18  Removing
+ Container koorde-node-18  Removed
+ Container koorde-node-27  Stopped
+ Container koorde-node-27  Removing
+ Container koorde-node-27  Removed
+ Container koorde-node-25  Stopped
+ Container koorde-node-25  Removing
+ Container koorde-node-25  Removed
+ Container koorde-node-5  Stopped
+ Container koorde-node-5  Removing
+ Container koorde-node-5  Removed
+ Container koorde-node-8  Stopped
+ Container koorde-node-8  Removing
+ Container koorde-node-8  Removed
+ Container koorde-node-10  Stopped
+ Container koorde-node-10  Removing
+ Container koorde-node-10  Removed
+ Container koorde-node-7  Stopped
+ Container koorde-node-7  Removing
+ Container koorde-node-7  Removed
+ Container koorde-node-2  Stopped
+ Container koorde-node-2  Removing
+ Container koorde-node-2  Removed
+ Container koorde-node-14  Stopped
+ Container koorde-node-14  Removing
+ Container koorde-node-14  Removed
+ Container koorde-node-30  Stopped
+ Container koorde-node-30  Removing
+ Container koorde-node-30  Removed
+ Container koorde-node-23  Stopped
+ Container koorde-node-23  Removing
+ Container koorde-node-23  Removed
+ Container koorde-node-16  Stopped
+ Container koorde-node-16  Removing
+ Container koorde-node-16  Removed
+ Container koorde-node-22  Stopped
+ Container koorde-node-22  Removing
+ Container koorde-node-22  Removed
+ Container koorde-node-28  Stopped
+ Container koorde-node-28  Removing
+ Container koorde-node-28  Removed
+ Container koorde-node-6  Stopped
+ Container koorde-node-6  Removing
+ Container koorde-node-6  Removed
+ Container koorde-node-13  Stopped
+ Container koorde-node-13  Removing
+ Container koorde-node-13  Removed
+ Container koorde-node-17  Stopped
+ Container koorde-node-17  Removing
+ Container koorde-node-17  Removed
+ Container koorde-bootstrap-1  Stopping
+ Container koorde-bootstrap-1  Stopped
+ Container koorde-bootstrap-1  Removing
+ Container koorde-bootstrap-1  Removed
+ Network koorde_koordenet  Removing
+ Network koorde_koordenet  Removed
+[OK] All components stopped.
+[INFO] Collecting output logs...
