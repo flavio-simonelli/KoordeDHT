@@ -22,8 +22,7 @@ Il bootstrap node e il client interattivo verranno avviati automaticamente.
 ### Accesso a Jaeger
 Una volta che i container sono in esecuzione, è possibile accedere all'interfaccia di Jaeger tramite il tuo browser web all'indirizzo:
 
-```http://localhost:16686
-```
+http://localhost:16686
 
 ### Utilizzo del client interattivo
 Il client interattivo consente di eseguire operazioni sulla rete KoordeDHT. Per accedere al client, esegui:
