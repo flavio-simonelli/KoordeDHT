@@ -28,7 +28,6 @@ usage() {
   echo "  NODES                Number of Koorde nodes to start (e.g. 3, 5, 10)"
   echo "  BASE_PORT            Starting port for the first node (e.g. 4000)."
   echo "                       Each subsequent node increments by +1 (4001, 4002...)"
-  echo "  VERSION              Docker image version (minimal | medium | strong)"
   echo "  MODE                 IP mode for node advertising (public | private)"
   echo "  ROUTE53_ZONE_ID     Route53 Hosted Zone ID"
   echo "  ROUTE53_SUFFIX      Route53 suffix for node registration (e.g. dht.local)"
@@ -41,7 +40,7 @@ usage() {
   exit 1
 }
 
-if [[ -z "$NODES" || -z "$BASE_PORT" || -z "$VERSION" || -z "$MODE" || -z "$ROUTE53_ZONE_ID" || -z "$ROUTE53_SUFFIX" || -z "$S3_BUCKET" ]]; then
+if [[ -z "$NODES" || -z "$BASE_PORT" || -z "$MODE" || -z "$ROUTE53_ZONE_ID" || -z "$ROUTE53_SUFFIX" || -z "$S3_BUCKET" ]]; then
   echo "[ERROR] Missing required parameters"
   usage
 fi
@@ -51,37 +50,35 @@ echo "[INFO] Starting Koorde EC2 initialization..."
 # Configurable variables (can be overridden via environment)
 NODES=${NODES:-3}           # Number of Koorde nodes
 BASE_PORT=${BASE_PORT:-4000} # Starting port
-VERSION=${VERSION:-strong}   # Docker image version (minimal|medium|strong)
 MODE=${MODE:-private}        # IP mode: private or public
 ROUTE53_ZONE_ID=${ROUTE53_ZONE_ID:-""}   # Route53 Hosted Zone ID
 ROUTE53_SUFFIX=${ROUTE53_SUFFIX:-""}     # DNS suffix for registration
 ROUTE53_REGION=${ROUTE53_REGION:-"us-east-1"} # AWS region for Route53
 
 S3_BUCKET=${S3_BUCKET:-"koorde-deploy"}   # S3 bucket containing scripts
-S3_PREFIX=${S3_PREFIX:-"scripts"}         # Prefix/folder inside bucket
+S3_PREFIX=${S3_PREFIX:-"demonstration"}         # Prefix/folder inside bucket
 
 WORKDIR="/opt/koorde"       # Working directory on EC2
 mkdir -p "$WORKDIR"
 
 # Download scripts and templates from S3
 echo "[STEP] Downloading deployment scripts from S3 (bucket=$S3_BUCKET, prefix=$S3_PREFIX)"
-aws s3 cp "s3://${S3_BUCKET}/${S3_PREFIX}/install_docker.sh" "$WORKDIR/install-docker.sh" || { echo "[ERROR] Failed to download install_docker.sh"; exit 1; }
-aws s3 cp "s3://${S3_BUCKET}/${S3_PREFIX}/gen_compose.sh" "$WORKDIR/gen-compose.sh" || { echo "[ERROR] Failed to download gen_compose.sh"; exit 1; }
-aws s3 cp "s3://${S3_BUCKET}/${S3_PREFIX}/docker-compose.koorde_nodes.template.yml" "$WORKDIR/docker-compose.koorde_nodes.template.yml" || { echo "[ERROR] Failed to download template"; exit 1; }
+aws s3 cp "s3://${S3_BUCKET}/${S3_PREFIX}/install_docker.sh" "$WORKDIR/install_docker.sh" || { echo "[ERROR] Failed to download install_docker.sh"; exit 1; }
+aws s3 cp "s3://${S3_BUCKET}/${S3_PREFIX}/gen_compose.sh" "$WORKDIR/gen_compose.sh" || { echo "[ERROR] Failed to download gen_compose.sh"; exit 1; }
+aws s3 cp "s3://${S3_BUCKET}/${S3_PREFIX}/docker-compose.template.yml" "$WORKDIR/docker-compose.template.yml" || { echo "[ERROR] Failed to download template"; exit 1; }
 aws s3 cp "s3://${S3_BUCKET}/${S3_PREFIX}/common_node.env" "/home/ec2-user/common_node.env" || { echo "[ERROR] Failed to download common_node.env"; exit 1; }
 
-chmod +x "$WORKDIR/install-docker.sh" "$WORKDIR/gen-compose.sh"
+chmod +x "$WORKDIR/install_docker.sh" "$WORKDIR/gen_compose.sh"
 
 # Install Docker and Docker Compose
 echo "[STEP] Installing Docker & Docker Compose..."
-bash "$WORKDIR/install-docker.sh"
+bash "$WORKDIR/install_docker.sh"
 
 # Generate docker-compose file for Koorde nodes
 echo "[STEP] Generating docker-compose configuration for $NODES nodes..."
-bash "$WORKDIR/gen-compose.sh" \
+bash "$WORKDIR/gen_compose.sh" \
   --nodes "$NODES" \
   --base-port "$BASE_PORT" \
-  --version "$VERSION" \
   --mode "$MODE" \
   --zone-id "$ROUTE53_ZONE_ID" \
   --suffix "$ROUTE53_SUFFIX" \
@@ -89,7 +86,7 @@ bash "$WORKDIR/gen-compose.sh" \
 
 # Deploy Koorde cluster with Docker Compose
 TARGET_COMPOSE="/home/ec2-user/docker-compose.yml"
-cp "$WORKDIR/docker-compose.koorde_nodes.generated.yml" "$TARGET_COMPOSE"
+cp "$WORKDIR/docker-compose.generated.yml" "$TARGET_COMPOSE"
 chown ec2-user:ec2-user "$TARGET_COMPOSE"
 chmod 644 "$TARGET_COMPOSE"
 

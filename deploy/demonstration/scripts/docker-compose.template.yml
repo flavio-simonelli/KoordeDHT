@@ -1,4 +1,4 @@
-image: flaviosimonelli/koorde-node-${VERSION}:latest
+image: flaviosimonelli/koorde-node:latest
 container_name: koorde-node-$ID
 restart: unless-stopped
 ports:

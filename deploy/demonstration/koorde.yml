@@ -36,11 +36,6 @@ Parameters:
     Type: Number
     Default: 4002
     Description: Last port (BasePort + Nodes - 1)
-  Version:
-    Type: String
-    Default: strong
-    AllowedValues: [ minimal, medium, strong ]
-    Description: Koorde node image version
   Mode:
     Type: String
     Default: private
@@ -119,7 +114,6 @@ Resources:
           # Export bootstrap parameters
           export NODES=${Nodes}
           export BASE_PORT=${BasePort}
-          export VERSION=${Version}
           export MODE=${Mode}
           export ROUTE53_ZONE_ID=${Route53ZoneId}
           export ROUTE53_SUFFIX=${Route53Suffix}
@@ -127,7 +121,7 @@ Resources:
           export S3_BUCKET=${S3Bucket}
           export S3_PREFIX=${S3Prefix}
           
-          # Run your init script
+          # Run init script
           aws s3 cp s3://${S3Bucket}/${S3Prefix}/init.sh /opt/init.sh
           chmod +x /opt/init.sh
           bash /opt/init.sh
