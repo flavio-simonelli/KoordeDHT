@@ -26,6 +26,8 @@ KoordeDHT è organizzato in microservizi containerizzati:
 | **koorde-client** | Client interattivo gRPC per eseguire operazioni (`put`, `get`, `delete`, `lookup`, `getrt`, `getstore`) |
 | **koorde-tester** | Client automatico per test su larga scala, generazione CSV e misure di latenza |
 
+Sono disponibili in Docker Hub come `flaviosimonelli/koorde-node`, `flaviosimonelli/koorde-client` e `flaviosimonelli/koorde-tester`.
+
 Vengono in oltre utilizzati i seguenti servizi di supporto opensource containerizzati:
 
 | Servizio | Descrizione |
