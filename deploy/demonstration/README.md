@@ -65,7 +65,7 @@ Il file `koorde.yml` è un template CloudFormation che crea un'istanza EC2 con D
 ### Deploy su AWS
 Per eseguire il deploy della rete KoordeDHT, utilizza lo script `deply_koorde.sh`:
 ```bash
-./deploy-koorde.sh \
+./deploy_koorde.sh \
   --instances 5 \
   --nodes 5 \
   --base-port 4000 \
@@ -85,7 +85,7 @@ Per eseguire il deploy della rete KoordeDHT, utilizza lo script `deply_koorde.sh
 Dopo che le istanze EC2 sono state avviate, è possibile utilizzare il client interattivo per eseguire operazioni sulla rete KoordeDHT.  
 Per accedere al client, esegui:
 ```bash
-docker run -it --rm koordectl:latest client --addr <NODO_BOOTSTRAP>:<PORTA>
+docker run -it --rm flaviosimonelli/koorde-client:latest --addr <NODO_BOOTSTRAP>:<PORTA>
 ```
 Sostituire `<NODO_BOOTSTRAP>` con l'indirizzo pubblico di una delle istanze e `<PORTA>` con la porta associata a quel nodo (ad esempio, `4000`).
 Una volta all'interno del client, puoi utilizzare i seguenti comandi:
